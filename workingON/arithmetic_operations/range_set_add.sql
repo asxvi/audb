@@ -1,5 +1,5 @@
 -- previous implementation returned "(,)" when params were NULL and/or 'empty'
-CREATE OR REPLACE FUNCTION range_add(set1 int4range, set2 int4range) 
+CREATE OR REPLACE FUNCTION range_set_add(set1 int4range, set2 int4range) 
 RETURNS int4range AS $$
 BEGIN
     -- NULL or invalid type
@@ -21,6 +21,6 @@ $$ LANGUAGE plpgsql;
 
 
 -- -- test conditions
--- SELECT range_add('[1,7]'::int4range, '[3,4]'::int4range) AS test1;
--- SELECT range_add('empty'::int4range, '[3,9]'::int4range) AS test2;
--- SELECT range_add(NULL::int4range, '[3,9]'::int4range) AS test3;
+-- SELECT range_set_add('[1,7]'::int4range, '[3,4]'::int4range) AS test1;
+-- SELECT range_set_add('empty'::int4range, '[3,9]'::int4range) AS test2;
+-- SELECT range_set_add(NULL::int4range, '[3,9]'::int4range) AS test3;
