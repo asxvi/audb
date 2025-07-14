@@ -25,3 +25,13 @@ set)
 - OR
 - NOT
 
+
+
+What data types are we working with? array[int4range]?
+Are the parameter sets monotone(do the always increase or decrease)
+
+
+arithmetic basic algorithm:
+iter thru both arrays
+combine values (unordered for +,*)(ordered for -,/)
+remove overlap and return value
