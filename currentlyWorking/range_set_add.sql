@@ -1,4 +1,4 @@
--- i think this works
+-- i think this works, test for none types or nulls
 CREATE OR REPLACE FUNCTION range_set_add(set1 int4range[], set2 int4range[])
 RETURNS int4range[] AS $$
 DECLARE

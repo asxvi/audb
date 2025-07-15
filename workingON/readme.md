@@ -3,11 +3,11 @@
 ahttps://nam04.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.postgresql.org%2Fdocs%2Fcurrent%2Frangetypes.html&data=05%7C02%7Castan27%40uic.edu%7C5112b0b4626f45a3c28d08ddba2953d8%7Ce202cd477a564baa99e3e3b71a7c77dd%7C0%7C0%7C638871408885353265%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=fOVpH1M1N4Z6La4AvMdygP8KeRkjhAvm4uog0QboXc8%3D&reserved=0
 
 ### arithmetic operations
-- add / minus set // in progress
-- multiplication
-- division
+- add / minus set   // in progress
+- multiplication    //
+- division          //
 - equality
-- smaller
+- smaller           
 - larger 
 - lte 
 - gte
@@ -35,3 +35,29 @@ arithmetic basic algorithm:
 iter thru both arrays
 combine values (unordered for +,*)(ordered for -,/)
 remove overlap and return value
+
+
+
+
+[a,b] < [c,d]
+x < y
+[max(x) < min(y), min(x) < max(y)]
+[a<d,b<c]
+if b < c:
+   return true;
+if a < d:
+   return None;
+return false;
+
+------a-------    ------b--------
+{(3,4), (8,12)} < {(6,9), (13,17)}
+
+12 < 6
+    ignore
+3 < 17
+    return none
+return false
+
+
+
+{?, ?}
