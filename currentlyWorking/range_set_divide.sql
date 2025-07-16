@@ -1,0 +1,1 @@
+-- not working, have to prevent division by zero, and maybe reformat function

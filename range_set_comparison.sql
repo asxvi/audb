@@ -1,6 +1,7 @@
 -- using int4range instead of int[][], since int4range is more suitable for range comparison.
 -- have different functions for each operation
 
+
 CREATE OR REPLACE FUNCTION range_set_smallerthan(set1 int4range[], set2 int4range[]) RETURNS boolean AS $$
 DECLARE
     lowest_a int;
@@ -15,7 +16,6 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION range_set_largerthan(set1 int4range[], set2 int4range[]) RETURNS boolean AS $$
 DECLARE
