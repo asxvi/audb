@@ -6,13 +6,9 @@ DECLARE
     i int4range;
     j int4range;
 BEGIN
-    IF set1 IS NULL OR set2 IS NULL THEN
+    if array_length(set1, 1) is NULL or array_length(set2, 1) is NULL THEN
         RETURN NULL;
-    END IF;
-    IF isempty(set1) OR isempty(set2) THEN
-        RETURN 'empty'::int4range;
-    END IF;
-
+    end if;
 
     FOR i IN (SELECT unnest(set1)) LOOP
         FOR j IN (SELECT unnest(set2)) LOOP
@@ -22,8 +18,6 @@ BEGIN
     RETURN result;
 END;
 $$ LANGUAGE plpgsql;
-
-
 
 
 --  SELECT (range_set_multiply(
