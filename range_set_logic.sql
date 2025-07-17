@@ -14,6 +14,7 @@ BEGIN
         ELSIF operator = 'OR' THEN
             result := array_append(result, set1[i] + set2[i]);
         ELSIF operator = 'NOT' THEN
+            result := array_append(result, set1[i] - set2[i]);
             -- just use upper bound = 1 - lower bound, lower bound = 1 - upper bound
         ELSE
             RAISE EXCEPTION 'Invalid operator. Use AND or OR.';

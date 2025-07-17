@@ -13,6 +13,7 @@ BEGIN
         RETURN NULL;
     end if;
 
+    -- find absolute min and absolute max in set2
     FOR i IN (SELECT unnest(set1)) LOOP
         IF min1 is null or lower(i) < min1 then 
             min1 := lower(i);
@@ -23,6 +24,7 @@ BEGIN
         end if;
     END LOOP;
 
+    -- find absolute min and absolute max in set2
     FOR j IN (SELECT unnest(set2)) LOOP
         IF min2 is null or lower(j) < min2 then 
             min2 := lower(j);
@@ -33,6 +35,7 @@ BEGIN
         end if;
     END LOOP;
 
+    -- compare using 3VL
     if max1 < min2 then 
         RETURN TRUE;
     elsif min1 < max2 THEN 

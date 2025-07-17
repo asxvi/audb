@@ -8,10 +8,12 @@ DECLARE
     i int4range;
     j int4range;
 BEGIN 
+    -- check for empty sets 
     if array_length(set1, 1) is NULL or array_length(set2, 1) is NULL THEN
         RETURN NULL;
     end if;
 
+    -- find absolute min and absolute max in set2
     FOR i IN (SELECT unnest(set1)) LOOP
         IF min1 is null or lower(i) < min1 then 
             min1 := lower(i);
