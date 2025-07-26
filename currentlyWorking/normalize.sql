@@ -4,8 +4,12 @@ DECLARE
     rv int4range[] := '{}';
     sorted int4range[] := '{}';
     currMin int := NULL;
-    currMax int := NULL;
+    currMax int INT := NULL;
 BEGIN
+    IF vals IS NULL OR array_length(vals, 1) IS NULL THEN
+        RETURN '{}';
+    END IF;
+
     sorted := lsort2(vals);
 
 	-- init min/max to first int4range
@@ -13,18 +17,18 @@ BEGIN
     currMax := upper(sorted[1]);
 
     -- iter once and keep track of local/global min/mxa
-    for i in 2..array_length(sorted, 1) LOOP
-		IF currMax >= lower(sorted[i]) then
+    FOR i IN 2..array_length(sorted, 1) LOOP
+		IF currMax >= lower(sorted[i]) THEN
             currMax := upper(sorted[i]);
 		ELSE 
             rv := array_append(rv, int4range(currMin, currMax));
             currMin := lower(sorted[i]);
             currMax := upper(sorted[i]);
-		end if;
-	end loop;
+		END IF;
+	END LOOP;
 	
     -- last iteration doesn't acccount for last range
 	rv := array_append(rv, int4range(currMin, currMax));
-    return rv;
+    RETURN rv;
 END;
 $$ LANGUAGE plpgsql;

@@ -1,3 +1,4 @@
+-- assume that parameters are not normalized. If want to normalize, call normalize, and then just index at set[1], set[last]
 CREATE OR REPLACE FUNCTION range_greater_than(set1 int4range[], set2 int4range[])
 RETURNS boolean AS $$
 DECLARE
@@ -9,33 +10,33 @@ DECLARE
     j int4range;
 BEGIN 
     -- check for empty sets 
-    if array_length(set1, 1) is NULL or array_length(set2, 1) is NULL THEN
+    IF array_length(set1, 1) IS NULL OR array_length(set2, 1) IS NULL THEN
         RETURN NULL;
-    end if;
+    END IF;
 
     -- find absolute min and absolute max in set2
     FOR i IN (SELECT unnest(set1)) LOOP
-        IF min1 is null or lower(i) < min1 then 
+        IF min1 IS NULL OR lower(i) < min1 THEN
             min1 := lower(i);
-        end IF;
+        END IF;
 
-        if max1 is null or upper(i) > max1 then 
+        IF max1 IS NULL OR upper(i) > max1 THEN
             max1 := upper(i);
-        end if;
+        END IF;
     END LOOP;
 
     FOR j IN (SELECT unnest(set2)) LOOP
-        IF min2 is null or lower(j) < min2 then 
+        IF min2 IS NULL OR lower(j) < min2 THEN 
             min2 := lower(j);
-        end IF;
+        END IF;
 
-        if max2 is null or upper(j) > max2 then
+        IF max2 IS NULL OR upper(j) > max2 THEN
             max2 := upper(j);
-        end if;
+        END IF;
     END LOOP;
 
-    if max1 < min2 then 
-        RETURN FALSE;
+    IF max1 < min2 THEN
+        RETURN False;
     elsif min1 < max2 THEN 
         RETURN NULL;
     else 
@@ -45,6 +46,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
+
 -- for every () in x
 --     find min and find max 
 -- for every () in y
@@ -52,5 +55,5 @@ $$ LANGUAGE plpgsql;
 
 -- then just do basic comparison 
 
--- O(2n)
+-- O(n+m)
 
