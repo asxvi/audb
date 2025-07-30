@@ -1,3 +1,6 @@
+-- is range set equal on just a point where a=b=c=d
+-- eg [4,5) == [4,5), or range(s) eg [1,11) == [1,5),[4,7),[6, 11)
+
 CREATE OR REPLACE FUNCTION range_set_equal(set1 int4range[], set2 int4range[])
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -5,17 +8,13 @@ DECLARE
     b int := upper(set1[1]);
     c int := lower(set2[1]);
     d int := upper(set2[1]);
-    RAISE NOTICE 'a is: %', a;
-    RAISE NOTICE 'b is: %', b;
-    RAISE NOTICE 'c is: %', c;
-    RAISE NOTICE 'd is: %', d;
     global_min int; 
     global_max int;
     max_range int;
     total_range int;
 BEGIN
     IF a = b AND b = c AND c = d THEN
-        RETURN true;
+        RETURN TRUE;
     END IF;
 
     global_min := LEAST(a, c);

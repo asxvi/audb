@@ -1,14 +1,26 @@
--- may need some more work
--- use Postgres boolean type, single interval instead of int4range
--- for OR, cap it at 1, minimum of adding the two values and 1.
-CREATE OR REPLACE FUNCTION range_set_and(set1 int4range[], set2 int4range[]) RETURNS int4range[] AS $$
-DECLARE
-    result int4range[];
+-- find all unions between 2 sets and normalize to fewest/smallest ranges
+-- not sure if calling normalize is okay???
+CREATE OR REPLACE FUNCTION range_set_or(set1 int4range[], set2 int4range[])
+RETURNS int4range[] AS $$
 BEGIN
-    result := ARRAY[]::int4range[];
-    FOR i IN 1..array_length(set1, 1) LOOP
-        result := array_append(result, set1[i] + set2[i]);
-    END LOOP;
-    RETURN result;
+    IF set1 IS NULL AND set2 IS NULL THEN
+        RETURN '{}';
+    ELSIF set1 IS NULL THEN
+        -- RETURN normalize_vals(set2);
+        RETURN set2;
+    ELSIF set2 IS NULL THEN
+        -- RETURN normalize_vals(set1);
+        RETURN set1;
+    END IF;
+
+    --    return nomalized values or no?
+    -- RETURN normalize_vals(set1 || set2);
+    RETURN (set1 || set2);
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- SELECT (range_set_or(
+--         ARRAY[int4range(1,4), int4range(6,9), int4range(2,5)],
+--         ARRAY[int4range(100,1220), int4range(3, 6)]
+--     )) as jack;

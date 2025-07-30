@@ -1,10 +1,11 @@
+-- ideally dont want to use array_append bc its expensive inside for loop
 CREATE OR REPLACE FUNCTION normalize_vals(vals int4range[])
 RETURNS int4range[] AS $$
 DECLARE
     rv int4range[] := '{}';
     sorted int4range[] := '{}';
     currMin int := NULL;
-    currMax int INT := NULL;
+    currMax int := NULL;
 BEGIN
     IF vals IS NULL OR array_length(vals, 1) IS NULL THEN
         RETURN '{}';

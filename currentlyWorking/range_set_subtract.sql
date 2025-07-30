@@ -5,21 +5,27 @@ BEGIN
     IF set1 IS NULL OR set2 IS NULL THEN
         RETURN '{}';
     END IF;
-
+    
     RETURN ARRAY(
-        SELECT (int4range((lower(i) - upper(j)-1), (upper(i)-1 - lower(j))))
-        FROM unnest(set1) i, unnest(set2) j
+        SELECT int4range(l, u)
+        FROM (
+            -- keep into account the initial open upper bound.
+            -- we also want to return an open upper bound
+            SELECT (lower(i) - (upper(j)-1)) as l, 
+                   ((upper(i)) - lower(j)) as u
+            FROM unnest(set1) i, unnest(set2) j
+        ) calc
+        WHERE l < u
     );
-    -- RETURN result;
 END;
 $$ LANGUAGE plpgsql;
 
 
 
- SELECT (range_set_subtract(
-   ARRAY[int4range(1,4), int4range(3,6), int4range(6,8)],
-   ARRAY[int4range(2,3), int4range(5,9)]
- ));
+-- SELECT (range_set_subtract(
+--    ARRAY[int4range(1,4), int4range(3,6), int4range(6,8)],
+--    ARRAY[int4range(2,3), int4range(5,9)]
+--  ));
 
 
 --  SELECT (range_set_subtract(
@@ -31,3 +37,4 @@ $$ LANGUAGE plpgsql;
 --    ARRAY[int4range(1,4)],
 --    ARRAY[int4range(2,5)]
 --  ));
+
