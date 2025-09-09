@@ -56,3 +56,11 @@ $$ LANGUAGE plpgsql;
 --  {{1,-1},{2,1},{3,0}} | integer[] |      
 select query, pg_typeof(query), query[1]
 from reduceSize(ARRAY[int4range(10,24), int4range(2,5), int4range(1,3), int4range(6,10)], 3) as query;
+
+
+
+
+
+-- array_dims ( anyarray ) → text
+-- Returns a text representation of the array's dimensions.
+-- array_dims(ARRAY[[1,2,3], [4,5,6]]) → [1:2][1:3]

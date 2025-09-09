@@ -1,18 +1,16 @@
--- i think this works, test for none types or nulls
 CREATE OR REPLACE FUNCTION range_set_subtract(set1 int4range[], set2 int4range[])
 RETURNS int4range[] AS $$
 BEGIN
+    -- want to return null, bc its a valid range value; in every world, this val is null
     IF set1 IS NULL OR set2 IS NULL THEN
-        RETURN '{}';
+        RETURN NULL;
     END IF;
     
     RETURN ARRAY(
-        SELECT int4range(l, u)
+        SELECT int4range(l, u, '[]')
         FROM (
-            -- keep into account the initial open upper bound.
-            -- we also want to return an open upper bound
-            SELECT (lower(i) - (upper(j)-1)) as l, 
-                   ((upper(i)) - lower(j)) as u
+            SELECT (lower(i) - upper(j)) as l, 
+                   (upper(i) - lower(j)) as u
             FROM unnest(set1) i, unnest(set2) j
         ) calc
         WHERE l < u
@@ -37,4 +35,8 @@ $$ LANGUAGE plpgsql;
 --    ARRAY[int4range(1,4)],
 --    ARRAY[int4range(2,5)]
 --  ));
+
+
+
+
 

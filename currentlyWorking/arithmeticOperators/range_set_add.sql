@@ -1,21 +1,17 @@
--- i think this works
+ -- compute Minowski sum, O(n x m)
 CREATE OR REPLACE FUNCTION range_set_add(set1 int4range[], set2 int4range[])
 RETURNS int4range[] AS $$
-DECLARE
-    result int4range[] := '{}';
-    i int4range;
-    j int4range;
 BEGIN
-    FOR i IN (SELECT unnest(set1)) LOOP
-        FOR j IN (SELECT unnest(set2)) LOOP
-            result := array_append(result, int4range((lower(i) + lower(j)), (upper(i) + upper(j)) + 1));
-        END LOOP;
-    END LOOP;
-    RETURN result;
+    IF set1 IS NULL OR set2 IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    RETURN ARRAY(
+        SELECT int4range(lower(i) + lower(j), upper(i) + upper(j), '[]')
+        FROM unnest(set1) i, unnest(set2) j
+    );
 END;
 $$ LANGUAGE plpgsql;
-
-
 
 
 -- SELECT (range_set_add(

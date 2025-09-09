@@ -56,3 +56,5 @@ $$ LANGUAGE plpgsql;
 
 -- O(i+j)
 
+
+-- SELECT min(x), max(x) FROM unnest(Y) AS f(x)

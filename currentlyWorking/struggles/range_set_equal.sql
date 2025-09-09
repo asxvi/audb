@@ -29,3 +29,7 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+
+
+-- sets can be equal
