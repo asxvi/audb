@@ -12,7 +12,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-select logical_3vl_not(true, NULL);
-select logical_3vl_not(TRUE, FALSE);
-select logical_3vl_not(TRUE, TRUE);
+-- select logical_3vl_not(true, NULL);
+-- select logical_3vl_not(TRUE, FALSE);
+-- select logical_3vl_not(TRUE, TRUE);
 

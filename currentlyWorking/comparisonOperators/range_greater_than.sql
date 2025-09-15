@@ -35,6 +35,7 @@ BEGIN
         END IF;
     END LOOP;
 
+    -- looking for disjoint 
     IF max1 < min2 THEN
         RETURN False;
     elsif min1 < max2 THEN 

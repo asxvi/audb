@@ -12,9 +12,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-select logical_3vl_or(true, NULL);
-select logical_3vl_or(TRUE, FALSE);
-select logical_3vl_or(NULL, FALSE);
-select logical_3vl_or(FALSE, FALSE);
-select logical_3vl_or(TRUE, TRUE);
+-- select logical_3vl_or(true, NULL);
+-- select logical_3vl_or(TRUE, FALSE);
+-- select logical_3vl_or(NULL, FALSE);
+-- select logical_3vl_or(FALSE, FALSE);
+-- select logical_3vl_or(TRUE, TRUE);
 

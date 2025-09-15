@@ -12,7 +12,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-select logical_3vl_and(true, NULL);
-select logical_3vl_and(TRUE, FALSE);
-select logical_3vl_and(TRUE, TRUE);
+-- select logical_3vl_and(true, NULL);
+-- select logical_3vl_and(TRUE, FALSE);
+-- select logical_3vl_and(TRUE, TRUE);
 
