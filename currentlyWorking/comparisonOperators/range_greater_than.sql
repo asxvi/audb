@@ -1,3 +1,10 @@
+-- for every () in x
+--     find min and find max 
+-- for every () in y
+--     find min and find max
+-- then just do basic 3vl comparison 
+-- O(n+m)
+
 -- assume that parameters are not normalized. If want to normalize, call normalize, and then just index at set[1], set[last]
 CREATE OR REPLACE FUNCTION range_greater_than(set1 int4range[], set2 int4range[])
 RETURNS boolean AS $$
@@ -46,15 +53,3 @@ BEGIN
 
 END;
 $$ LANGUAGE plpgsql;
-
-
-
--- for every () in x
---     find min and find max 
--- for every () in y
---     find min and find max
-
--- then just do basic comparison 
-
--- O(n+m)
-

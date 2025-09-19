@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION normalize_vals(vals int4range[])
+CREATE OR REPLACE FUNCTION normalize_range(vals int4range[])
 RETURNS int4range[] AS $$
 DECLARE
     rv int4range[] := '{}';
