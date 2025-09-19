@@ -16,7 +16,6 @@ BEGIN
         )
         FROM (
             SELECT 
-                -- do i do int division?
                 lower(i) / lower(j) as p1,
                 lower(i) / upper(j) as p2,
                 upper(i) / lower(j) as p3,
@@ -30,7 +29,7 @@ BEGIN
             FROM unnest(set1) i, unnest(set2) j
             -- ingnore bounds that cross 0 because this is not possible to divide by
             -- WHERE NOT(lower(j) <= 0 AND upper(j) > 0)
-            WHERE (lower(j) = 0 AND upper(j) = 0)
+            -- WHERE (lower(j) = 0 AND upper(j) = 0)
         ) calc
     );
 END;
@@ -50,6 +49,6 @@ $$ LANGUAGE plpgsql;
 
 
 -- only error is upper annd lower. ==0
-CASE WHEN lower(j) = 0 THEN 1 ELSE lower(j) END
-CASE WHEN upper(j) = 0 THEN -1 ELSE upper(j) END
+-- CASE WHEN lower(j) = 0 THEN 1 ELSE lower(j) END
+-- CASE WHEN upper(j) = 0 THEN -1 ELSE upper(j) END
 
