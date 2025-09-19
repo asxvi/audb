@@ -5,7 +5,7 @@
 -- select lower(int4range(6,8, '[)')), upper(int4range(6,8,'[)'));              // 6|8
  
 
-CREATE OR REPLACE FUNCTION range_add(set1 int4range, set2 int4range)
+CREATE OR REPLACE FUNCTION set_add(set1 int4range, set2 int4range)
 RETURNS int4range AS $$
 BEGIN
     IF set1 IS NULL OR set2 IS NULL THEN

@@ -17,38 +17,29 @@ BEGIN
         FROM (
             SELECT 
                 lower(i) / lower(j) as p1,
-                lower(i) / upper(j) as p2,
-                upper(i) / lower(j) as p3,
-                upper(i) / upper(j) as p4
-
-                -- lower(i)::numeric / lower(j)::numeric as p1,
-                -- lower(i)::numeric / upper(j)::numeric as p2,
-                -- upper(i)::numeric / lower(j)::numeric as p3,
-                -- upper(i)::numeric / upper(j)::numeric as p4
-                
+                lower(i) / (upper(j)-1) as p2,
+                (upper(i)-1) / lower(j) as p3,
+                (upper(i)-1) / (upper(j)-1) as p4
             FROM unnest(set1) i, unnest(set2) j
-            -- ingnore bounds that cross 0 because this is not possible to divide by
-            -- WHERE NOT(lower(j) <= 0 AND upper(j) > 0)
-            -- WHERE (lower(j) = 0 AND upper(j) = 0)
+            -- ignore bounds that cross 0 because this is not possible to divide by.
+			-- ignore [0,1) == [0,0]
+            WHERE NOT(lower(j) <= 0 AND upper(j) > 0) 
+			  AND NOT (lower(j) = 0 AND upper(j) = 1)
         ) calc
     );
 END;
 $$ LANGUAGE plpgsql;
 
+
+
+-----------------------------------
 -- SELECT (range_set_divide(
 --   ARRAY[int4range(2,4), int4range(6,8)],
 --   ARRAY[int4range(2,4), int4range(4,5)]
 -- ));
 
-
 -- SELECT (range_set_divide(
 --   ARRAY[int4range(2,5)],
 --   ARRAY[int4range(2,21)]
 -- ));
-
-
-
--- only error is upper annd lower. ==0
--- CASE WHEN lower(j) = 0 THEN 1 ELSE lower(j) END
--- CASE WHEN upper(j) = 0 THEN -1 ELSE upper(j) END
-
+-----------------------------------

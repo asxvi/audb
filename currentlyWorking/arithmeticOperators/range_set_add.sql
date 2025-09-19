@@ -7,13 +7,15 @@ BEGIN
     END IF;
 
     RETURN ARRAY(
-        SELECT int4range(lower(i) + lower(j), upper(i) + upper(j), '[]')
+        SELECT int4range(lower(i) + lower(j), upper(i)-1 + upper(j)-1, '[]')
         FROM unnest(set1) i, unnest(set2) j
     );
 END;
 $$ LANGUAGE plpgsql;
 
 
+
+-----------------------------------
 -- SELECT (range_set_add(
 --   ARRAY[int4range(1,4), int4range(3,6), int4range(6,8)],
 --   ARRAY[int4range(2,3), int4range(5,9)]
@@ -29,3 +31,4 @@ $$ LANGUAGE plpgsql;
 --   ARRAY[int4range(1,4)],
 --   ARRAY[int4range(2,5)]
 -- ));
+-----------------------------------

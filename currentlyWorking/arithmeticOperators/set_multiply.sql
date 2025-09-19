@@ -11,9 +11,9 @@ BEGIN
         FROM (
             SELECT 
                 lower(set1) * lower(set2) as p1,
-                lower(set1) * upper(set2) as p2,
-                upper(set1) * lower(set2) as p3,
-                upper(set1) * upper(set2) as p4
+                lower(set1) * (upper(set2)-1) as p2,
+                (upper(set1)-1) * lower(set2) as p3,
+                (upper(set1)-1) * (upper(set2)-1) as p4
         ) calc
     );
 END;

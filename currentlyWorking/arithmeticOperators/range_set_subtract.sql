@@ -7,19 +7,21 @@ BEGIN
     END IF;
     
     RETURN ARRAY(
+        -- return inclusive range to account for result = [x,x] == 'empty'. instead convert to [x, x+1)
         SELECT int4range(l, u, '[]')
         FROM (
-            SELECT (lower(i) - upper(j)) as l, 
-                   (upper(i) - lower(j)) as u
+            SELECT (lower(i) - (upper(j)-1)) as l, 
+                   ((upper(i)-1) - lower(j)) as u
             FROM unnest(set1) i, unnest(set2) j
         ) calc
-        WHERE l < u
+        WHERE l <= u
     );
 END;
 $$ LANGUAGE plpgsql;
 
 
 
+-----------------------------------
 -- SELECT (range_set_subtract(
 --    ARRAY[int4range(1,4), int4range(3,6), int4range(6,8)],
 --    ARRAY[int4range(2,3), int4range(5,9)]
@@ -35,8 +37,4 @@ $$ LANGUAGE plpgsql;
 --    ARRAY[int4range(1,4)],
 --    ARRAY[int4range(2,5)]
 --  ));
-
-
-
-
-
+-----------------------------------
