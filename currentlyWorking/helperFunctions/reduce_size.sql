@@ -18,7 +18,7 @@ BEGIN
     END IF;
 
     sortedRanges := sort(vals);
-    currNumRanges := array_length(sortedRanges, 1);
+    -- currNumRanges := array_length(sortedRanges, 1);
 	
 	WHILE currNumRanges > numRangesKeep LOOP
 		prev := sortedRanges[1];

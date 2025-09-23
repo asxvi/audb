@@ -1,3 +1,3 @@
-- [ ] Still confused on what functions to implement for logical operators.
-- [ ] int4ranges vs multiranges
-
+- [ ] Still confused on what to implement for logical operators.
+- [X] int4ranges vs multiranges
+- [ ] 

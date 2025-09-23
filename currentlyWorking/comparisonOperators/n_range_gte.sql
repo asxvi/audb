@@ -1,5 +1,5 @@
 -- assume that parameters are not normalized. If want to normalize, call normalize, and then just index at set[1], set[last]
-CREATE OR REPLACE FUNCTION range_greater_than(set1 int4range[], set2 int4range[])
+CREATE OR REPLACE FUNCTION range_greater_than_equal(set1 int4range[], set2 int4range[])
 RETURNS boolean AS $$
 DECLARE
     n1 int4range[];
@@ -22,9 +22,9 @@ BEGIN
     l1 := n1[array_length(n1,1)];
     l2 := n2[array_length(n2,1)];   
 
-    IF lower(f1) >= upper(l2) THEN
+    IF lower(f1) >= upper(l2)-1 THEN
         RETURN TRUE;
-    ELSIF upper(l1) <= lower(f2) THEN
+    ELSIF upper(l1)-1 < lower(f2) THEN
         RETURN FALSE;
     ELSE
         RETURN NULL;
