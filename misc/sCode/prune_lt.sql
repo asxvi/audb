@@ -8,12 +8,14 @@ DECLARE
   minA int;
   maxB int;
   pruned int4range;
+
 BEGIN
   norm1 := normalize_vals(set1);
   norm2 := normalize_vals(set2);
 
   -- A < B; A = A n [-inf, max(B)-1]
-  IF direction = FALSE THEN 
+  IF direction = FALSE THEN 	
+    
     -- not sure what to do on CASE when A < NULL
 		IF array_length(norm2,1) is NULL THEN
       RETURN norm1;
@@ -23,7 +25,7 @@ BEGIN
     FROM unnest(norm2) as ranges
     WHERE upper(ranges) is not NULL;
 
-	  -- nothing to prune above
+	-- nothing to prune above
     IF maxB IS NULL THEN
       RETURN rv;  
     END IF;
@@ -34,8 +36,10 @@ BEGIN
         rv := rv || pruned;  
       END IF;
     END LOOP;  
+  
   -- A < B; B = B n [min(A)+1, inf]
   ELSE
+		
     -- not sure what to do on CASE when A < NULL
 		IF array_length(norm2,1) is NULL THEN
       RETURN norm1;
@@ -50,6 +54,7 @@ BEGIN
       RETURN rv;  
     END IF;
 
+
     FOREACH curr IN ARRAY norm2 LOOP
       pruned := curr * int4range(minA+1, NULL);
       IF NOT isempty(pruned) THEN
@@ -60,3 +65,26 @@ BEGIN
   RETURN rv;
 END;
 $$ LANGUAGE plpgsql;
+
+
+select * from borisExample;
+-- [[1,10)] < [[3,6)]
+select prune_lt(A, B, false) as A, prune_lt(A, B, true) as B, 
+int4range(lower(mult) * case when range_greater_than(a,b) is NULL then 0 else 1 end, upper(mult)) as mult
+from borisExample;
+
+--{"[1,6)"}|{"[3,6)"}|[0,2)|
+
+
+
+select * from suExample;
+--{"[1,2)","[10,12)"}|{"[8,14)"}|[1,2)|
+--{"[1,2)","[10,30)"}|{"[8,14)"}|[0,1)|
+--{"[1,10)"}         |{"[3,6)"} |[1,2)|
+
+select prune_lt(A, B, false) as A, prune_lt(A, B, true) as B, 
+int4range(lower(mult) * case when range_greater_than(a,b) is NULL then 0 else 1 end, upper(mult)) as mult
+from suExample;
+--{"[1,2)","[10,12)"}|{"[8,14)"}|[0,2)|
+--{"[1,2)","[10,14)"}|{"[8,14)"}|[0,1)|
+--{"[1,6)"}          |{"[3,6)"} |[0,2)|

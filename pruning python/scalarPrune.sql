@@ -8,7 +8,6 @@ DECLARE
 BEGIN
     FOREACH curr IN ARRAY vals LOOP
         CASE op
-
             WHEN '<' THEN
                 IF lower(curr) < x THEN
                     new_upper := LEAST(upper(curr), x);

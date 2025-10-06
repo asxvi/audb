@@ -1,17 +1,16 @@
 CREATE OR REPLACE FUNCTION range_set_equal(set1 int4range[], set2 int4range[])
-RETURNS BOOLEAN AS $$   
-DECLARE 
+RETURNS boolean AS $$
+DECLARE
     norm1 int4range[] := '{}';
     norm2 int4range[] := '{}';
-    numPossible int := 0;
 BEGIN
     norm1 := normalize_vals(set1);
     norm2 := normalize_vals(set2);
 
-    IF array_length(norm1,1) IS NULL AND array_length(norm2,1) IS NULL THEN
+    IF array_length(norm1, 1) IS NULL AND array_length(norm2, 1) IS NULL THEN
         RETURN TRUE;
     END IF;
-    IF array_length(norm1,1) IS NULL OR array_length(norm2,1) IS NULL THEN
+    IF array_length(norm1, 1) IS NULL OR array_length(norm2, 1) IS NULL THEN
         RETURN FALSE;
     END IF;
 
@@ -23,24 +22,17 @@ BEGIN
 			RETURN TRUE;
 		END IF;
     END IF;
-    
 
-    -- only after normalizing the lengths shouldnt differ
-    IF array_length(norm1, 1) != array_length(norm2, 1) THEN
-        RETURN FALSE;
-    END IF;
-	
-    -- go thru every range, and check if they can poissibly overlap == NULL rv
-    FOR i in 1..array_length(norm1, 1) LOOP
-        IF (norm1[i] = norm2[i]) OR (norm1[i] && norm2[i]);
-            numPossible := numPossible + 1;
-        END IF;
+    -- any overlap = NULL rv
+    FOR i IN 1..array_length(norm1, 1) LOOP
+        FOR j IN 1..array_length(norm2, 1) LOOP
+            IF norm1[i] && norm2[j] THEN
+                RETURN NULL;
+            END IF;
+        END LOOP;
     END LOOP;
 
-    IF numPossible = array_length(norm1, 1) THEN
-        RETURN NULL;
-    END IF;
-
+    -- otherwise, disjoint and unequal
     RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql;

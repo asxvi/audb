@@ -60,3 +60,30 @@ BEGIN
   RETURN rv;
 END;
 $$ LANGUAGE plpgsql;
+
+
+select * from borisExample;
+-- [[1,10)] > [[3,6)]
+select prune_gt(A, B, false) as A, prune_gt(A, B, true) as B, 
+int4range(lower(mult) * case when range_greater_than(a,b) is NULL then 0 else 1 end, upper(mult)) as mult
+from borisExample;
+
+--{"[3,10)"}|{"[3,6)"}|[0,2)|
+
+
+
+select * from suExample;
+--{"[1,2)","[10,12)"}|{"[8,14)"}|[1,2)|
+--{"[1,2)","[10,30)"}|{"[8,14)"}|[0,1)|
+--{"[1,10)"}         |{"[3,6)"} |[1,2)|
+
+select prune_gt(A, B, false) as A, prune_gt(A, B, true) as B, 
+int4range(lower(mult) * case when range_greater_than(a,b) is NULL then 0 else 1 end, upper(mult)) as mult
+from suExample;
+--{"[1,2)","[10,12)"}|{"[8,14)"}|[0,2)|
+--{"[1,2)","[10,14)"}|{"[8,14)"}|[0,1)|
+--{"[1,6)"}          |{"[3,6)"} |[0,2)|
+
+--{"[10,12)"}|{"[8,12)"}|[0,2)|
+--{"[10,30)"}|{"[8,14)"}|[0,1)|
+--{"[3,10)"} |{"[3,6)"} |[0,2)|

@@ -1,28 +1,19 @@
-CREATE OR REPLACE FUNCTION prune_equal(set1 int4range[], set2 int4range[], direction bool)
-RETURNS int4range[] as $$
+-- must compare cross product of ranges O(n^2)
+CREATE OR REPLACE FUNCTION prune_eq(set1 int4range[], set2 int4range[], direction bool)
+RETURNS int4range[] AS $$
+DECLARE
+  rv int4range[] := '{}';
+  curr1 int4range;
+  curr2 int4range;
 BEGIN
-    RETURN (
-		SELECT array_agg( int4range(lower(i), least(upper(i)-1, k), '[]') )
-        FROM unnest(set1) i
-        WHERE lower(i) < k
-	);
+  FOREACH curr1 IN ARRAY normalize_vals(set1) LOOP
+    FOREACH curr2 IN ARRAY normalize_vals(set2) LOOP
+      IF curr1 && curr2 THEN
+        rv := rv || (curr1 * curr2);
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  RETURN rv;
 END;
 $$ LANGUAGE plpgsql;
-
-
-
-
-
-
-
-CREATE OR REPLACE FUNCTION prune_equal(set1 int4range, set2 int4range, direction bool)
-RETURNS int4range as $$
-BEGIN
-  IF direction = FALSE THEN
-    RETURN int4range(upper(set2))  
-  END IF;
-  RETURN ()
-END;
-$$ LANGUAGE plpgsql;
-
-

@@ -49,18 +49,23 @@ create table tempMult (
 	mult int4range
 ); 
 
-insert into temp (A, B) values (array[int4range(1,9)], array[int4range(2,8)]), (array[int4range(0,2)], array[int4range(4,5)]);
+--drop table if exists tempMult;
+--insert into temp (A, B) values (array[int4range(1,9)], array[int4range(2,8)]), (array[int4range(0,2)], array[int4range(4,5)]);
+--insert into tempMult (A, B, mult) values (array[int4range(1,9)], array[int4range(2,8)], int4range(0,1)), (array[int4range(0,2)], array[int4range(4,5)], int4range(1,3));
 
-insert into tempMult (A, B, mult) values (array[int4range(1,9)], array[int4range(2,8)], int4range(0,1)), (array[int4range(0,2)], array[int4range(4,5)], int4range(1,3));
+insert into tempMult (A, B, mult) 
+values (array[int4range(2,7), int4range(9,12)], array[int4range(2,8), int4range(9,11)], int4range(0,1)), 
+	   (array[int4range(0,2), int4range(5,11)], array[int4range(3,6), int4range(12,20)], int4range(0,1)),
+	   (array[int4range(0,5), int4range(1,11)], array[int4range(2,16), int4range(12,20)], int4range(0,1));
+		
 
 
+select *
+from tempMult
+where range_less_than(a, array[int4range(3,4)]) is not false
 
-select prune_gt(t.resA, 2), t.resb as b
-from (
-	select prune_lt(a, 3) as resA, b as resB
-	from temp
-	where range_less_than(a, array[int4range(3,4)]) is not false
-) t
+select normalize_vals(a), normalize_vals(b)
+from tempMult
 
 
 select prune_gt(t.resA, 2), t.resb as b
@@ -72,7 +77,15 @@ from (
 
 
 
-select scalarComparisonFilter(A, 3, '<='), scalarComparisonFilter(B, 5, '>') 
+select prune_gt(t.resA, 2), t.resb as b
+from (
+	select prune_lt(a, 3) as resA, b as resB
+	from temp
+	where range_set_equal(a, array[int4range(3,4)]) is not false
+) t
+
+
+select scalarComparisonFilter(A, 3, '=') 
 from temp
 where range_set_equal(a, array[int4range(3,4)]) is not false
 
@@ -87,3 +100,8 @@ BEGIN
 	);
 END;
 $$ LANGUAGE plpgsql;
+
+
+
+
+select * from tempmult t  where range_set_equal(a,b) is not false
