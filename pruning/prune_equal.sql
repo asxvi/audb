@@ -17,3 +17,8 @@ BEGIN
   RETURN rv;
 END;
 $$ LANGUAGE plpgsql;
+
+
+
+(1,3), (7,10) = (1,2) , (7,8)
+(1,1), 7,7
