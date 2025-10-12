@@ -1,5 +1,5 @@
 -- still not sure what these operators are for
-CREATE OR REPLACE FUNCTION logical_3vl_or(a BOOLEAN, b BOOLEAN)
+CREATE OR REPLACE FUNCTION uncertain_or(a BOOLEAN, b BOOLEAN)
 RETURNS BOOLEAN as $$
 BEGIN
     IF a IS TRUE OR b IS TRUE THEN
