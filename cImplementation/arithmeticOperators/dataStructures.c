@@ -1,4 +1,4 @@
-#include <dataStructures.h>
+#include "dataStructures.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -10,3 +10,7 @@ void printRangeSet(Int4RangeSet a){
     printf("}\n");
 }
 
+
+bool validRange(Int4Range a){
+    return a.lower < a.upper;
+}
