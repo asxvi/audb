@@ -25,3 +25,13 @@ CREATE FUNCTION c_range_divide(a int4range, b int4range )
 RETURNS int4range
 AS 'MODULE_PATHNAME', 'c_range_divide'
 LANGUAGE c;
+
+
+----------------------------------------------------------------------------
+-------------------------------Set functions--------------------------------
+----------------------------------------------------------------------------
+-- c_range_subtract takes 2 int4range types and returns the divded result
+CREATE FUNCTION c_range_set_add(a int4range[], b int4range[])
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'c_range_set_add'
+LANGUAGE c;
