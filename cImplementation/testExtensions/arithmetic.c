@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+
+/////////// eventuall move to a util/helper file
 // can also implement macro or add Utility.h/.c
 // https://www.delftstack.com/howto/c/c-max-and-min-function/
 int MIN(int My_array[], int len) {
@@ -23,6 +25,21 @@ int MAX(int My_array[], int len) {
   }
   return num;
 }
+
+void printRangeSet(Int4RangeSet a){
+    printf("{");
+    for (size_t i=0; i<a.count; i++){
+        printf("[%d, %d]", a.ranges[i].lower, a.ranges[i].upper);
+    }
+    printf("}\n");
+}
+
+
+bool validRange(Int4Range a){
+    return a.lower < a.upper;
+}
+
+/////////// eventually move to a util/helper file
 
 Int4Range range_add(Int4Range a, Int4Range b){
     Int4Range rv = {0,0};
@@ -241,4 +258,3 @@ Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b){
 
 //     return 0;
 // }
-
