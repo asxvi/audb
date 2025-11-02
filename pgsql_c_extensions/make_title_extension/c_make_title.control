@@ -1,0 +1,4 @@
+comment = 'Convert Text to Title Format'
+default_version = '1.2'
+module_pathname = '$libdir/c_make_title'
+relocatable = true

@@ -17,7 +17,7 @@ def test():
             continue
 
         path = os.path.join(base_dir, d)
-        if path == "./testTemplating/arithmeticOperators":  ##########
+        if path == "./testTemplating/arithmeticOperators":  ########## remove when ready to test on other
             for file in os.listdir(path):
                 file_path = os.path.join(path, file)
                 if not os.path.isfile(file_path):
