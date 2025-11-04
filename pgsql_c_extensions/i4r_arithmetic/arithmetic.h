@@ -24,6 +24,8 @@ typedef struct{
 // add extra utilites for working with defined type
 void printRangeSet(Int4RangeSet a);
 bool validRange(Int4Range a);
+int MIN(int My_array[], int len);
+int MAX(int My_array[], int len);
 
 // Range functions
 Int4Range range_add(Int4Range a, Int4Range b);

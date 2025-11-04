@@ -129,7 +129,7 @@ Int4Range range_multiply(Int4Range a, Int4Range b){
     rv.upper = MAX(arr, 4)+1;
     return rv;
 }
-Int4RangeSet range_set_mutiply(Int4RangeSet a, Int4RangeSet b){
+Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv = {NULL, 0};
     
     if (a.count == 0 || b.count == 0) return rv;
@@ -249,7 +249,7 @@ Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b){
 //     // rvSet = range_set_subtract(aSet, bSet);
 //     // printRangeSet(rvSet);
 //     // printf("%zu\n", rvSet.count);
-//     // rvSet = range_set_mutiply(aSet, bSet);
+//     // rvSet = range_set_multiply(aSet, bSet);
 //     // printRangeSet(rvSet);
 //     // printf("%zu\n", rvSet.count);
 //     rvSet = range_set_divide(aSet, bSet);
