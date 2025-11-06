@@ -1,28 +1,7 @@
-#include "arithmetic.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-
-// can also implement macro or add Utility.h/.c
-// https://www.delftstack.com/howto/c/c-max-and-min-function/
-int MIN(int My_array[], int len) {
-  int num = My_array[0];
-  for (int i = 1; i < len; i++) {
-    if (My_array[i] < num) {
-      num = My_array[i];
-    }
-  }
-  return num;
-}
-int MAX(int My_array[], int len) {
-  int num = My_array[0];
-  for (int i = 1; i < len; i++) {
-    if (My_array[i] > num) {
-      num = My_array[i];
-    }
-  }
-  return num;
-}
+#include "arithmetic.h"
 
 Int4Range range_add(Int4Range a, Int4Range b){
     Int4Range rv = {0,0};
@@ -196,6 +175,10 @@ Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b){
 
 int main(){
     
+    Int4Range l = lift(6);
+    printf("%d, %d", l.lower, l.upper);
+
+
     Int4Range rv;
     Int4Range a = {1, 3};
     Int4Range b = {9, 10};

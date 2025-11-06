@@ -1,7 +1,7 @@
 #ifndef ARITHMETIC_H
 #define ARITHMETIC_H
 
-#include "dataStructures.h"
+#include "helperFunctions.h"
 
 // Range functions
 Int4Range range_add(Int4Range a, Int4Range b);
