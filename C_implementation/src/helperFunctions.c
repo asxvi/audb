@@ -1,9 +1,5 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
+#include <string.h>
 #include "helperFunctions.h"
-#include "arithmetic.h"
-#include "postgres.h"
 
 // can also implement macro or add Utility.h/.c
 // https://www.delftstack.com/howto/c/c-max-and-min-function/
@@ -48,53 +44,67 @@ static int compare_ranges(const void* range1, const void* range2){
   const Int4Range r1 = *(Int4Range*)range1;
   const Int4Range r2 = *(Int4Range*)range2;
 
-
-
+  if(r1.lower != r2.lower){
+    return r1.lower < r2.lower ? -1 : 1;
+  }
+  return r1.upper < r2.upper ? -1 : 1;
 
 }
 
-
-// double pass. Order by lower bound first, and then upper bound. can maybe do in 1 pass
+// using C quicksort to sort on lower, upper
 Int4RangeSet sort(Int4RangeSet vals){
   Int4RangeSet sorted;
+  
+  if (vals.count == 0){
+    sorted.count = 0;
+    sorted.ranges = NULL;
+    return sorted;
+  }
+
   sorted.count = vals.count;
-  sorted.ranges = palloc(sizeof(Int4Range) * vals.count);
+  sorted.ranges = malloc(sizeof(Int4Range) * vals.count);
   memcpy(sorted.ranges, vals.ranges, sizeof(Int4Range) * vals.count);
   
-  int n = sizeof(vals) / sizeof(Int4Range);
-  qsort(vals, vals.count, n, compare_ranges);
-
-  // // Int4RangeSet sorted2;
-  // sorted1.ranges = palloc(sizeof(Int4Range) * vals.count);
-  // sorted1.count = 0;
-  // // sorted2.ranges = palloc(sizeof(Int4Range) * vals.count);
-
-  // for (size_t i=0; i<vals.count; i++){
-  //   Int4Range curr = vals.ranges[i];
-  //   // auto append first element
-  //   if (i == 0){
-  //     sorted1.ranges[0] = curr;
-  //     sorted1.count += 1;
-  //   }
-  //   else{
-  //     for (size_t j=0; j<sorted1.count; j++){
-  //       // check on lower bound
-  //       if (sorted1.ranges[j].lower > vals.ranges[i].lower){
-
-  //       }
-  //       else if (sorted1.ranges[j].lower == vals.ranges[i].lower){
-          
-  //       }
-  //     }
-  //   }
-    
-
-
-  // }
-  
-
+  // int n = sizeof(vals) / sizeof(Int4Range);
+  qsort(sorted.ranges, vals.count, sizeof(Int4Range), compare_ranges);
+  return sorted;
 }
 
-// Int4RangeSet normalize(Int4RangeSet vals){
-//   Int4RangeSet 
-// }
+Int4RangeSet normalize(Int4RangeSet vals){
+  Int4RangeSet normalized;
+
+  if (vals.count == 0){
+    normalized.count = 0;
+    normalized.ranges = NULL;
+    return normalized;
+  }
+  
+  Int4RangeSet sorted = sort(vals);
+
+  normalized.count = 0;
+  normalized.ranges = malloc(sizeof(Int4Range) * sorted.count);
+  
+  Int4Range prev = sorted.ranges[0];
+
+  for(size_t i=1; i<sorted.count; i++){
+    Int4Range curr = sorted.ranges[i];
+    if (overlap(prev, curr)){
+      prev.lower = (curr.lower < prev.lower) ? curr.lower : prev.lower;
+      prev.upper = (curr.upper > prev.upper) ? curr.upper : prev.upper;
+    }
+    // no overlap, so add entire range
+    else{
+      normalized.ranges[normalized.count++] = prev;
+      prev = curr;
+    }
+  }
+  
+  // account for last range
+  normalized.ranges[normalized.count++] = prev;
+  
+  return normalized;
+}
+
+bool overlap(Int4Range a, Int4Range b){
+  return (a.upper-1 >= b.lower);
+}

@@ -22,8 +22,8 @@ int MIN(int My_array[], int len);
 int MAX(int My_array[], int len);
 
 Int4Range lift(int x);
+bool overlap(Int4Range a, Int4Range b);
 Int4RangeSet sort(Int4RangeSet vals);
 Int4RangeSet normalize(Int4RangeSet vals);
-
 
 #endif

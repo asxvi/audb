@@ -175,39 +175,50 @@ Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b){
 
 int main(){
     
-    Int4Range l = lift(6);
-    printf("%d, %d", l.lower, l.upper);
+    // Int4Range l = lift(6);
+    // printf("%d, %d", l.lower, l.upper);
+    Int4Range l_ranges[] = {{9,10}, {12,13}, {1,3}, {5,7}, {5,10}};
+    Int4RangeSet rangeSet = {l_ranges, 5};
+    Int4RangeSet sorted = sort(rangeSet);
 
+    printf("sorted:  ");
+    printRangeSet(sorted);
+    Int4RangeSet norm = normalize(sorted);
+    printf("normalized:  ");
+    printRangeSet(norm);
 
-    Int4Range rv;
-    Int4Range a = {1, 3};
-    Int4Range b = {9, 10};
+    // Int4Range rv;
+    // Int4Range a = {1, 4};
+    // Int4Range b = {4, 10};
     // Int4Range c = {5, 7};
     // Int4Range d = {12, 13};
+
+    // bool ol = overlap(a, b);
+    // printf("%d\n" ,ol);
     
-    Int4Range x = {4, 8};
-    Int4Range y = {2, 3};
+    // Int4Range x = {4, 8};
+    // Int4Range y = {2, 3};
     
     // Int4Range a_ranges[] = {{1,3}, {4,5}};
     // Int4Range b_ranges[] = {{6,7}, {8,9}};
-    Int4Range a_ranges[] = {{1,3}, {5,7}};
-    Int4Range b_ranges[] = {{9,10}, {12,13}};
+    // Int4Range a_ranges[] = {{1,3}, {5,7}};
+    // Int4Range b_ranges[] = {{9,10}, {12,13}};
     
-    Int4RangeSet aSet = {a_ranges, 2};
-    Int4RangeSet bSet = {b_ranges, 2}; 
-    Int4RangeSet rvSet;
+    // Int4RangeSet aSet = {a_ranges, 2};
+    // Int4RangeSet bSet = {b_ranges, 2}; 
+    // Int4RangeSet rvSet;
     // printRangeSet(aSet);
     // printRangeSet(bSet);
     
-    rv = range_add(a, b);
+    // rv = range_add(a, b);
     // printf("add: %d, %d\n", rv.lower, rv.upper);
     // rv = range_subtract(a, b);
     // printf("sub: %d, %d\n", rv.lower, rv.upper);
     // rv = range_multiply(a, b);
     // printf("mult: %d, %d\n", rv.lower, rv.upper);
     // rv = range_divide(a, b);
-    rv = range_divide(x, y);
-    printf("div: %d, %d\n", rv.lower, rv.upper);
+    // rv = range_divide(x, y);
+    // printf("div: %d, %d\n", rv.lower, rv.upper);
 
     // rvSet = range_set_add(aSet, bSet);
     // printRangeSet(rvSet);
@@ -218,9 +229,9 @@ int main(){
     // rvSet = range_set_mutiply(aSet, bSet);
     // printRangeSet(rvSet);
     // printf("%zu\n", rvSet.count);
-    rvSet = range_set_divide(aSet, bSet);
-    printRangeSet(rvSet);
-    printf("%zu\n", rvSet.count);
+    // rvSet = range_set_divide(aSet, bSet);
+    // printRangeSet(rvSet);
+    // printf("%zu\n", rvSet.count);
 
     return 0;
 }

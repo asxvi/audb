@@ -1,10 +1,11 @@
 CC=gcc
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra #-I/usr/local/pgsql16/include/server
+# PGFLAGS = /usr/local/pgsql16/include/server
 TEST_CFLAGS = $(CFLAGS) -I/opt/homebrew/Cellar/cunit/2.1-3/include
 TEST_LDFLAGS = -L/opt/homebrew/Cellar/cunit/2.1-3/lib -lcunit
 
 arithmetic: arithmetic.o helperFunctions.o
-	$(CC) -o arithmetic arithmetic.o helperFunctions.o
+	$(CC) -o arithmetic arithmetic.o helperFunctions.o $(CFLAGS)
 
 # arithmetic.o: arithmetic.c arithmetic.h helperFunctions.h
 
