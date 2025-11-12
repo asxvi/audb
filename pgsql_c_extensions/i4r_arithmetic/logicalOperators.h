@@ -5,10 +5,9 @@
 
 //3VL 1 true, 0 null, -1 false
 
-int less_than(Int4RangeSet a, Int4RangeSet b);
-int less_than_equal(Int4RangeSet a, Int4RangeSet b);
-int greater_than(Int4RangeSet a, Int4RangeSet b);
-int greater_than_equal(Int4RangeSet a, Int4RangeSet b);
-
+int range_less_than(Int4RangeSet a, Int4RangeSet b);
+int range_less_than_equal(Int4RangeSet a, Int4RangeSet b);
+int range_greater_than(Int4RangeSet a, Int4RangeSet b);
+int range_greater_than_equal(Int4RangeSet a, Int4RangeSet b);
 
 #endif

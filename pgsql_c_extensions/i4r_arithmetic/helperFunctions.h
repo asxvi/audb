@@ -5,8 +5,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "postgres.h" /////
+// #include "postgres.h" /////
 
+// maybe split into own file???
 typedef struct{ 
     int lower; // inclusive
     int upper; // exclusive

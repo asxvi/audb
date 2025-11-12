@@ -1,6 +1,9 @@
 -- `complain if script is sourced in psql, rather than via CREATE EXTENSION
 \echo Use "CREATE EXTENSION i4r_arithmetic" to load this file. \quit
 
+----------------------------------------------------------------------------
+---------------------------Arithemtic functions-----------------------------
+----------------------------------------------------------------------------
 -- c_range_add takes 2 int4range types and returns the sum
 CREATE FUNCTION c_range_add(a int4range, b int4range ) 
 RETURNS int4range
@@ -26,10 +29,6 @@ RETURNS int4range
 AS 'MODULE_PATHNAME', 'c_range_divide'
 LANGUAGE c;
 
-
-----------------------------------------------------------------------------
--------------------------------Set functions--------------------------------
-----------------------------------------------------------------------------
 -- c_range_set_add takes 2 arrays of int4range types and returns an array with added results
 CREATE FUNCTION c_range_set_add(a int4range[], b int4range[])
 RETURNS int4range[]
@@ -52,4 +51,32 @@ LANGUAGE c;
 CREATE FUNCTION c_range_set_divide(a int4range[], b int4range[])
 RETURNS int4range[]
 AS 'MODULE_PATHNAME', 'c_range_set_divide'
+LANGUAGE c;
+
+
+----------------------------------------------------------------------------
+-------------------------Logical Operator functions-------------------------
+----------------------------------------------------------------------------
+-- c_lt takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION c_lt(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'c_lt'
+LANGUAGE c;
+
+-- c_lte takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION c_lte(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'c_lte'
+LANGUAGE c;
+
+-- c_gt takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION c_gt(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'c_gt'
+LANGUAGE c;
+
+-- c_gte takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION c_gte(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'c_gte'
 LANGUAGE c;

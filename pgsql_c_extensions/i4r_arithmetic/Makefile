@@ -6,7 +6,8 @@ DATA = i4r_arithmetic--1.1.sql
 OBJS = 	\
 	arithmetic.o \
 	arithmeticExtension.o \
-	helperFunctions.o
+	helperFunctions.o \
+	logicalOperators.o
 # does order matter when working with macros. ex define malloc palloc before #includes would modify each malloc to become palloc right
 
 # using postgres@16 for local testing
