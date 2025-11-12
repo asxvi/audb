@@ -177,21 +177,26 @@ int main(){
     
     // Int4Range l = lift(6);
     // printf("%d, %d", l.lower, l.upper);
-    Int4Range l_ranges[] = {{9,10}, {12,13}, {1,3}, {5,7}, {5,10}};
-    Int4RangeSet rangeSet = {l_ranges, 5};
-    Int4RangeSet sorted = sort(rangeSet);
-
-    printf("sorted:  ");
-    printRangeSet(sorted);
-    Int4RangeSet norm = normalize(sorted);
-    printf("normalized:  ");
-    printRangeSet(norm);
-
+    // Int4Range l_ranges[] = {{9,10}, {12,13}, {1,3}, {5,7}, {5,10}};
+    // Int4RangeSet rangeSet = {l_ranges, 5};
+    // Int4RangeSet sorted = sort(rangeSet);
+    // printf("sorted:  ");
+    // printRangeSet(sorted);
+    // Int4RangeSet norm = normalize(sorted);
+    // printf("normalized:  ");
+    // printRangeSet(norm);
+    
     // Int4Range rv;
-    // Int4Range a = {1, 4};
-    // Int4Range b = {4, 10};
-    // Int4Range c = {5, 7};
-    // Int4Range d = {12, 13};
+    Int4Range a = {1, 4};
+    Int4Range b = {4, 10};
+    Int4Range c = {5, 7};
+    Int4Range d = {12, 13};
+    
+    printf("%d", range_distance(a, b));
+    printf("%d", range_distance(a, c));
+    printf("%d", range_distance(a, d));
+
+
 
     // bool ol = overlap(a, b);
     // printf("%d\n" ,ol);

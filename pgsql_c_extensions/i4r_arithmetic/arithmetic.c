@@ -2,44 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include "helperFunctions.h" //error causing
 
 
-/////////// eventuall move to a util/helper file
-// can also implement macro or add Utility.h/.c
-// https://www.delftstack.com/howto/c/c-max-and-min-function/
-int MIN(int My_array[], int len) {
-  int num = My_array[0];
-  for (int i = 1; i < len; i++) {
-    if (My_array[i] < num) {
-      num = My_array[i];
-    }
-  }
-  return num;
-}
-int MAX(int My_array[], int len) {
-  int num = My_array[0];
-  for (int i = 1; i < len; i++) {
-    if (My_array[i] > num) {
-      num = My_array[i];
-    }
-  }
-  return num;
-}
+#include "postgres.h" /////
 
-void printRangeSet(Int4RangeSet a){
-    printf("{");
-    for (size_t i=0; i<a.count; i++){
-        printf("[%d, %d]", a.ranges[i].lower, a.ranges[i].upper);
-    }
-    printf("}\n");
-}
-
-
-bool validRange(Int4Range a){
-    return a.lower < a.upper;
-}
-
-/////////// eventually move to a util/helper file
+#define malloc palloc
+#define free pfree
 
 Int4Range range_add(Int4Range a, Int4Range b){
     Int4Range rv = {0,0};
@@ -210,51 +179,3 @@ Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b){
     }
     return rv;
 }
-
-// int main(){
-    
-//     Int4Range rv;
-//     Int4Range a = {1, 3};
-//     Int4Range b = {9, 10};
-//     // Int4Range c = {5, 7};
-//     // Int4Range d = {12, 13};
-    
-//     Int4Range x = {4, 8};
-//     Int4Range y = {2, 3};
-    
-//     // Int4Range a_ranges[] = {{1,3}, {4,5}};
-//     // Int4Range b_ranges[] = {{6,7}, {8,9}};
-//     Int4Range a_ranges[] = {{1,3}, {5,7}};
-//     Int4Range b_ranges[] = {{9,10}, {12,13}};
-    
-//     Int4RangeSet aSet = {a_ranges, 2};
-//     Int4RangeSet bSet = {b_ranges, 2}; 
-//     Int4RangeSet rvSet;
-//     // printRangeSet(aSet);
-//     // printRangeSet(bSet);
-    
-//     rv = range_add(a, b);
-//     // printf("add: %d, %d\n", rv.lower, rv.upper);
-//     // rv = range_subtract(a, b);
-//     // printf("sub: %d, %d\n", rv.lower, rv.upper);
-//     // rv = range_multiply(a, b);
-//     // printf("mult: %d, %d\n", rv.lower, rv.upper);
-//     // rv = range_divide(a, b);
-//     rv = range_divide(x, y);
-//     printf("div: %d, %d\n", rv.lower, rv.upper);
-
-//     // rvSet = range_set_add(aSet, bSet);
-//     // printRangeSet(rvSet);
-//     // printf("%zu\n", rvSet.count);
-//     // rvSet = range_set_subtract(aSet, bSet);
-//     // printRangeSet(rvSet);
-//     // printf("%zu\n", rvSet.count);
-//     // rvSet = range_set_multiply(aSet, bSet);
-//     // printRangeSet(rvSet);
-//     // printf("%zu\n", rvSet.count);
-//     rvSet = range_set_divide(aSet, bSet);
-//     printRangeSet(rvSet);
-//     printf("%zu\n", rvSet.count);
-
-//     return 0;
-// }

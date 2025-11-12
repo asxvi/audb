@@ -1,4 +1,5 @@
 #include "arithmetic.h"         // c implemented I4R functions
+
 #include "postgres.h"
 #include "fmgr.h"
 
@@ -9,7 +10,6 @@
 #include "catalog/pg_type_d.h"  // pg_type oid macros
 #include "catalog/namespace.h"
 #include "utils/rangetypes.h"
-
 
 PG_MODULE_MAGIC;
 
@@ -22,7 +22,6 @@ PG_FUNCTION_INFO_V1(c_range_set_add);
 PG_FUNCTION_INFO_V1(c_range_set_subtract);
 PG_FUNCTION_INFO_V1(c_range_set_multiply);
 PG_FUNCTION_INFO_V1(c_range_set_divide);
-
 
 /*
     takes in 2 pg RangeType parameters, and returns

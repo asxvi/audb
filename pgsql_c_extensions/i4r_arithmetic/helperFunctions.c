@@ -1,6 +1,12 @@
 #include <string.h>
 #include "helperFunctions.h"
 
+#include "postgres.h" /////
+
+// conditional compilation
+// #ifdef STANDALONE 
+// #define xxx 0
+
 // can also implement macro or add Utility.h/.c
 // https://www.delftstack.com/howto/c/c-max-and-min-function/
 int MIN(int My_array[], int len) {
@@ -50,6 +56,7 @@ static int compare_ranges(const void* range1, const void* range2){
   return r1.upper < r2.upper ? -1 : 1;
 
 }
+
 // using C quicksort to sort on lower, upper
 Int4RangeSet sort(Int4RangeSet vals){
   Int4RangeSet sorted;
@@ -103,6 +110,40 @@ Int4RangeSet normalize(Int4RangeSet vals){
   
   return normalized;
 }
+
+// Int4RangeSet* normalize(Int4RangeSet vals){
+//   if (vals.count == 0){
+//     Int4RangeSet *empty = malloc(sizeof(Int4RangeSet));
+//     empty->count = 0;
+//     empty->ranges = NULL;
+//     return empty;
+//   }
+//   Int4RangeSet* normalized = malloc(sizeof(Int4RangeSet));
+//   Int4RangeSet sorted = sort(vals);
+
+//   normalized->count = 0;
+//   normalized->ranges = malloc(sizeof(Int4Range) * sorted.count);
+  
+//   Int4Range prev = sorted.ranges[0];
+
+//   for(size_t i=1; i<sorted.count; i++){
+//     Int4Range curr = sorted.ranges[i];
+//     if (overlap(prev, curr)){
+//       prev.lower = (curr.lower < prev.lower) ? curr.lower : prev.lower;
+//       prev.upper = (curr.upper > prev.upper) ? curr.upper : prev.upper;
+//     }
+//     // no overlap, so add entire range
+//     else{
+//       normalized->ranges[normalized->count++] = prev;
+//       prev = curr;
+//     }
+//   }
+  
+//   // account for last range
+//   normalized->ranges[normalized->count++] = prev;
+  
+//   return normalized;
+// }
 
 bool overlap(Int4Range a, Int4Range b){
   return (a.upper-1 >= b.lower);
