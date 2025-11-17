@@ -24,6 +24,12 @@ int MAX(int My_array[], int len) {
   return num;
 }
 
+void printRange(Int4Range a){
+  printf("[");
+  printf("%d, %d", a.lower, a.upper);
+  printf(")\n");
+}
+
 void printRangeSet(Int4RangeSet a){
   printf("{");
   for (size_t i=0; i<a.count; i++){
@@ -111,13 +117,14 @@ bool overlap(Int4Range a, Int4Range b){
   return (a.upper-1 >= b.lower);
 }
 
+// a contains b
 bool contains(Int4Range a, Int4Range b){
   return (a.lower <= b.lower && b.lower <= a.upper 
       && a.lower <= b.upper && b.upper <= a.upper);
 }
 
 // confusion example: a(1,5) b(2,9)
-int range_distance(Int4Range a, Int4Range b){
+int range_distance2(Int4Range a, Int4Range b){
   if(contains(a, b) || contains(b, a)){
     return 0;
   }
@@ -129,19 +136,23 @@ int range_distance(Int4Range a, Int4Range b){
   }
 }
 
-int range_distance2(Int4Range a, Int4Range b){
-  if(contains(a, b) || contains(b, a)){
+
+// confusion example: a(1,5) b(2,9)
+int range_distance(Int4Range a, Int4Range b){
+  if ((a.upper-1) <= b.lower){
+    return b.lower - (a.upper-1);
+  }
+  else if ((b.upper-1) <= a.lower){
+    return a.lower - (b.upper-1);
+  }
+  // overlap ranges
+  else{
     return 0;
-  }
-  else if((a.upper) < b.lower){
-    return (b.lower - (a.upper));
-  }
-  else {
-    return (a.lower - (b.upper));
   }
 }
 
-Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
+
+Int4RangeSet reduceSize2(Int4RangeSet vals, int numRangesKeep){
   Int4RangeSet normalized;
 
   if (vals.count == 0){
@@ -152,7 +163,10 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
   else if (vals.count <= numRangesKeep){
     return vals;
   }
-  
+
+  Int4RangeSet rv;
+  rv.ranges = malloc(sizeof(Int4Range) * numRangesKeep);
+  rv.count = 0;
 
   Int4RangeSet sortedInput = sort(vals);
   Int4Range prev;
@@ -166,7 +180,7 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
     prev = sortedInput.ranges[0];
 
     int bestDist = -1;
-    int  = -1;
+    int bestIndex = -1;
 
     // greedy look for smallest remaining gap
     for(int i=1; i<currNumRanges; i++){
@@ -199,28 +213,92 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
   return sortedInput;
 }
 
+
+Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
+  Int4RangeSet normalized;
+  if (vals.count == 0){
+    normalized.count = 0;
+    normalized.ranges = NULL;
+    return normalized;
+  }
+  else if (vals.count <= numRangesKeep){
+    return vals;
+  }
+  
+  // Int4RangeSet rv;
+  // rv.ranges = malloc(sizeof(Int4Range) * numRangesKeep);
+  // rv.count = 0;
+
+  Int4RangeSet sortedInput = sort(vals);
+  int currNumRanges = sortedInput.count;
+
+  while(currNumRanges > numRangesKeep){
+    int bestDist = -1;
+    int bestIndex = -1;
+
+    // greedy look for smallest remaining gap
+    for(int i=1; i<currNumRanges; i++){
+      int currDist = abs(range_distance(sortedInput.ranges[i], sortedInput.ranges[i-1]));
+      // printRange(sortedInput.ranges[i-1]);
+      // printRange(sortedInput.ranges[i]);
+      // printf("%d\n", currDist);
+
+      // compare distances and keep min difference between 2 ranges in entire set
+      if(bestDist < 0 || currDist < bestDist){
+        bestDist = currDist;
+        bestIndex = i-1;
+      }
+    }
+
+    
+    Int4Range a = sortedInput.ranges[bestIndex];
+    Int4Range b = sortedInput.ranges[bestIndex+1];
+
+    Int4Range toInsert = {
+      .lower = (a.lower < b.lower ? a.lower : b.lower),
+      .upper = (a.upper > b.upper ? a.upper : b.upper)
+    };
+
+    sortedInput.ranges[bestIndex] = toInsert;
+
+    for (int i=bestIndex+1; i<currNumRanges-1; i++){
+      sortedInput.ranges[i] = sortedInput.ranges[i+1];
+    }
+
+    currNumRanges -= 1;
+  }
+
+  sortedInput.count = currNumRanges;
+
+  return sortedInput;
+}
+
+
+
+
+
 int main(){
 
-  Int4Range sorted_ranges[] = {{1,10}, {12,13}, {100,300}, {505,700}, {5,10}};
-  Int4Range unsort_ranges[] = {{12,13}, {100,300}, {1,10}, {505,700}, {5,10}};
-  Int4Range minisorted_ranges[] = {{1,10}, {12,13}, {100,300}};
+  Int4Range sorted_ranges[] = {{1,10}, {12,13}, {100,300}, {500,700}, {5,10}};
+  Int4Range unsort_ranges[] = {{12,13}, {100,300}, {1,10}, {500,700}, {5,10}};
+  Int4Range minisorted_ranges[] = {{100,300}, {500,700}, {1,10}, {12,13}};
   
   // Int4RangeSet temp = {minisorted_ranges, 4};
-  Int4RangeSet temp = {sorted_ranges, 4};
+  Int4RangeSet temp = {sorted_ranges, 5};
 
-  Int4RangeSet res = reduceSize(temp, 3);
+  Int4RangeSet res = reduceSize(temp, 2);
 
   printf("output count: %d\n", res.count);
   for(int i=0; i<res.count; i++){
     printf("%d, %d \n", res.ranges[i].lower, res.ranges[i].upper);
   }
 
-  // Int4Range r1 = {0,3};
-  // Int4Range r2 = {4,6};
+  // Int4Range r1 = {0,10};
+  // Int4Range r2 = {4,20};
   // Int4Range r3 = {10,1000};
   // Int4Range r4 = {-100,-10};
 
-  // printf("%d\n", range_distance(r1, r2));
+  // printf("%d\n", range_distance(r1, r3));
   // printf("%d\n", range_distance2(r2, r1));
   // printf("%d\n", range_distance(r1, r3));
   // printf("%d\n", range_distance(r1, r4));

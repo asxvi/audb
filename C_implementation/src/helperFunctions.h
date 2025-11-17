@@ -19,6 +19,7 @@ typedef struct{
 } Int4RangeSet;
 
 // add extra utilites for working with defined type
+void printRange(Int4Range a);
 void printRangeSet(Int4RangeSet a);
 bool validRange(Int4Range a);
 
