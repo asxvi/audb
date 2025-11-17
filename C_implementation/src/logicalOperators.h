@@ -1,0 +1,14 @@
+#ifndef LOGICALOPERATORS_H
+#define LOGICALOPERATORS_H
+
+#include "helperFunctions.h"
+
+//3VL 1 true, 0 null, -1 false
+
+int less_than(Int4RangeSet a, Int4RangeSet b);
+int less_than_equal(Int4RangeSet a, Int4RangeSet b);
+int greater_than(Int4RangeSet a, Int4RangeSet b);
+int greater_than_equal(Int4RangeSet a, Int4RangeSet b);
+
+
+#endif

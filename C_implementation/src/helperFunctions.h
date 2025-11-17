@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+
+// #include "postgres.h" /////
+
+// maybe split into own file???
 typedef struct{ 
     int lower; // inclusive
     int upper; // exclusive
@@ -27,6 +31,7 @@ int range_distance(Int4Range a, Int4Range b);
 Int4Range lift(int x);
 Int4RangeSet sort(Int4RangeSet vals);
 Int4RangeSet normalize(Int4RangeSet vals);
+Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep);
 
 
 #endif

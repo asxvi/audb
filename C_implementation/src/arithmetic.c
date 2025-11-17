@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "arithmetic.h"
+#include "logicalOperators.h"
+// #include "postgres.h"
+
+#define malloc palloc
 
 Int4Range range_add(Int4Range a, Int4Range b){
     Int4Range rv = {0,0};
@@ -175,8 +179,8 @@ Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b){
 
 int main(){
     
-    // Int4Range l = lift(6);
-    // printf("%d, %d", l.lower, l.upper);
+    Int4Range l = lift(6);
+    printf("%d, %d", l.lower, l.upper);
     // Int4Range l_ranges[] = {{9,10}, {12,13}, {1,3}, {5,7}, {5,10}};
     // Int4RangeSet rangeSet = {l_ranges, 5};
     // Int4RangeSet sorted = sort(rangeSet);
@@ -187,14 +191,21 @@ int main(){
     // printRangeSet(norm);
     
     // Int4Range rv;
-    Int4Range a = {1, 4};
-    Int4Range b = {4, 10};
-    Int4Range c = {5, 7};
-    Int4Range d = {12, 13};
+    // Int4Range a = {1, 4};
+    // Int4Range b = {4, 10};
+    // Int4Range c = {5, 7};
+    // Int4Range d = {12, 13};
     
-    printf("%d", range_distance(a, b));
-    printf("%d", range_distance(a, c));
-    printf("%d", range_distance(a, d));
+    // printf("%d", range_distance(a, b));
+    // printf("%d", range_distance(a, c));
+    // printf("%d", range_distance(a, d));
+
+    // Int4Range a_ranges[] = {{1,3}, {4,5}};
+    // Int4Range b_ranges[] = {{6,7}, {8,9}};
+    // Int4RangeSet aSet = {a_ranges, 2};
+    // Int4RangeSet bSet = {b_ranges, 2}; 
+    // printf("%d", greater_than(aSet, bSet));
+    // printf("yoyoyooyoy");
 
 
 
