@@ -7,7 +7,7 @@
 
 // #include "postgres.h" /////
 
-// maybe split into own file???
+// seperate file?
 typedef struct{ 
     int lower; // inclusive
     int upper; // exclusive
@@ -19,6 +19,7 @@ typedef struct{
 } Int4RangeSet;
 
 // add extra utilites for working with defined type
+void printRange(Int4Range a);
 void printRangeSet(Int4RangeSet a);
 bool validRange(Int4Range a);
 
@@ -31,6 +32,6 @@ int range_distance(Int4Range a, Int4Range b);
 Int4Range lift(int x);
 Int4RangeSet sort(Int4RangeSet vals);
 Int4RangeSet normalize(Int4RangeSet vals);
-
+Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep);
 
 #endif

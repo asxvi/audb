@@ -3,10 +3,6 @@
 
 // #include "postgres.h" /////
 
-// conditional compilation
-// #ifdef STANDALONE 
-// #define xxx 0
-
 // can also implement macro or add Utility.h/.c
 // https://www.delftstack.com/howto/c/c-max-and-min-function/
 int MIN(int My_array[], int len) {
@@ -28,6 +24,14 @@ int MAX(int My_array[], int len) {
   return num;
 }
 
+// convenience function
+void printRange(Int4Range a){
+  printf("[");
+  printf("%d, %d", a.lower, a.upper);
+  printf(")\n");
+}
+
+// convenience function
 void printRangeSet(Int4RangeSet a){
   printf("{");
   for (size_t i=0; i<a.count; i++){
@@ -57,7 +61,7 @@ static int compare_ranges(const void* range1, const void* range2){
 
 }
 
-// using C quicksort to sort on lower, upper
+// using C quicksort to sort on lower, upper allocate a new array
 Int4RangeSet sort(Int4RangeSet vals){
   Int4RangeSet sorted;
   
@@ -115,13 +119,14 @@ bool overlap(Int4Range a, Int4Range b){
   return (a.upper-1 >= b.lower);
 }
 
+// a contains b
 bool contains(Int4Range a, Int4Range b){
   return (a.lower <= b.lower && b.lower <= a.upper 
       && a.lower <= b.upper && b.upper <= a.upper);
 }
 
 // confusion example: a(1,5) b(2,9)
-int range_distance(Int4Range a, Int4Range b){
+int range_distance2(Int4Range a, Int4Range b){
   if(contains(a, b) || contains(b, a)){
     return 0;
   }
@@ -133,3 +138,68 @@ int range_distance(Int4Range a, Int4Range b){
   }
 }
 
+// confusion example: a(1,5) b(2,9)
+int range_distance(Int4Range a, Int4Range b){
+  if ((a.upper-1) <= b.lower){
+    return b.lower - (a.upper-1);
+  }
+  else if ((b.upper-1) <= a.lower){
+    return a.lower - (b.upper-1);
+  }
+  // overlap ranges
+  else{
+    return 0;
+  }
+}
+
+// reduce size inplace and return newly allocated RangeSet
+Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
+  Int4RangeSet normalized;
+  if (vals.count == 0){
+    normalized.count = 0;
+    normalized.ranges = NULL;
+    return normalized;
+  }
+  else if (vals.count <= numRangesKeep){
+    return vals;
+  }
+
+  Int4RangeSet sortedInput = sort(vals);
+  int currNumRanges = sortedInput.count;
+
+  while(currNumRanges > numRangesKeep){
+    int bestDist = -1;
+    int bestIndex = -1;
+
+    // greedy look for smallest remaining gap
+    for(int i=1; i<currNumRanges; i++){
+      int currDist = abs(range_distance(sortedInput.ranges[i], sortedInput.ranges[i-1]));
+      
+      // compare distances and keep min difference between 2 ranges in entire set
+      if(bestDist < 0 || currDist < bestDist){
+        bestDist = currDist;
+        bestIndex = i-1;
+      }
+    }
+    
+    Int4Range a = sortedInput.ranges[bestIndex];
+    Int4Range b = sortedInput.ranges[bestIndex+1];
+
+    Int4Range toInsert = {
+      .lower = (a.lower < b.lower ? a.lower : b.lower),
+      .upper = (a.upper > b.upper ? a.upper : b.upper)
+    };
+
+    sortedInput.ranges[bestIndex] = toInsert;
+
+    for (int i=bestIndex+1; i<currNumRanges-1; i++){
+      sortedInput.ranges[i] = sortedInput.ranges[i+1];
+    }
+
+    currNumRanges -= 1;
+  }
+
+  sortedInput.count = currNumRanges;
+
+  return sortedInput;
+}
