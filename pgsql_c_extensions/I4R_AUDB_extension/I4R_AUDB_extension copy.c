@@ -1216,7 +1216,7 @@ c_gte(PG_FUNCTION_ARGS)
     PG_RETURN_BOOL((bool)rv);
 }
 
-/* lift expects 1 parameter x for example and returns a valid int4range [x, x+1) */
+// lift expects 1 parameter x for example and returns a valid int4range [x, x+1)
 Datum
 c_lift(PG_FUNCTION_ARGS)
 {
@@ -1254,44 +1254,40 @@ c_lift(PG_FUNCTION_ARGS)
     PG_RETURN_RANGE_P(result);
 }
 
+/* Expects 1 Int4RangeSet and returns the numerically sorted Int4RangeSet on (1)lower bound, (2)upper bound */
 Datum
-c_reduceSize(PG_FUNCTION_ARGS)
+c_sort(PG_FUNCTION_ARGS)
 {
     // check for NULLS. Diff from empty check
-    if (PG_ARGISNULL(0) || PG_ARGISNULL(1)){
+    if (PG_ARGISNULL(0)){
         PG_RETURN_NULL();
     }
 
     ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    int32 numRangesKeep = PG_GETARG_INT32(1);
-
     Datum *elems1;
     bool *nulls1;
     int n1;
 
-    // hardcoded for int4range. will need to replace for other range implementations
-    // Oid rangeTypeOID = INT4RANGEOID;
+    // deconstruct array
     Oid rangeTypeOID = TypenameGetTypid("int4range");
-
     int16 typlen;
     bool typbyval;
     char typalign;
     get_typlenbyvalalign(rangeTypeOID, &typlen, &typbyval, &typalign);
-
     deconstruct_array(a1, rangeTypeOID, typlen, typbyval, typalign, &elems1, &nulls1, &n1);
-    
-    // NULL on both empty, return non empty otherwise. 
+
+    // empty range
     if (n1 == 0){
         PG_RETURN_NULL();
     }
 
+    // create self defined Int4RangeSet type, and convert Datum into RangeType appending to set
     Int4RangeSet set1;
     set1.count = n1;
     set1.ranges = palloc(sizeof(Int4Range) * n1);
 
     // require that typecache has range info
     TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
-    // ereport(INFO, errmsg("(%d)", typcache->type_id));
 
     // add all values in param1 a1
     for(int i=0; i<n1; i++){
@@ -1312,8 +1308,7 @@ c_reduceSize(PG_FUNCTION_ARGS)
         // ereport(INFO, errmsg("(%d, %d)", set1.ranges[i].lower, set1.ranges[i].upper));
     }
 
-    Int4RangeSet rv = reduceSize(set1, numRangesKeep);
-    rv.count = numRangesKeep;
+    Int4RangeSet rv = sort(set1);
 
     Datum *results_out = palloc(sizeof(Datum) * rv.count);
     for(int i=0; i<rv.count; i++){
@@ -1335,39 +1330,29 @@ c_reduceSize(PG_FUNCTION_ARGS)
     // Convert array of Datums into an ArrayType
     ArrayType *resultsArrOut = construct_array(results_out, rv.count, rangeTypeOID, typlen, typbyval, typalign);
 
-    // // implemented C functions use c memory allocation. Make sure to free!
-    // if(rv.ranges){
-    //     free(rv.ranges);
-    // }
+    // implemented C functions use c memory allocation. Make sure to free!
+    if(rv.ranges){
+        free(rv.ranges);
+    }
 
     PG_RETURN_ARRAYTYPE_P(resultsArrOut);
 }
 
-Datum
-c_sort(PG_FUNCTION_ARGS)
-{
-    // check for NULLS. Diff from empty check
-    if (PG_ARGISNULL(0)){
-        PG_RETURN_NULL();
-    }
-
-    ArrayType *input = PG_GETARG_ARRAYTYPE_P(0);
-    Datum *elems;
-    bool *nulls;
-    int count;
-
-    // deconstruct array
-    Oid rangeTypeOID = TypenameGetTypid("int4range");
-    int16 typlen;
-    bool typbyval;
-    char typalign;
-    get_typlenbyvalalign(rangeTypeOID, &typlen, &typbyval, &typalign);
-    deconstruct_array(input, rangeTypeOID, typlen, typbyval, typalign, &elems, &nulls, &count);
+// Datum
+// c_normalize(PG_FUNCTION_ARGS)
+// {
     
-    ArrayType *output = general_helper(input, sort);
 
-    PG_RETURN_ARRAYTYPE_P(output);
-}
+// }
+
+// Datum
+// c_reduceSize(PG_FUNCTION_ARGS)
+// {
+    
+
+// }
+
+
 
 Datum
 c_normalize(PG_FUNCTION_ARGS)
@@ -1474,142 +1459,4 @@ general_helper(ArrayType *input, Int4RangeSet (*callback)() )
     // }
 
     return resultsArrOut;
-}
-
-
-Datum
-c_range_set_add(PG_FUNCTION_ARGS){
-    // check for NULLS. Diff from empty check
-    if (PG_ARGISNULL(0) && PG_ARGISNULL(1))
-        PG_RETURN_NULL();
-    else if (PG_ARGISNULL(0))
-        PG_RETURN_DATUM(PG_GETARG_DATUM(1));
-    else if (PG_ARGISNULL(1))
-        PG_RETURN_DATUM(PG_GETARG_DATUM(0));
-
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
-
-    Datum *elems1, *elems2;
-    bool *nulls1, *nulls2;
-    int n1, n2;
-
-    // hardcoded for int4range. will need to replace for other range implementations
-    // Oid rangeTypeOID = INT4RANGEOID;
-    Oid rangeTypeOID = TypenameGetTypid("int4range");
-
-    int16 typlen;
-    bool typbyval;
-    char typalign;
-    get_typlenbyvalalign(rangeTypeOID, &typlen, &typbyval, &typalign);
-
-    deconstruct_array(a1, rangeTypeOID, typlen, typbyval, typalign, &elems1, &nulls1, &n1);
-    deconstruct_array(a2, rangeTypeOID, typlen, typbyval, typalign, &elems2, &nulls2, &n2);
-    
-    // NULL on both empty, return non empty otherwise. 
-    if (n1 == 0 && n2 == 0){
-        PG_RETURN_NULL();
-    }
-    else if (n1 == 0){
-        PG_RETURN_ARRAYTYPE_P(a2);
-    }
-    else if (n2 == 0){
-        PG_RETURN_ARRAYTYPE_P(a1);
-    }
-
-    ArrayType *output = arithmetic_set_helper(a1, a2, range_set_add);
-
-
-
-}
-
-
-/*
-Takes in 3 parameters: 
-  s1 Array: Int4RangeSet, 
-  s2 Array: Int4RangeSet, 
-  function ptr callback: Int4RangeSet function()   
-*/
-ArrayType*
-arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4RangeSet (*callback)() )
-{   
-    deconstruct_array(a1, rangeTypeOID, typlen, typbyval, typalign, &elems1, &nulls1, &n1);
-    deconstruct_array(a2, rangeTypeOID, typlen, typbyval, typalign, &elems2, &nulls2, &n2);
-    
-    // create self defined Int4RangeSet type, and convert Datum into RangeType appending to set
-    Int4RangeSet set1, set2;
-    set1.count = n1;
-    set2.count = n2;
-    set1.ranges = palloc(sizeof(Int4Range) * n1);
-    set2.ranges = palloc(sizeof(Int4Range) * n2);
-    
-    // require that typecache has range info
-    TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
-    ereport(INFO, errmsg("(%d)", typcache->type_id));
-
-    // add all values in param1 a1
-    for(int i=0; i<n1; i++){
-        RangeType *curr = DatumGetRangeTypeP(elems1[i]);
-        RangeBound l1, u1;
-        bool isEmpty;
-        
-        range_deserialize(typcache, curr, &l1, &u1, &isEmpty);
-        
-        // if range 1 not empty then set curr index low and high members. default 0, 0 has no effect on add
-        if (!isEmpty) {
-            set1.ranges[i].lower = DatumGetInt32(l1.val);
-            set1.ranges[i].upper = DatumGetInt32(u1.val);
-        } else {
-            set1.ranges[i].lower = 0;
-            set1.ranges[i].upper = 0;
-        }
-        // ereport(INFO, errmsg("(%d, %d)", set1.ranges[i].lower, set1.ranges[i].upper));
-    }
-
-    for(int i=0; i<n2; i++){
-        RangeType *curr = DatumGetRangeTypeP(elems2[i]);
-        RangeBound l2, u2;
-        bool isEmpty;
-        
-        range_deserialize(typcache, curr, &l2, &u2, &isEmpty);
-        
-        // if range 1 not empty then set curr index low and high members. default 0, 0 has no effect on add
-        if (!isEmpty) {
-            set2.ranges[i].lower = DatumGetInt32(l2.val);
-            set2.ranges[i].upper = DatumGetInt32(u2.val);
-        } else {
-            set2.ranges[i].lower = 0;
-            set2.ranges[i].upper = 0;
-        }
-        // ereport(INFO, errmsg("(%d, %d)", set1.ranges[i].lower, set1.ranges[i].upper));
-    }
-
-    // convert from defined Int4RangeSet into a Datum array of RangeTypes
-    Int4RangeSet rv = range_set_add(set1, set2);
-    Datum *results_out = palloc(sizeof(Datum) * rv.count);
-    for(int i=0; i<rv.count; i++){
-        RangeBound lowerRv, upperRv;
-        lowerRv.val = Int32GetDatum(rv.ranges[i].lower);
-        lowerRv.inclusive = true;
-        lowerRv.infinite = false;
-        lowerRv.lower = true;
-
-        upperRv.val = Int32GetDatum(rv.ranges[i].upper);
-        upperRv.inclusive = false;
-        upperRv.infinite = false;
-        upperRv.lower = false;
-
-        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
-        results_out[i] = RangeTypePGetDatum(r);
-    }
-
-    // Convert array of Datums into an ArrayType
-    ArrayType *resultsArrOut = construct_array(results_out, rv.count, rangeTypeOID, typlen, typbyval, typalign);
-
-    // implemented C functions use c memory allocation. Make sure to free!
-    if(rv.ranges){
-        free(rv.ranges);
-    }
-
-    PG_RETURN_ARRAYTYPE_P(resultsArrOut);
 }

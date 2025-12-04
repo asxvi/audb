@@ -206,3 +206,19 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
 
   return sortedInput;
 }
+
+// int main(){
+//   Int4Range a = {1,3};
+//   Int4Range b = {100,600};
+//   Int4Range c = {150,300};
+//   Int4Range d = {-4,-2};
+  
+  
+//   Int4Range a_ranges[] = {a, b, c, d};
+//   Int4RangeSet s1 = {a_ranges, 4};
+
+//   Int4RangeSet rv = reduceSize(s1, 3);
+
+//   printRangeSet(rv);
+//   return 0;
+// }

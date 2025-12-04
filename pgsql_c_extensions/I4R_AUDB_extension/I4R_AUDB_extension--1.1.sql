@@ -4,6 +4,7 @@
 ----------------------------------------------------------------------------
 ---------------------------Arithemtic functions-----------------------------
 ----------------------------------------------------------------------------
+
 -- c_range_add takes 2 int4range types and returns the sum
 CREATE FUNCTION c_range_add(a int4range, b int4range ) 
 RETURNS int4range
@@ -57,6 +58,7 @@ LANGUAGE c;
 ----------------------------------------------------------------------------
 -------------------------Logical Operator functions-------------------------
 ----------------------------------------------------------------------------
+
 -- c_lt takes 2 arrays of int4range types and returns bool result of logical expression
 CREATE FUNCTION c_lt(a int4range[], b int4range[])
 RETURNS boolean
@@ -79,4 +81,32 @@ LANGUAGE c;
 CREATE FUNCTION c_gte(a int4range[], b int4range[])
 RETURNS boolean
 AS 'MODULE_PATHNAME', 'c_gte'
+LANGUAGE c;
+
+----------------------------------------------------------------------------
+------------------------------Helper functions------------------------------
+----------------------------------------------------------------------------
+
+-- c_lift takes 1 int32 and returns its equivallent Int4Range 
+CREATE FUNCTION c_lift(a int4)
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'c_lift'
+LANGUAGE c;
+
+-- c_reduceSize takes 1 array of int4range, and an integer and returns reduced size array of int4range
+CREATE FUNCTION c_reduceSize(a int4range[], numRangesKeep integer)
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'c_reduceSize'
+LANGUAGE c;
+
+-- c_sort takes 1 array of int4range, and sorts input 
+CREATE FUNCTION c_sort(a int4range[])
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'c_sort'
+LANGUAGE c;
+
+-- c_normalize takes 1 array of int4range, and merges contained ranges
+CREATE FUNCTION c_normalize(a int4range[])
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'c_normalize'
 LANGUAGE c;
