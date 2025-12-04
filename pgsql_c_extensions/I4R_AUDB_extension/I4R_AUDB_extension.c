@@ -29,10 +29,10 @@ PG_FUNCTION_INFO_V1(c_lte);
 PG_FUNCTION_INFO_V1(c_gt);
 PG_FUNCTION_INFO_V1(c_gte);
 
-PG_FUNCTION_INFO_V1(lift);
-PG_FUNCTION_INFO_V1(sort);
-PG_FUNCTION_INFO_V1(normalize);
-PG_FUNCTION_INFO_V1(reduceSize);
+// PG_FUNCTION_INFO_V1(c_lift);
+// PG_FUNCTION_INFO_V1(c_sort);
+// PG_FUNCTION_INFO_V1(c_normalize);
+// PG_FUNCTION_INFO_V1(c_reduceSize);
 
 /*
     takes in 2 pg RangeType parameters, and returns
@@ -1215,36 +1215,36 @@ c_gte(PG_FUNCTION_ARGS)
     PG_RETURN_BOOL((bool)rv);
 }
 
-// lift expects 1 parameter x for example and returns a valid int4range [x, x+1)
-Datum
-lift(PG_FUNCTION_ARGS)
-{
-    // check for NULLS. Diff from empty check
-    if (PG_ARGISNULL(0)){
-        PG_RETURN_NULL();
-    }
+// // lift expects 1 parameter x for example and returns a valid int4range [x, x+1)
+// Datum
+// lift(PG_FUNCTION_ARGS)
+// {
+//     // check for NULLS. Diff from empty check
+//     if (PG_ARGISNULL(0)){
+//         PG_RETURN_NULL();
+//     }
 
-    PG_
+//     PG_
 
-}
+// }
 
-Datum
-sort(PG_FUNCTION_ARGS)
-{
+// Datum
+// sort(PG_FUNCTION_ARGS)
+// {
 
 
-}
+// }
 
-Datum
-normalize(PG_FUNCTION_ARGS)
-{
+// Datum
+// normalize(PG_FUNCTION_ARGS)
+// {
     
 
-}
+// }
 
-Datum
-reduceSize(PG_FUNCTION_ARGS)
-{
+// Datum
+// reduceSize(PG_FUNCTION_ARGS)
+// {
     
 
-}
+// }

@@ -4,10 +4,10 @@ RETURNS integer AS $$
 BEGIN
     IF r1 @> r2 OR r1 <@ r2 THEN
         RETURN 0;
-    ELSIF upper(r1) < lower(r2) THEN
-        RETURN lower(r2) - upper(r1);
+    ELSIF (upper(r1)-1) < lower(r2) THEN
+        RETURN lower(r2) - (upper(r1)-1);
     ELSE
-        RETURN lower(r1) - upper(r2);
+        RETURN lower(r1) - (upper(r2)-1);
     END IF;
 END;
 $$ LANGUAGE plpgsql;

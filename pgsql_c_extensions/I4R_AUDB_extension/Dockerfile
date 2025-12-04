@@ -1,70 +1,90 @@
-# # FROM ubuntu:22.04
-
-# # # Install build tools, PostgreSQL dev headers, and zsh
-# # RUN apt-get update && apt-get install -y \
-# #     build-essential \
-# #     clang \
-# #     git \
-# #     zsh \
-# #     && rm -rf /var/lib/apt/lists/*
-
-# # RUN apt-get update && apt-get install -y \
-# #     ca-certificates \
-# #     /usr/share/postgresql-common/pgdg \ 
-    
-
-# # RUN apt-get update && apt-get install -y \
-# #     postgresql-client-16 postgresql-server-dev-16 \
-# #     && rm -rf /var/lib/apt/lists/*
-
-# # WORKDIR /audb
-
-# # COPY . /audb
-
-# # CMD ["zsh"]
-
-
 # FROM ubuntu:22.04
 
-# RUN rm -rf /var/lib/apt/lists/* \
-#     && apt-get clean \
-#     && apt-get update
 
-# RUN apt-get update && apt-get install -y --fix-missing build-essential
+# ENV DEBIAN_FRONTEND=noninteractive
+# ENV PG_VERSION=16.0
+# ENV PG_PREFIX=/usr/local/pgsql16
+# ENV PATH=$PG_PREFIX/bin:$PATH
 
-#     # clang \
-#     # git \
-#     # zsh \
-#     # && rm -rf /var/lib/apt/lists/*
+# # correctly addresses mac checksum issues
+# # error on Mac no matter the attempted changes. This 'magically' fixes it
+# # https://forums.docker.com/t/hash-sum-mismatch-writing-more-data-as-expected/45940/3
+# COPY ./badproxy /etc/apt/apt.conf.d/99fixbadproxy
+
+# RUN apt-get update && apt-get install -y \
+#     build-essential \
+#     vim \
+#     clang \
+#     git \
+#     curl \
+#     wget \
+#     flex \
+#     bison \
+#     zsh \
+#     ca-certificates \
+#     gnupg2 \
+#     && rm -rf /var/lib/apt/lists/*
+
+# WORKDIR /src
+
+# # Build Postgres16 from scratch
+# RUN wget https://ftp.postgresql.org/pub/source/v16.0/postgresql-16.0.tar.gz \
+#     && tar xzf postgresql-16.0.tar.gz \
+#     && cd postgresql-16.0 \
+#     && ./configure  \
+#     # && make install \
+#     # && cd .. \
+#     # && rm -rf postgresql-${PG_VERSION} postgresql-${PG_VERSION}.tar.gz
+
+# # init db 
+# # RUN adduser postgres \
+# #     && mkdir -p /usr/local/pgsql/data \
+# #     && chown postgres /usr/local/pgsql/data \
+# #     && su -u postgres $PG_PREFIX/bin/initdb -D /usr/local/pgsql/data
 
 # WORKDIR /audb
-
 # COPY . /audb
 
+# # Optional: switch to bash
 # CMD ["bash"]
 
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
-# Avoid apt hash issues
-ENV DEBIAN_FRONTEND=noninteractive
-
-# error on Mac no matter the attempted changes. This 'magically' fixes it
-# https://forums.docker.com/t/hash-sum-mismatch-writing-more-data-as-expected/45940/3
+# # error on Mac no matter the attempted changes. This 'magically' fixes it
+# # https://forums.docker.com/t/hash-sum-mismatch-writing-more-data-as-expected/45940/3
 COPY ./badproxy /etc/apt/apt.conf.d/99fixbadproxy
 
-# Install curl and gnupg (needed to add PostgreSQL repo)
-RUN apt-get update && apt-get install -y curl gnupg lsb-release ca-certificates \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        libreadline-dev \
+        zlib1g-dev \
+        icu \
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
-# # Add PostgreSQL official repo for version 16
-# RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
-#     && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
-#        > /etc/apt/sources.list.d/pgdg.list
+# Download and build PostgreSQL 16.5 from source
+RUN wget https://ftp.postgresql.org/pub/source/v16.5/postgresql-16.5.tar.gz --no-check-certificate \
+    && tar -xzf postgresql-16.5.tar.gz \
+    && cd postgresql-16.5 \
+    && ./configure --prefix=/usr/local/pgsql \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /postgresql-16.5*
 
-# # Install PostgreSQL 16
-# RUN apt-get update && apt-get install -y postgresql-16 postgresql-client-16 \
-#     && rm -rf /var/lib/apt/lists/*
+# Make psql and pg_ctl available
+ENV PATH="/usr/local/pgsql/bin:${PATH}"
 
-# Optional: switch to bash
-CMD ["bash"]
+# Create a postgres user and data directory
+RUN useradd postgres \
+    && mkdir /pgdata \
+    && chown postgres:postgres /pgdata
+
+# Initialize database
+USER postgres
+RUN initdb -D /pgdata
+
+# Expose port and start PostgreSQL
+EXPOSE 5432
+CMD ["postgres", "-D", "/pgdata"]

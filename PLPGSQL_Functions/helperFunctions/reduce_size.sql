@@ -1,9 +1,9 @@
 CREATE OR REPLACE FUNCTION reduce_size(vals int4range[], numRangesKeep int)
--- RETURNS int4range[] AS $$
-RETURNS text[] AS $$
+RETURNS int4range[] AS $$
+-- RETURNS text[] AS $$
 DECLARE
     sortedRanges int4range[];
-	currNumRanges int;
+	currNumRanges int := NULL;
     distance int := NULL;
 	index int := NULL;
     prev int4range;
@@ -18,7 +18,7 @@ BEGIN
     END IF;
 
     sortedRanges := sort(vals);
-    -- currNumRanges := array_length(sortedRanges, 1);
+    currNumRanges := array_length(sortedRanges, 1);
 	
 	WHILE currNumRanges > numRangesKeep LOOP
 		prev := sortedRanges[1];
@@ -42,10 +42,10 @@ BEGIN
 			sortedRanges[i] := sortedRanges[i+1];
 		END LOOP;
 		
-		currNumRanges := currNumRanges-1;
+		  := currNumRanges-1;
 		distance := NULL;	
 	END LOOP;
     
-    RETURN sortedRanges[1:numRangesKeep];
+    RETURN sortedRanges;
 END;
 $$ LANGUAGE plpgsql;
