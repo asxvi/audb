@@ -20,7 +20,13 @@ var length; extend for range of date or ts
 ## 
 * add aggregation logic - similar to prune functions, https://www.postgresql.org/docs/current/xaggr.html
 * create test cases and answers in a runnable sql script
+* detect and handle lifting a i4r to an i4r set. overload funcitons pg_c functions to handle case 
 
 additional optimizing
 * reduce and convert boilerplate to macros 
 * shell script entire process of building, running and testing
+
+
+aggregate sum size therashold. extra parameter
+if num of ranges is greater than extra param, then reduce and continue
+or add 2 params, 1 target to start reducing 2

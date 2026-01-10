@@ -242,7 +242,7 @@ c_gte(PG_FUNCTION_ARGS)
 
 /* lift expects 1 parameter x for example and returns a valid int4range [x, x+1) */
 Datum
-c_lift(PG_FUNCTION_ARGS)
+c_lift_scalar(PG_FUNCTION_ARGS)
 {
     // check for NULLS. Diff from empty check
     if (PG_ARGISNULL(0)){
@@ -251,7 +251,45 @@ c_lift(PG_FUNCTION_ARGS)
 
     int unlifted = PG_GETARG_INT32(0);
 
-    Int4Range rv = lift(unlifted);
+    Int4Range rv = lift_scalar(unlifted);
+
+    RangeBound lowerRv, upperRv;
+    lowerRv.val = Int32GetDatum(rv.lower);
+    lowerRv.inclusive = true;
+    lowerRv.infinite = false;
+    lowerRv.lower = true;
+
+    upperRv.val = Int32GetDatum(rv.upper);
+    upperRv.inclusive = false;
+    upperRv.infinite = false;
+    upperRv.lower = false;
+
+    Oid rangeTypeOID = TypenameGetTypid("int4range");
+    TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
+    
+    RangeType *result = make_range(
+        typcache, 
+        &lowerRv, 
+        &upperRv, 
+        false, 
+        NULL
+    );
+
+    PG_RETURN_RANGE_P(result);
+}
+
+/* lift expects 1 parameter x for example and returns a valid int4range [x, x+1) */
+Datum
+c_lift_range(PG_FUNCTION_ARGS)
+{
+    // check for NULLS. Diff from empty check
+    if (PG_ARGISNULL(0)){
+        PG_RETURN_NULL();
+    }
+
+    int unlifted = PG_GETARG_INT32(0);
+
+    Int4Range rv = lift_range(unlifted);
 
     RangeBound lowerRv, upperRv;
     lowerRv.val = Int32GetDatum(rv.lower);
