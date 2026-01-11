@@ -1,11 +1,9 @@
+#include "postgres.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include "arithmetic.h"
 
-#include "postgres.h" /////
-
-#define malloc palloc
+#define malloc palloc       // must include postgres for palloc
 #define free pfree
 
 Int4Range range_add(Int4Range a, Int4Range b){
@@ -18,6 +16,7 @@ Int4Range range_add(Int4Range a, Int4Range b){
     rv.upper = a.upper+b.upper-1; // exclusive upper
     return rv;
 }
+
 Int4RangeSet range_set_add(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv = {NULL, 0};
     
@@ -54,6 +53,7 @@ Int4Range range_subtract(Int4Range a, Int4Range b){
     rv.upper = ((a.upper-1) - b.lower) + 1; 
     return rv;
 }
+
 Int4RangeSet range_set_subtract(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv = {NULL, 0};
     
@@ -96,6 +96,7 @@ Int4Range range_multiply(Int4Range a, Int4Range b){
     rv.upper = MAX(arr, 4)+1;
     return rv;
 }
+
 Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv = {NULL, 0};
     
@@ -147,6 +148,7 @@ Int4Range range_divide(Int4Range a, Int4Range b){
     rv.upper = MAX(arr, 4)+1;
     return rv;
 }
+
 Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv = {NULL, 0};
     

@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-// #include "postgres.h" /////
-
 // separate file?
 typedef struct{ 
     int lower; // inclusive
@@ -17,23 +15,12 @@ typedef struct{
     size_t count;
 } Int4RangeSet;
 
-struct Int4Range{ 
-    int lower; // inclusive
-    int upper; // exclusive
-} Int4Range_default = {0,0};
-typedef struct Int4Range Int4Range;
-
-struct Int4RangeSet{
-    Int4Range* ranges;
-    size_t count;
-} Int4RangeSet;
-
 // add extra utilites for working with defined type
 void printRange(Int4Range a);
 void printRangeSet(Int4RangeSet a);
 bool validRange(Int4Range a);
 
-// for finding the min int in array. probably worst way of doing this..sorry
+// for finding the min int in array. probably worst way of doing this
 int MIN(int My_array[], int len);
 int MAX(int My_array[], int len);
 

@@ -87,17 +87,17 @@ LANGUAGE c;
 ------------------------------Helper functions------------------------------
 ----------------------------------------------------------------------------
 
--- c_lift takes 1 int32 and returns its equivallent Int4Range 
-CREATE FUNCTION c_lift(a int4)
-RETURNS int4range
-AS 'MODULE_PATHNAME', 'c_lift'
-LANGUAGE c;
+-- -- c_lift takes 1 int32 and returns its equivallent Int4Range 
+-- CREATE FUNCTION c_lift_scalar(a int4)
+-- RETURNS int4range
+-- AS 'MODULE_PATHNAME', 'c_lift'
+-- LANGUAGE c;
 
--- c_lift takes 1 int4range and returns its equivallent Int4RangeSet: int4range[] 
-CREATE FUNCTION c_lift(a int4range)
-RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'c_lift_range'
-LANGUAGE c;
+-- -- c_lift takes 1 int4range and returns its equivallent Int4RangeSet: int4range[] 
+-- CREATE FUNCTION c_lift_range(a int4range)
+-- RETURNS int4range[]
+-- AS 'MODULE_PATHNAME', 'c_lift_range'
+-- LANGUAGE c;
 
 -- c_reduceSize takes 1 array of int4range, and an integer and returns reduced size array of int4range
 CREATE FUNCTION c_reduceSize(a int4range[], numRangesKeep integer)

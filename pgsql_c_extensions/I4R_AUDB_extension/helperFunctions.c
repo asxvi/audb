@@ -1,7 +1,7 @@
-#include <string.h>
+#include "postgres.h"
 #include "helperFunctions.h"
+#include <string.h>
 
-// #include "postgres.h" /////
 // #define malloc palloc
 // #define free pfree
 

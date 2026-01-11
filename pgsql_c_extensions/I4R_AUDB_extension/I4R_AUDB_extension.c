@@ -33,7 +33,6 @@ PG_FUNCTION_INFO_V1(c_sort);
 PG_FUNCTION_INFO_V1(c_normalize);
 PG_FUNCTION_INFO_V1(c_reduceSize);
 
-
 // check for NULLS parameters. Different from empty range check
 #define CHECK_BINARY_PGARG_NULL_ARGS()                          \
     do {                                                        \
@@ -53,6 +52,7 @@ PG_FUNCTION_INFO_V1(c_reduceSize);
     } while (0)
 
 RangeType* arithmetic_helper( RangeType *r1, RangeType *r2, Int4Range (*callback)(Int4Range, Int4Range) );
+RangeType* arithmetic_helper(RangeType *r1, RangeType *r2, Int4Range (*callback)(Int4Range, Int4Range), char operation);
 ArrayType* arithmetic_set_helper( ArrayType *input1, ArrayType *input2, Int4RangeSet (*callback)(Int4RangeSet, Int4RangeSet) );
 int comparison_helper(ArrayType *a1, ArrayType *a2, int (*callback)(Int4RangeSet, Int4RangeSet) );
 ArrayType* general_helper( ArrayType *input, Int4RangeSet (*callback)() );
@@ -271,50 +271,68 @@ c_lift_scalar(PG_FUNCTION_ARGS)
         typcache, 
         &lowerRv, 
         &upperRv, 
-        false, 
-        NULL
+        false
+        // NULL
     );
 
     PG_RETURN_RANGE_P(result);
 }
 
 /* lift expects 1 parameter x for example and returns a valid int4range [x, x+1) */
-Datum
-c_lift_range(PG_FUNCTION_ARGS)
-{
-    // check for NULLS. Diff from empty check
-    if (PG_ARGISNULL(0)){
-        PG_RETURN_NULL();
-    }
+// Datum
+// c_lift_range(PG_FUNCTION_ARGS)
+// {
+//     // // check for NULLS. Diff from empty check
+//     // if (PG_ARGISNULL(0)){
+//     //     PG_RETURN_NULL();
+//     // }
 
-    int unlifted = PG_GETARG_INT32(0);
+//     // // parse out single RangeType, convert to our I4R, call funciton and convert results back
+//     // RangeType *r = PG_GETARG_RANGE_P(0);
+//     // RangeBound l1, u1;
+//     // bool isEmpty1;
+//     // // require that typecache has range info
+//     // Oid rangeTypeOID = TypenameGetTypid("int4range");
+//     // TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
+//     // range_deserialize(typcache, r1, &l1, &u1, &isEmpty1);
 
-    Int4Range rv = lift_range(unlifted);
+//     // Int4Range a = {DatumGetInt32(l1.val), DatumGetInt32(u1.val)};
 
-    RangeBound lowerRv, upperRv;
-    lowerRv.val = Int32GetDatum(rv.lower);
-    lowerRv.inclusive = true;
-    lowerRv.infinite = false;
-    lowerRv.lower = true;
+//     // Int4Range rv = lift_range(a);
 
-    upperRv.val = Int32GetDatum(rv.upper);
-    upperRv.inclusive = false;
-    upperRv.infinite = false;
-    upperRv.lower = false;
+//     // RangeBound lowerRv, upperRv;
+//     // lowerRv.val = Int32GetDatum(rv.lower);
+//     // lowerRv.inclusive = true;
+//     // lowerRv.infinite = false;
+//     // lowerRv.lower = true;
 
-    Oid rangeTypeOID = TypenameGetTypid("int4range");
-    TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
+//     // upperRv.val = Int32GetDatum(rv.upper);
+//     // upperRv.inclusive = false;
+//     // upperRv.infinite = false;
+//     // upperRv.lower = false;
+
+//     // Oid rangeTypeOID = TypenameGetTypid("int4range");
+//     // TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
     
-    RangeType *result = make_range(
-        typcache, 
-        &lowerRv, 
-        &upperRv, 
-        false, 
-        NULL
-    );
+//     // RangeType *result = make_range(
+//     //     typcache, 
+//     //     &lowerRv, 
+//     //     &upperRv, 
+//     //     false, 
+//     //     NULL
+//     // );
 
-    PG_RETURN_RANGE_P(result);
-}
+//     // PG_RETURN_RANGE_P(result);
+
+
+//     CHECK_BINARY_PGARG_NULL_OR();
+
+//     RangeType *r = PG_GETARG_RANGE_P(0);
+
+//     RangeType* rv = lift_helper(a1, lift_range);
+    
+//     PGreturn((bool)rv);
+// }
 
 Datum
 c_reduceSize(PG_FUNCTION_ARGS)
@@ -390,7 +408,7 @@ c_reduceSize(PG_FUNCTION_ARGS)
         upperRv.infinite = false;
         upperRv.lower = false;
 
-        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
+        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false);//, NULL);
         results_out[i] = RangeTypePGetDatum(r);
     }
 
@@ -523,7 +541,7 @@ general_helper(ArrayType *input, Int4RangeSet (*callback)() )
         upperRv.infinite = false;
         upperRv.lower = false;
 
-        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
+        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false);//, NULL);
         results_out[i] = RangeTypePGetDatum(r);
     }
 
@@ -604,7 +622,6 @@ arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4RangeSet (*callb
             set2.ranges[i].upper = 0;
         }
     }
-
     
     // callback function in this case is an arithmetic function with params: (Int4RangeSet a, Int4RangeSet b)
     Int4RangeSet rv = callback(set1, set2);
@@ -623,7 +640,7 @@ arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4RangeSet (*callb
         upperRv.infinite = false;
         upperRv.lower = false;
 
-        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
+        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false);//, NULL);
         results_out[i] = RangeTypePGetDatum(r);
     }
 
@@ -654,22 +671,22 @@ arithmetic_helper(RangeType *r1, RangeType *r2, Int4Range (*callback)(Int4Range,
     range_deserialize(typcache, r1, &l1, &u1, &isEmpty1);
     range_deserialize(typcache, r2, &l2, &u2, &isEmpty2);
 
-    // // NULL on both empty, return non empty otherwise. 
-    // if (isEmpty1 && isEmpty2){
-    //     PG_RETURN_NULL();
-    // }
-    // else if (isEmpty1){
-    //     PG_RETURN_RANGE_P(r2);
-    // }
-    // else if (isEmpty2){
-    //     PG_RETURN_RANGE_P(r1);
-    // }
+    // NULL on both empty, return non empty otherwise. 
+    if (isEmpty1 && isEmpty2){
+        PG_RETURN_NULL();
+    }
+    else if (isEmpty1){
+        PG_RETURN_RANGE_P(r2);
+    }
+    else if (isEmpty2){
+        PG_RETURN_RANGE_P(r1);
+    }
     
     Int4Range a = {DatumGetInt32(l1.val), DatumGetInt32(u1.val)};
     Int4Range b = {DatumGetInt32(l2.val), DatumGetInt32(u2.val)};
 
     // implemented C function
-    Int4Range rv = range_add(a, b);
+    Int4Range rv = callback(a, b);
 
     // create rv and set rv's attributes
     RangeBound lowerRv, upperRv;
@@ -687,12 +704,131 @@ arithmetic_helper(RangeType *r1, RangeType *r2, Int4Range (*callback)(Int4Range,
         typcache, 
         &lowerRv, 
         &upperRv, 
-        false, 
-        NULL
+        false
+        // NULL
     );
     
     return result;
 }
+
+
+/*
+Takes in 4 parameters: 
+  s1 Array: Int4RangeSet, 
+  s2 Array: Int4RangeSet, 
+  function ptr callback: Int4RangeSet function()   
+  operation: char (+, -, *, /)
+returns ArrayType result
+*/
+RangeType*
+arithmetic_helper(RangeType *r1, RangeType *r2, Int4Range (*callback)(Int4Range, Int4Range), char operation)
+{   
+    RangeBound l1, u1, l2, u2;
+    bool isEmpty1, isEmpty2;
+    
+    // require that typecache has range info
+    Oid rangeTypeOID = TypenameGetTypid("int4range");
+    TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
+
+    range_deserialize(typcache, r1, &l1, &u1, &isEmpty1);
+    range_deserialize(typcache, r2, &l2, &u2, &isEmpty2);
+
+    // Handle empty values. Acts diff on operations
+    // NULL on both empty, return non empty otherwise. 
+    if (isEmpty1 && isEmpty2){
+        PG_RETURN_NULL();
+    }
+    else if (op == '+'){
+        if (isEmpty1) return r2;
+        if (isEmpty2) return r1;
+    }
+    else if (op == '-'){
+        if (isEmpty1) return make_empty_range(typcache);
+        if (isEmpty2) return r1;
+    }
+    else if (op == '*' || op == '/') {
+        if (isEmpty1 || isEmpty2) return make_empty_range(typcache);
+    }
+    
+    Int4Range a = {DatumGetInt32(l1.val), DatumGetInt32(u1.val)};
+    Int4Range b = {DatumGetInt32(l2.val), DatumGetInt32(u2.val)};
+
+    // implemented C function
+    Int4Range rv = callback(a, b);
+
+    // create rv and set rv's attributes
+    RangeBound lowerRv, upperRv;
+    lowerRv.val = Int32GetDatum(rv.lower);
+    lowerRv.inclusive = true;
+    lowerRv.infinite = false;
+    lowerRv.lower = true;
+
+    upperRv.val = Int32GetDatum(rv.upper);
+    upperRv.inclusive = false;
+    upperRv.infinite = false;
+    upperRv.lower = false;
+    
+    RangeType *result = make_range(
+        typcache, 
+        &lowerRv, 
+        &upperRv, 
+        false
+        // NULL
+    );
+    
+    return result;
+}
+
+// /*
+// Takes in 3 parameters: 
+//   s1 Array: Int4RangeSet, 
+//   function ptr callback: Int4RangeSet function()   
+// returns ArrayType result
+// */
+// ArrayType*
+// lift_helper(RangeType *r1, Int4Range (*callback)(Int4Range) )
+// {   
+//     RangeBound l1, u1;
+//     bool isEmpty1;
+    
+//     // require that typecache has range info
+//     Oid rangeTypeOID = TypenameGetTypid("int4range");
+//     TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
+
+//     range_deserialize(typcache, r1, &l1, &u1, &isEmpty1);
+
+//     // // NULL on both empty, return non empty otherwise. 
+//     if (isEmpty1){
+//         PG_RETURN_NULL();
+//     }
+    
+//     Int4Range a = {DatumGetInt32(l1.val), DatumGetInt32(u1.val)};
+
+//     // implemented C function
+//     Int4Range rv = callback(a);
+
+//     // create rv and set rv's attributes
+//     RangeBound lowerRv, upperRv;
+//     lowerRv.val = Int32GetDatum(rv.lower);
+//     lowerRv.inclusive = true;
+//     lowerRv.infinite = false;
+//     lowerRv.lower = true;
+
+//     upperRv.val = Int32GetDatum(rv.upper);
+//     upperRv.inclusive = false;
+//     upperRv.infinite = false;
+//     upperRv.lower = false;
+    
+//     RangeType *result = make_range(
+//         typcache, 
+//         &lowerRv, 
+//         &upperRv, 
+//         false, 
+//         NULL
+//     );
+    
+//     return result;
+// }
 
 int 
 comparison_helper(ArrayType *a1, ArrayType *a2, int (*callback)(Int4RangeSet, Int4RangeSet) )
