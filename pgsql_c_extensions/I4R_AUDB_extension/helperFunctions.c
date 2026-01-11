@@ -180,12 +180,10 @@ Int4RangeSet normalize(Int4RangeSet vals){
 
 // returns the Int4RangeSet of any intervals not empty 
 Int4RangeSet removeEmpty(Int4RangeSet vals) {
-  Int4RangeSet normalized;
+  Int4RangeSet result = {NULL, 0};
 
-  if (vals.count == 0){
-    normalized.count = 0;
-    normalized.ranges = NULL;
-    return normalized;
+  if (vals.count == 0) {
+    return result;
   }
 
   size_t nonEmptyCount = 0;
@@ -195,33 +193,22 @@ Int4RangeSet removeEmpty(Int4RangeSet vals) {
     }
   }
 
-  normalized.ranges = malloc(sizeof(Int4Range) * nonEmptyCount);
+  if (nonEmptyCount == 0){
+    return result;
+  }
+
+  // only add in non empty ranges
+  int currIdx = 0;
+  result.ranges = malloc(sizeof(Int4Range) * nonEmptyCount);
   for (size_t i = 0; i < vals.count; i++) {
     if (validRangeStrict(vals.ranges[i])) {
-      nonEmptyCount++;
+      result.ranges[currIdx] = vals.ranges[i];
+      currIdx++;
     }
   }
-  
 
-  normalized.ranges = malloc(sizeof(Int4Range) * vals.count);
-  for(size_t i=0; i<sorted.count; i++){
-    Int4Range curr = sorted.ranges[i];
-    if (overlap(prev, curr)){
-      prev.lower = (curr.lower < prev.lower) ? curr.lower : prev.lower;
-      prev.upper = (curr.upper > prev.upper) ? curr.upper : prev.upper;
-    }
-    // no overlap, so add entire range
-    else{
-      normalized.ranges[normalized.count++] = prev;
-      prev = curr;
-    }
-  }
-  
-  // account for last range
-  normalized.ranges[normalized.count++] = prev;
-  
-  return normalized;
-}
+  return result;
+} // free in returning function
 
 bool overlap(Int4Range a, Int4Range b){
   return a.lower < b.upper && b.lower < a.upper;

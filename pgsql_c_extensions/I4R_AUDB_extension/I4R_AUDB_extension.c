@@ -737,6 +737,13 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
         results_out[i] = RangeTypePGetDatum(r);
     }
 
+    pfree(elems1);
+    pfree(nulls1);
+    pfree(elems2);
+    pfree(nulls2);
+    pfree(set1.ranges);
+    pfree(set2.ranges);
+
     // Convert array of Datums into an ArrayType
     ArrayType *resultsArrOut = construct_array(results_out, rv.count, rangeTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign);
 
