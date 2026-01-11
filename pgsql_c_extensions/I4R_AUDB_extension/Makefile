@@ -10,8 +10,8 @@ OBJS = 	\
 	logicalOperators.o
 
 # using postgres@16 for local testing
-# PG_CONFIG ?= /usr/local/pgsql16/bin/pg_config
-PG_CONFIG = pg_config
+PG_CONFIG = /usr/local/pgsql16/bin/pg_config
+# PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 

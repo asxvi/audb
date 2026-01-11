@@ -2,11 +2,11 @@
 #include "helperFunctions.h"
 #include <string.h>
 
-// #define malloc palloc
-// #define free pfree
+#define malloc palloc
+#define free pfree
 
-#define min2(a, b) (((a) < (b)) ? (a) : (b))
-#define max2(a, b) (((a) > (b)) ? (a) : (b))
+// #define min2(a, b) (((a) < (b)) ? (a) : (b))
+// #define max2(a, b) (((a) > (b)) ? (a) : (b))
 
 // can also implement macro or add Utility.h/.c
 // https://www.delftstack.com/howto/c/c-max-and-min-function/
@@ -40,13 +40,17 @@ void printRange(Int4Range a){
 void printRangeSet(Int4RangeSet a){
   printf("{");
   for (size_t i=0; i<a.count; i++){
-    printf("[%d, %d]", a.ranges[i].lower, a.ranges[i].upper);
+    printf("[%d, %d)", a.ranges[i].lower, a.ranges[i].upper);
   }
   printf("}\n");
 }
 
 bool validRange(Int4Range a){
   return a.lower <= a.upper;
+}
+
+bool validRangeStrict(Int4Range a){
+  return a.lower < a.upper;
 }
 
 /*lift a scalar int into a Int4Range*/
@@ -174,6 +178,51 @@ Int4RangeSet normalize(Int4RangeSet vals){
   return normalized;
 }
 
+// returns the Int4RangeSet of any intervals not empty 
+Int4RangeSet removeEmpty(Int4RangeSet vals) {
+  Int4RangeSet normalized;
+
+  if (vals.count == 0){
+    normalized.count = 0;
+    normalized.ranges = NULL;
+    return normalized;
+  }
+
+  size_t nonEmptyCount = 0;
+  for (size_t i = 0; i < vals.count; i++) {
+    if (validRangeStrict(vals.ranges[i])) {
+      nonEmptyCount++;
+    }
+  }
+
+  normalized.ranges = malloc(sizeof(Int4Range) * nonEmptyCount);
+  for (size_t i = 0; i < vals.count; i++) {
+    if (validRangeStrict(vals.ranges[i])) {
+      nonEmptyCount++;
+    }
+  }
+  
+
+  normalized.ranges = malloc(sizeof(Int4Range) * vals.count);
+  for(size_t i=0; i<sorted.count; i++){
+    Int4Range curr = sorted.ranges[i];
+    if (overlap(prev, curr)){
+      prev.lower = (curr.lower < prev.lower) ? curr.lower : prev.lower;
+      prev.upper = (curr.upper > prev.upper) ? curr.upper : prev.upper;
+    }
+    // no overlap, so add entire range
+    else{
+      normalized.ranges[normalized.count++] = prev;
+      prev = curr;
+    }
+  }
+  
+  // account for last range
+  normalized.ranges[normalized.count++] = prev;
+  
+  return normalized;
+}
+
 bool overlap(Int4Range a, Int4Range b){
   return a.lower < b.upper && b.lower < a.upper;
 }
@@ -183,19 +232,6 @@ bool contains(Int4Range a, Int4Range b){
   return (a.lower <= b.lower && b.lower <= a.upper 
       && a.lower <= b.upper && b.upper <= a.upper);
 }
-
-// // confusion example: a(1,5) b(2,9)
-// int range_distance2(Int4Range a, Int4Range b){
-//   if(contains(a, b) || contains(b, a)){
-//     return 0;
-//   }
-//   else if((a.upper-1) < b.lower){
-//     return (b.lower - (a.upper-1));
-//   }
-//   else {
-//     return (a.lower - (b.upper-1));
-//   }
-// }
 
 // confusion example: a(1,5) b(2,9)
 int range_distance(Int4Range a, Int4Range b){

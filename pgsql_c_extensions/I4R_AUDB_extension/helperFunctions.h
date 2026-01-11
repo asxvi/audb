@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#define min2(a, b) (((a) < (b)) ? (a) : (b))
+#define max2(a, b) (((a) > (b)) ? (a) : (b))
+
 // separate file?
 typedef struct{ 
     int lower; // inclusive
@@ -19,8 +22,9 @@ typedef struct{
 void printRange(Int4Range a);
 void printRangeSet(Int4RangeSet a);
 bool validRange(Int4Range a);
+bool validRangeStrict(Int4Range a);
 
-// for finding the min int in array. probably worst way of doing this
+// for finding the min int in array. probably not optimal method
 int MIN(int My_array[], int len);
 int MAX(int My_array[], int len);
 

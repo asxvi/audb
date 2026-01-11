@@ -128,6 +128,7 @@ Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
     return rv;
 }
 
+// divison with a bound crossing 0 should be 0 or ???
 Int4Range range_divide(Int4Range a, Int4Range b){
     Int4Range rv = {0,0};
     
