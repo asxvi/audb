@@ -1,24 +1,25 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "helperFunctions.h" 
 
-// [Inclusive LB, Exclusive UB)
-typedef struct{ 
-    int lower; // inclusive
-    int upper; // exclusive
-} Int4Range;
+// // [Inclusive LB, Exclusive UB)
+// typedef struct{ 
+//     int lower; // inclusive
+//     int upper; // exclusive
+// } Int4Range;
 
-// array of Int4Range's and the tot count of array
-typedef struct{
-    Int4Range* ranges;
-    size_t count;
-} Int4RangeSet;
+// // array of Int4Range's and the tot count of array
+// typedef struct{
+//     Int4Range* ranges;
+//     size_t count;
+// } Int4RangeSet;
 
-// [Inlcusive LB, Inclusive UB]
-typedef struct{
-    int lower;  //inclusive
-    int upper;  //inclusive
-} Multiplicity;
+// // [Inlcusive LB, Inclusive UB]
+// typedef struct{
+//     int lower;  //inclusive
+//     int upper;  //inclusive
+// } Multiplicity;
 
 int MIN(int My_array[], int len) {
   int num = My_array[0];
@@ -53,6 +54,9 @@ void printRangeSet(Int4RangeSet a){
   }
   printf("}\n");
 }
+
+
+
 
 Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv = {NULL, 0};
@@ -144,13 +148,56 @@ Int4Range floatIntervalSetMult2(Int4RangeSet a, Multiplicity mult) {
 }
 
 
-int main(){
+Int4RangeSet testNormalize(Int4RangeSet set1) {
+    // printf("%d\n\n", set1.count);
+    // printRangeSet(set1);
+  
+    Int4RangeSet rv;
+    rv.ranges = malloc(sizeof(Int4Range) * set1.count);
+
+    int currIdx = 0;
+    for (int i=0; i<set1.count; i++) {
+      // not empty then copy
+      if (set1.ranges[i].lower != 0 || set1.ranges[i].upper != 0) {
+        // printRange(set1.ranges[i]);
+        rv.ranges[currIdx++] = set1.ranges[i];
+
+      } 
+    }
+    rv.count = currIdx;
+
+    // Int4Range *temp = realloc(rv.ranges, sizeof(Int4Range) * rv.count);
+    if (rv.count == 0) {
+      free(rv.ranges);
+      rv.ranges = NULL;
+    }
+    else {
+      Int4Range *temp =
+      realloc(rv.ranges, sizeof(Int4Range) * rv.count);
+      
+      if (temp != NULL) rv.ranges = temp;
+    }
     
-  printf("1\n");
+    // printf("%d\n\n", rv.count);
+    // printRangeSet(rv);
+
+
+    // now normalize range
+    Int4RangeSet norm_rv = normalize(rv);
+    
+    printRangeSet(norm_rv);
+
+    return rv;
+} 
+
+
+int main(){
   Int4Range a = {1,2};
   Int4Range b = {10,11};
-  Int4Range c = {5,6};
+  Int4Range c = {5,8};
   Int4Range d = {7,12};
+  Int4Range e = {0,0};
+  Int4Range f = {6,11};
   Multiplicity mult1 = {0,1};
   Multiplicity mult2 = {1,2};
   Multiplicity mult3 = {0,2};
@@ -160,23 +207,19 @@ int main(){
   Int4RangeSet s1 = {a_ranges, 2};
   Int4RangeSet s2 = {b_ranges, 2};
     
-  Int4Range rv1 = floatIntervalSetMult(s1, mult1);  
-  printRange(rv1);
+  // Int4Range rv1 = floatIntervalSetMult(s1, mult1);  
+  // printRange(rv1);
+  // Int4Range rv2 = floatIntervalSetMult(s1, mult2);  
+  // printRange(rv2);
+  // Int4Range rv3 = floatIntervalSetMult(s1, mult3);  
+  // printRange(rv3);
 
-  Int4Range rv2 = floatIntervalSetMult(s1, mult2);  
-  printRange(rv2);
 
-  Int4Range rv3 = floatIntervalSetMult(s1, mult3);  
-  printRange(rv3);
+  Int4Range c_ranges[] = {f, a, e, c};
+  Int4RangeSet s3 = {c_ranges, 4};
+  Int4RangeSet tn_rv = testNormalize(s3);
+  // printRangeSet(tn_rv);
 
-//     Int4Range rv1 = floatIntervalSetMult2(s1, mult1);  
-//   printRange(rv1);
-
-//   Int4Range rv2 = floatIntervalSetMult2(s1, mult2);  
-//   printRange(rv2);
-
-//   Int4Range rv3 = floatIntervalSetMult2(s1, mult3);  
-//   printRange(rv3);
 
   return 0;
 }

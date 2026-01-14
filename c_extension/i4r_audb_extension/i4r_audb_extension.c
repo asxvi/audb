@@ -824,57 +824,6 @@ arithmetic_helper(RangeType *r1, RangeType *r2, Int4Range (*callback)(Int4Range,
     return result;
 }
 
-// /*
-// Takes in 3 parameters: 
-//   s1 Array: Int4RangeSet, 
-//   function ptr callback: Int4RangeSet function()   
-// returns ArrayType result
-// */
-// ArrayType*
-// lift_helper(RangeType *r1, Int4Range (*callback)(Int4Range) )
-// {   
-//     RangeBound l1, u1;
-//     bool isEmpty1;
-    
-//     // require that typecache has range info
-//     Oid rangeTypeOID = TypenameGetTypid("int4range");
-//     TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
-
-//     range_deserialize(typcache, r1, &l1, &u1, &isEmpty1);
-
-//     // // NULL on both empty, return non empty otherwise. 
-//     if (isEmpty1){
-//         PG_RETURN_NULL();
-//     }
-    
-//     Int4Range a = {DatumGetInt32(l1.val), DatumGetInt32(u1.val)};
-
-//     // implemented C function
-//     Int4Range rv = callback(a);
-
-//     // create rv and set rv's attributes
-//     RangeBound lowerRv, upperRv;
-//     lowerRv.val = Int32GetDatum(rv.lower);
-//     lowerRv.inclusive = true;
-//     lowerRv.infinite = false;
-//     lowerRv.lower = true;
-
-//     upperRv.val = Int32GetDatum(rv.upper);
-//     upperRv.inclusive = false;
-//     upperRv.infinite = false;
-//     upperRv.lower = false;
-    
-//     RangeType *result = make_range(
-//         typcache, 
-//         &lowerRv, 
-//         &upperRv, 
-//         false, 
-//         NULL
-//     );
-    
-//     return result;
-// }
-
 int 
 comparison_helper(ArrayType *a1, ArrayType *a2, int (*callback)(Int4RangeSet, Int4RangeSet) )
 {
@@ -961,3 +910,94 @@ comparison_helper(ArrayType *a1, ArrayType *a2, int (*callback)(Int4RangeSet, In
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
+// TESTING
+
+
+ArrayType*
+normalizeRange(ArrayType *input1) {
+
+    // dynamic to range type we are working with. Accesses arrays element OID
+    static Oid rangeTypeOID = InvalidOid;
+    static TypeCacheEntry *typcache = NULL;
+    
+    if (rangeTypeOID == InvalidOid) {
+        rangeTypeOID = input1->elemtype;
+        typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
+    }
+
+    // deconstruct array, create our representation of I4R, call function and get 'normalized' result
+    Datum *elems1;
+    bool *nulls1;
+    int n1;
+    deconstruct_array(input1, rangeTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign, elems1, nulls1, n1);
+
+    Int4RangeSet set1;
+    set1.ranges = palloc(sizeof(Int4Range) * set1.count);
+    
+    int currIdx = 0;
+    for(int i=0; i<n1; i++){
+        
+        // only append in valid ranges
+        RangeType *curr = DatumGetRangeTypeP(elems1[i]);
+        RangeBound l1, u1;
+        bool isEmpty;
+        
+        range_deserialize(typcache, curr, &l1, &u1, &isEmpty);
+        
+        if (!isEmpty) {
+            set1.ranges[currIdx].lower = l1.val;
+            set1.ranges[currIdx].upper = u1.val;
+            currIdx++;
+        }
+    }
+    set1.count = currIdx;
+    // change size of working set after removing NULL's
+
+    if (set1.count == 0) {
+        pfree(set1.ranges);
+        set1.ranges = NULL;
+    }
+    else {
+        Int4Range *temp = realloc(set1.ranges, sizeof(Int4Range) * set1.count);
+        if (temp != NULL) set1.ranges = temp;
+    }
+
+    normalize()
+
+}
+
+
+
+
+
+/*
+Parameters: 
+    ArrayType of Int4Ranges (RangeType) 
+    Range Type for multiplicity [inclusive bounds]
+*/
+Datum
+test_c_range_set_add(PG_FUNCTION_ARGS)
+{
+    int resizeTrigger = 4;
+    
+    CHECK_BINARY_PGARG_NULL_ARGS();
+
+    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
+    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
+    
+    ArrayType *output = arithmetic_set_helper(a1, a2, range_set_add);
+
+    int nelems = ArrayGetNItems(ARR_NDIM(output), ARR_DIMS(output));
+
+    // call function to resize the array. create new arr and free old one
+    if (nelems >= resizeTrigger) {
+        // function to create new array
+
+        ArrayType *rv = 
+
+        pfree(output);
+    }
+
+    PG_RETURN_ARRAYTYPE_P(output);
+}
+
