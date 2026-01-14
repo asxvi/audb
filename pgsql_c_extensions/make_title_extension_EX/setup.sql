@@ -1,2 +1,0 @@
-DROP EXTENSION IF EXISTS c_make_title;
-CREATE EXTENSION IF NOT EXISTS c_make_title;

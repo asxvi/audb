@@ -1,9 +1,5 @@
-#include "arithmetic.h"         // c implemented I4R functions
-#include "logicalOperators.h"
-
 #include "postgres.h"
 #include "fmgr.h"
-
 #include "utils/rangetypes.h"   // non set functions pass RangeType params
 #include "utils/array.h"        // set functions pass ArrayType params
 #include "utils/typcache.h"
@@ -11,6 +7,9 @@
 #include "catalog/pg_type_d.h"  // pg_type oid macros
 #include "catalog/namespace.h"
 #include "utils/rangetypes.h"
+
+#include "arithmetic.h"         // c implemented I4R functions
+#include "logicalOperators.h"
 
 PG_MODULE_MAGIC;
 
@@ -105,22 +104,6 @@ c_range_set_divide(PG_FUNCTION_ARGS)
     ArrayType *output = arithmetic_set_helper(a1, a2, range_set_divide);
     PG_RETURN_ARRAYTYPE_P(output);
 }
-
-
-// testing
-Datum
-c_range_add(PG_FUNCTION_ARGS)
-{   
-    CHECK_BINARY_PGARG_NULL_ARGS();
-
-    RangeType *r1 = PG_GETARG_RANGE_P(0);
-    RangeType *r2 = PG_GETARG_RANGE_P(1);
-
-    RangeType *output = arithmetic_helper(r1, r2, range_add, '+');
-
-    PG_RETURN_RANGE_P(output);
-}
-
 
 /*
     takes in 2 pg RangeType parameters, and returns
@@ -780,6 +763,9 @@ arithmetic_helper(RangeType *r1, RangeType *r2, Int4Range (*callback)(Int4Range,
     // NOTE this is static for I4R. need a modular replacement for other range types
     static Oid rangeTypeOID = InvalidOid;
     static TypeCacheEntry *typcache = NULL;
+    
+    
+    // can maybe set oid if r1->rangetypid == r1->rangetypid then rangeTypeOID = r1->rangetypid;
     if (rangeTypeOID == InvalidOid) {
         rangeTypeOID = TypenameGetTypid("int4range");
         typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
@@ -973,3 +959,5 @@ comparison_helper(ArrayType *a1, ArrayType *a2, int (*callback)(Int4RangeSet, In
     // otherwise return the datum representation of boolean result
     return rv;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////

@@ -90,6 +90,38 @@ Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
   Does not handle edge cases like mult = (0,n), or a is empty. This is handled caller function
 */ 
 Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult) {
+    // convert mult to I4R... make exlusive upper
+    Int4RangeSet convertedMult = {NULL, 1};
+    convertedMult.ranges = malloc(sizeof(Int4RangeSet));
+    Int4Range convertedMultRange = {mult.lower, mult.upper+1};
+    convertedMult.ranges[0] = convertedMultRange;
+
+    // create return value and update inplace
+    Int4Range expanded;
+
+    int minLB = mult.lower;
+    int maxUB = mult.upper+1;
+    for (size_t j=0; j < a.count; j++){
+        int r1 = convertedMultRange.lower * a.ranges[j].lower;
+        int r2 = convertedMultRange.lower * (a.ranges[j].upper-1); 
+        int r3 = (convertedMultRange.upper-1) * a.ranges[j].lower;
+        int r4 = (convertedMultRange.upper-1) * (a.ranges[j].upper-1);
+        int arr[] = {r1, r2, r3, r4, minLB, maxUB};
+        
+        minLB = MIN(arr, 6);
+        maxUB = MAX(arr, 6);
+    }
+    
+    Int4Range rv = {minLB, maxUB+1};
+    return rv;
+}
+
+
+/*
+  Helper function to multiply float interval set * float interval set. 
+  Does not handle edge cases like mult = (0,n), or a is empty. This is handled caller function
+*/ 
+Int4Range floatIntervalSetMult2(Int4RangeSet a, Multiplicity mult) {
     Int4RangeSet convertedMult = {NULL, 1};
     convertedMult.ranges = malloc(sizeof(Int4RangeSet));
     Int4Range convertedMultRange = {mult.lower, mult.upper+1};
@@ -110,6 +142,7 @@ Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult) {
     Int4Range rv = {minLB, maxUB};
     return rv;
 }
+
 
 int main(){
     
@@ -135,6 +168,15 @@ int main(){
 
   Int4Range rv3 = floatIntervalSetMult(s1, mult3);  
   printRange(rv3);
+
+//     Int4Range rv1 = floatIntervalSetMult2(s1, mult1);  
+//   printRange(rv1);
+
+//   Int4Range rv2 = floatIntervalSetMult2(s1, mult2);  
+//   printRange(rv2);
+
+//   Int4Range rv3 = floatIntervalSetMult2(s1, mult3);  
+//   printRange(rv3);
 
   return 0;
 }

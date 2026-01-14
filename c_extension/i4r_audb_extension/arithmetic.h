@@ -21,4 +21,10 @@ Int4RangeSet range_set_subtract(Int4RangeSet a, Int4RangeSet b);
 Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b);
 Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b);
 
+
+/*
+  Helper function to multiply float interval set * float interval set. 
+  Does not handle edge cases like mult = (0,n), or a is empty. This is handled caller function
+*/ 
+Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult);
 #endif

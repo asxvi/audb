@@ -128,6 +128,33 @@ Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
     return rv;
 }
 
+Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult) {
+    // convert mult to I4R... make exlusive upper
+    Int4RangeSet convertedMult = {NULL, 1};
+    convertedMult.ranges = malloc(sizeof(Int4RangeSet));
+    Int4Range convertedMultRange = {mult.lower, mult.upper+1};
+    convertedMult.ranges[0] = convertedMultRange;
+
+    // create return value and update inplace
+    Int4Range expanded;
+
+    int minLB = mult.lower;
+    int maxUB = mult.upper+1;
+    for (size_t j=0; j < a.count; j++){
+        int r1 = convertedMultRange.lower * a.ranges[j].lower;
+        int r2 = convertedMultRange.lower * (a.ranges[j].upper-1); 
+        int r3 = (convertedMultRange.upper-1) * a.ranges[j].lower;
+        int r4 = (convertedMultRange.upper-1) * (a.ranges[j].upper-1);
+        int arr[] = {r1, r2, r3, r4, minLB, maxUB};
+        
+        minLB = MIN(arr, 6);
+        maxUB = MAX(arr, 6);
+    }
+    
+    Int4Range rv = {minLB, maxUB+1};
+    return rv;
+}
+
 // divison with a bound crossing 0 should be 0 or ???
 Int4Range range_divide(Int4Range a, Int4Range b){
     Int4Range rv = {0,0};

@@ -1,5 +1,5 @@
 -- `complain if script is sourced in psql, rather than via CREATE EXTENSION
-\echo Use "CREATE EXTENSION I4R_AUDB_extension" to load this file. \quit
+\echo Use "CREATE EXTENSION i4r_audb_extension" to load this file. \quit
 
 ----------------------------------------------------------------------------
 ---------------------------Arithemtic functions-----------------------------
