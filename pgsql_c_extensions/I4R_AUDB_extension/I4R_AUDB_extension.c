@@ -107,6 +107,21 @@ c_range_set_divide(PG_FUNCTION_ARGS)
 }
 
 
+// testing
+Datum
+c_range_add(PG_FUNCTION_ARGS)
+{   
+    CHECK_BINARY_PGARG_NULL_ARGS();
+
+    RangeType *r1 = PG_GETARG_RANGE_P(0);
+    RangeType *r2 = PG_GETARG_RANGE_P(1);
+
+    RangeType *output = arithmetic_helper(r1, r2, range_add, '+');
+
+    PG_RETURN_RANGE_P(output);
+}
+
+
 /*
     takes in 2 pg RangeType parameters, and returns
     a single RangeType with provided operator result

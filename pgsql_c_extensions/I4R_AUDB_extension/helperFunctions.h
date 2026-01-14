@@ -8,15 +8,23 @@
 #define min2(a, b) (((a) < (b)) ? (a) : (b))
 #define max2(a, b) (((a) > (b)) ? (a) : (b))
 
-// separate file?
+// [Inclusive LB, Exclusive UB)
 typedef struct{ 
     int lower; // inclusive
     int upper; // exclusive
 } Int4Range;
+
+// array of Int4Range's and the tot count of array
 typedef struct{
     Int4Range* ranges;
     size_t count;
 } Int4RangeSet;
+
+// [Inlcusive LB, Inclusive UB]
+typedef struct{
+    int lower;  //inclusive
+    int upper;  //inclusive
+} Multiplicity;
 
 // add extra utilites for working with defined type
 void printRange(Int4Range a);
@@ -34,6 +42,7 @@ Int4Range max_range(Int4Range a, Int4Range b);
 Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b);
 Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b);
 
+Int4RangeSet floatIntervalSetMult(Int4RangeSet a, Multiplicity mult);
 bool overlap(Int4Range a, Int4Range b);
 bool contains(Int4Range a, Int4Range b);
 int range_distance(Int4Range a, Int4Range b);

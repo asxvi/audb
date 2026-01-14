@@ -1,5 +1,6 @@
 #include "postgres.h"
 #include "helperFunctions.h"
+#include "arithmetic.h" //
 #include <string.h>
 
 #define malloc palloc
@@ -210,11 +211,28 @@ Int4RangeSet removeEmpty(Int4RangeSet vals) {
   return result;
 } // free in returning function
 
+
+/*
+  Helper function to multiply float interval set * float interval set. 
+  Does not handle edge cases like mult = (0,n), or a is empty. This is handled caller function
+*/ 
+Int4RangeSet floatIntervalSetMult(Int4RangeSet a, Multiplicity mult) {
+  Int4RangeSet convertedMult = {NULL, 1};
+  Int4Range convertedMultRange = {mult.lower, mult.upper-1};
+  convertedMult.ranges[0] = convertedMultRange;
+
+  Int4RangeSet expanded = range_set_multiply(a, convertedMult);  
+  printRangeSet(expanded);
+
+  return expanded;
+}
+
+// check if 2 ranges overlap 
 bool overlap(Int4Range a, Int4Range b){
   return a.lower < b.upper && b.lower < a.upper;
 }
 
-// a contains b
+// a fully contains b
 bool contains(Int4Range a, Int4Range b){
   return (a.lower <= b.lower && b.lower <= a.upper 
       && a.lower <= b.upper && b.upper <= a.upper);

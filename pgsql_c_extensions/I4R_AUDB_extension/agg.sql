@@ -1,30 +1,37 @@
+-- Count is implemented natively
+-- Sum works but explodes m^n where m is the avg num of elements in each set, n is number of rows
+-- Min naive approach can be optimized
+-- Max naive approach can be optimized
+-- Avg sum/count
+
+
+-- deal with blowup with hardcoded value
+-- initcond = NULL by default
 create aggregate sum (int4range[])
 (
     stype = int4range[],
-    -- initcond = array[int4range(0,0)],
     sfunc = c_range_set_add
 );
 
+-- initcond = NULL by default
 create aggregate sum (int4range)
 (
-    sfunc = c_range_add,
-    stype = int4range
-    -- not sure why getting an error no matter what i use for initcond. tried int4range(0,1) and every other intuitive option
-    -- initcond = '[0,0]'::int4range 
+    stype = int4range,
+    sfunc = c_range_add
 );
 
 create aggregate max (int4range[])
 (
     stype = int4range[],
     -- initcond = array[int4range(0,0)],
-    sfunc = c_range_set_add
+    sfunc = 
 );
 
 create aggregate max (int4range)
 (
     stype = int4range,
     -- initcond = array[int4range(0,0)],
-    sfunc = c_range_set_add
+    sfunc = 
 );
 
 
@@ -32,25 +39,24 @@ create aggregate min (int4range[])
 (
     stype = int4range[],
     -- initcond = array[int4range(0,0)],
-    sfunc = c_range_set_add
+    sfunc = 
 );
 
 create aggregate min (int4range)
 (
     stype = int4range,
     -- initcond = array[int4range(0,0)],
-    sfunc = c_range_set_add
-    -- should be min
+    sfunc = 
 );
 
-create aggregate count()
+create aggregate avg (int4range)
 (
-    stype = int,
-    initcond = 0::int4
-    sfunc = c_range_set_add
-    -- if equals then increment by 1. rv either 0 or 1
-)
+    stype = int4range,
+    -- stype (sum [], count int)
+    -- finalfunc
 
+    
+);
 
 -- MAX and MIN
 -- naive approach without optimizing
@@ -63,15 +69,6 @@ sum_function (existing_ranges, new_ranges, max_wanted_ranges, num_ranges_to_keep
     add all ranges n x m
     if num_ranges in agg result >= max_wanted_ranges:
         reduce to num_ranges_to_keep
-
-
--- COUNT
-for every row:
-    compare if range is equal:
-        if yes:
-            count +=1
-        else
-            count +=0
 
 -- AVG
 for every
@@ -87,3 +84,5 @@ avg(A) = [(1,2), (3,3), (3,4), (5,5)]
 
 sum(A) after normalize = [(3,6), (7,10), (11,12)]
 avg(A) after normalize = [(1,2), (3,4), (5,5)]
+
+
