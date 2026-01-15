@@ -1,6 +1,17 @@
 -- `complain if script is sourced in psql, rather than via CREATE EXTENSION
 \echo Use "CREATE EXTENSION i4r_audb_extension" to load this file. \quit
 
+
+----------------------------------------------------------------------------
+---------------------------------TESTING------------------------------------
+
+-- c_range_add takes 2 int4range types and returns the sum
+CREATE FUNCTION test_c_range_set_add(a int4range[], b int4range[]) 
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'c_range_add'
+LANGUAGE c;
+-- LANGUAGE c STRICT VOLATILE;
+
 ----------------------------------------------------------------------------
 ---------------------------Arithemtic functions-----------------------------
 ----------------------------------------------------------------------------

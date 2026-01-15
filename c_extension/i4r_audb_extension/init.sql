@@ -55,3 +55,5 @@ INSERT INTO test_range (colA, colB) VALUES
     (int4range(1,3), int4range(2,4) ),
     (int4range(2,11), int4range(4,9) ),
     (int4range(10,13), int4range(12,14) );
+
+
