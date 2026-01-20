@@ -12,12 +12,14 @@
 typedef struct{ 
     int lower; // inclusive
     int upper; // exclusive
+    bool isNull;
 } Int4Range;
 
 // array of Int4Range's and the tot count of array
 typedef struct{
     Int4Range* ranges;
     size_t count;
+    bool containsNull;
 } Int4RangeSet;
 
 // [Inlcusive LB, Inclusive UB]
@@ -52,6 +54,6 @@ Int4RangeSet sort(Int4RangeSet vals);
 Int4RangeSet normalize(Int4RangeSet vals);
 Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep);
 
-void reallocRangeSet(Int4RangeSet* a);
+// void reallocRangeSet(Int4RangeSet* a);
 
 #endif

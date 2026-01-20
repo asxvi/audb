@@ -59,53 +59,8 @@ int comparison_helper(ArrayType *a1, ArrayType *a2, int (*callback)(Int4RangeSet
 ArrayType* general_helper( ArrayType *input, Int4RangeSet (*callback)() );
 
 
-Datum
-c_range_set_add(PG_FUNCTION_ARGS)
-{
-    CHECK_BINARY_PGARG_NULL_ARGS();
+// deserialize_array_to_rangeset(A)
 
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
-
-    ArrayType *output = arithmetic_set_helper(a1, a2, range_set_add);
-    PG_RETURN_ARRAYTYPE_P(output);
-}
-
-Datum
-c_range_set_subtract(PG_FUNCTION_ARGS)
-{
-    CHECK_BINARY_PGARG_NULL_ARGS();
-
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
-
-    ArrayType *output = arithmetic_set_helper(a1, a2, range_set_subtract);
-    PG_RETURN_ARRAYTYPE_P(output);
-}
-
-Datum
-c_range_set_multiply(PG_FUNCTION_ARGS)
-{
-    CHECK_BINARY_PGARG_NULL_ARGS();
-
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
-
-    ArrayType *output = arithmetic_set_helper(a1, a2, range_set_multiply);
-    PG_RETURN_ARRAYTYPE_P(output);
-}
-
-Datum
-c_range_set_divide(PG_FUNCTION_ARGS)
-{
-    CHECK_BINARY_PGARG_NULL_ARGS();
-
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
-
-    ArrayType *output = arithmetic_set_helper(a1, a2, range_set_divide);
-    PG_RETURN_ARRAYTYPE_P(output);
-}
 
 /*
     takes in 2 pg RangeType parameters, and returns
@@ -114,12 +69,16 @@ c_range_set_divide(PG_FUNCTION_ARGS)
 Datum
 c_range_add(PG_FUNCTION_ARGS)
 {   
+    RangeType *r1;
+    RangeType *r2;
+    RangeType *output;
+
     CHECK_BINARY_PGARG_NULL_ARGS();
 
-    RangeType *r1 = PG_GETARG_RANGE_P(0);
-    RangeType *r2 = PG_GETARG_RANGE_P(1);
-
-    RangeType *output = arithmetic_helper(r1, r2, range_add, '+');
+    r1 = PG_GETARG_RANGE_P(0);
+    r2 = PG_GETARG_RANGE_P(1);
+    
+    output = arithmetic_helper(r1, r2, range_add, '+');
 
     PG_RETURN_RANGE_P(output);
 }
@@ -127,12 +86,16 @@ c_range_add(PG_FUNCTION_ARGS)
 Datum
 c_range_subtract(PG_FUNCTION_ARGS)
 {   
+    RangeType *r1;
+    RangeType *r2;
+    RangeType *output;
+
     CHECK_BINARY_PGARG_NULL_ARGS();
 
-    RangeType *r1 = PG_GETARG_RANGE_P(0);
-    RangeType *r2 = PG_GETARG_RANGE_P(1);
+    r1 = PG_GETARG_RANGE_P(0);
+    r2 = PG_GETARG_RANGE_P(1);
 
-    RangeType *output = arithmetic_helper(r1, r2, range_subtract, '-');
+    output = arithmetic_helper(r1, r2, range_subtract, '-');
 
     PG_RETURN_RANGE_P(output);
 }
@@ -140,12 +103,16 @@ c_range_subtract(PG_FUNCTION_ARGS)
 Datum
 c_range_multiply(PG_FUNCTION_ARGS)
 {   
+    RangeType *r1;
+    RangeType *r2;
+    RangeType *output;
+
     CHECK_BINARY_PGARG_NULL_ARGS();
 
-    RangeType *r1 = PG_GETARG_RANGE_P(0);
-    RangeType *r2 = PG_GETARG_RANGE_P(1);
+    r1 = PG_GETARG_RANGE_P(0);
+    r2 = PG_GETARG_RANGE_P(1);
 
-    RangeType *output = arithmetic_helper(r1, r2, range_multiply, '*');
+    output = arithmetic_helper(r1, r2, range_multiply, '*');
 
     PG_RETURN_RANGE_P(output);
 }
@@ -153,14 +120,82 @@ c_range_multiply(PG_FUNCTION_ARGS)
 Datum
 c_range_divide(PG_FUNCTION_ARGS)
 {   
+    RangeType *r1;
+    RangeType *r2;
+    RangeType *output;
+
     CHECK_BINARY_PGARG_NULL_ARGS();
 
-    RangeType *r1 = PG_GETARG_RANGE_P(0);
-    RangeType *r2 = PG_GETARG_RANGE_P(1);
+    r1 = PG_GETARG_RANGE_P(0);
+    r2 = PG_GETARG_RANGE_P(1);
 
-    RangeType *output = arithmetic_helper(r1, r2, range_divide, '/');
+    output = arithmetic_helper(r1, r2, range_divide, '/');
 
     PG_RETURN_RANGE_P(output);
+}
+
+Datum
+c_range_set_add(PG_FUNCTION_ARGS)
+{
+    ArrayType *a1;
+    ArrayType *a2;
+    ArrayType *output;
+
+    CHECK_BINARY_PGARG_NULL_ARGS();
+
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
+
+    output = arithmetic_set_helper(a1, a2, range_set_add);
+    PG_RETURN_ARRAYTYPE_P(output);
+}
+
+Datum
+c_range_set_subtract(PG_FUNCTION_ARGS)
+{
+    ArrayType *a1;
+    ArrayType *a2;
+    ArrayType *output;
+
+    CHECK_BINARY_PGARG_NULL_ARGS();
+
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
+
+    output = arithmetic_set_helper(a1, a2, range_set_subtract);
+    PG_RETURN_ARRAYTYPE_P(output);
+}
+
+Datum
+c_range_set_multiply(PG_FUNCTION_ARGS)
+{
+    ArrayType *a1;
+    ArrayType *a2;
+    ArrayType *output;
+
+    CHECK_BINARY_PGARG_NULL_ARGS();
+
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
+
+    output = arithmetic_set_helper(a1, a2, range_set_multiply);
+    PG_RETURN_ARRAYTYPE_P(output);
+}
+
+Datum
+c_range_set_divide(PG_FUNCTION_ARGS)
+{   
+    ArrayType *a1;
+    ArrayType *a2;
+    ArrayType *output;
+
+    CHECK_BINARY_PGARG_NULL_ARGS();
+
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
+
+    output = arithmetic_set_helper(a1, a2, range_set_divide);
+    PG_RETURN_ARRAYTYPE_P(output);
 }
 
 /////////////////////
@@ -170,12 +205,16 @@ c_range_divide(PG_FUNCTION_ARGS)
 Datum
 c_lt(PG_FUNCTION_ARGS)
 {   
+    ArrayType *a1;
+    ArrayType *a2;
+    int rv;
+
     CHECK_BINARY_PGARG_NULL_OR();
 
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    int rv = comparison_helper(a1, a2, range_less_than);
+    rv = comparison_helper(a1, a2, range_less_than);
 
     if (rv == -1){
         PG_RETURN_NULL();
@@ -187,12 +226,16 @@ c_lt(PG_FUNCTION_ARGS)
 Datum
 c_gt(PG_FUNCTION_ARGS)
 {   
+    ArrayType *a1;
+    ArrayType *a2;
+    int rv;
+
     CHECK_BINARY_PGARG_NULL_OR();
 
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
-
-    int rv = comparison_helper(a1, a2, range_greater_than);
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
+    
+    rv = comparison_helper(a1, a2, range_greater_than);
     
     if (rv == -1){
         PG_RETURN_NULL();
@@ -204,12 +247,16 @@ c_gt(PG_FUNCTION_ARGS)
 Datum
 c_lte(PG_FUNCTION_ARGS)
 {   
+    ArrayType *a1;
+    ArrayType *a2;
+    int rv;
+
     CHECK_BINARY_PGARG_NULL_OR();
 
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    int rv = comparison_helper(a1, a2, range_less_than_equal);
+    rv = comparison_helper(a1, a2, range_less_than_equal);
 
     if (rv == -1){
         PG_RETURN_NULL();
@@ -221,12 +268,16 @@ c_lte(PG_FUNCTION_ARGS)
 Datum
 c_gte(PG_FUNCTION_ARGS)
 {   
+    ArrayType *a1;
+    ArrayType *a2;
+    int rv;
+
     CHECK_BINARY_PGARG_NULL_OR();
 
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    int rv = comparison_helper(a1, a2, range_greater_than_equal);
+    rv = comparison_helper(a1, a2, range_greater_than_equal);
     
     if (rv == -1){
         PG_RETURN_NULL();
@@ -676,6 +727,8 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
     Int4RangeSet set1, set2;
     set1.count = n1;
     set2.count = n2;
+    set1.containsNull = false;
+    set2.containsNull = false;
     set1.ranges = palloc(sizeof(Int4Range) * n1);
     set2.ranges = palloc(sizeof(Int4Range) * n2);
     
@@ -693,9 +746,13 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
         if (!isEmpty) {
             set1.ranges[i].lower = DatumGetInt32(l1.val);
             set1.ranges[i].upper = DatumGetInt32(u1.val);
-        } else {
-            set1.ranges[i].lower = 0;
-            set1.ranges[i].upper = 0;
+        } 
+        // handle this perhaps better
+        else {
+            // set1.ranges[i].lower = 0;
+            // set1.ranges[i].upper = 0;
+            set1.ranges[i].isNull = true;
+            set1.containsNull = true
         }
     }
 
@@ -712,8 +769,10 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
             set2.ranges[i].lower = DatumGetInt32(l2.val);
             set2.ranges[i].upper = DatumGetInt32(u2.val);
         } else {
-            set2.ranges[i].lower = 0;
-            set2.ranges[i].upper = 0;
+            // set2.ranges[i].lower = 0;
+            // set2.ranges[i].upper = 0;
+            set2.ranges[i].isNull = true;
+            set2.containsNull = true
         }
     }
     
@@ -722,14 +781,32 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
     
     // convert reult of self defined type Int4RangeSet into a Datum array of RangeTypes
     Datum *results_out = palloc(sizeof(Datum) * rv.count);
+
+    // only result is {NULL}
+    if (rv.count == 1 && rv.containsNull) {
+        results_out[0] = Datum;
+    }
+
     for(int i=0; i<rv.count; i++){
         RangeBound lowerRv, upperRv;
-        lowerRv.val = Int32GetDatum(rv.ranges[i].lower);
+
+        // account for NULL results. must include NULL I4R type in returning ArrayType
+        if (rv.ranges[i].isNull){
+            lowerRv.val = NULL;
+            upperRv.val = NULL;
+        }
+        else {
+            lowerRv.val = Int32GetDatum(rv.ranges[i].lower);    
+            upperRv.val = Int32GetDatum(rv.ranges[i].upper);
+        }
+
+
+        // lowerRv.val = Int32GetDatum(rv.ranges[i].lower);
         lowerRv.inclusive = true;
         lowerRv.infinite = false;
         lowerRv.lower = true;
 
-        upperRv.val = Int32GetDatum(rv.ranges[i].upper);
+        // upperRv.val = Int32GetDatum(rv.ranges[i].upper);
         upperRv.inclusive = false;
         upperRv.infinite = false;
         upperRv.lower = false;
@@ -779,7 +856,7 @@ arithmetic_helper(RangeType *r1, RangeType *r2, Int4Range (*callback)(Int4Range,
     range_deserialize(typcache, r1, &l1, &u1, &isEmpty1);
     range_deserialize(typcache, r2, &l2, &u2, &isEmpty2);
 
-    // Handle empty values. Acts diff on operations
+    // Handle empty/ NULL values. Acts diff on operations
     if (isEmpty1 && isEmpty2){
         return make_empty_range(typcache);
     }
@@ -912,9 +989,11 @@ comparison_helper(ArrayType *a1, ArrayType *a2, int (*callback)(Int4RangeSet, In
     return rv;
 }
 
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // TESTING
-
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 ArrayType*
 normalizeRange(ArrayType *input1) {
@@ -1034,3 +1113,5 @@ test_c_range_set_add(PG_FUNCTION_ARGS)
     PG_RETURN_ARRAYTYPE_P(rv);
 }
 
+
+// c_sum_func(c_range_mult(colA, multiplicity))

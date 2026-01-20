@@ -6,19 +6,28 @@
 
 // 3VL 1 true, -1 null, 0 false 
 int range_greater_than(Int4RangeSet a, Int4RangeSet b){
+    int result;
+    Int4RangeSet n1;
+    Int4RangeSet n2;
+    
     if (a.count == 0 || b.count == 0){
         return -1;
     }
     
-    int result = -1;
-    Int4RangeSet n1 = normalize(a);
-    Int4RangeSet n2 = normalize(b);
+    result = -1;
+    n1 = normalize(a);
+    n2 = normalize(b);
 
     if (n1.count > 0 && n2.count > 0) {
-        Int4Range f1 = n1.ranges[0];
-        Int4Range f2 = n2.ranges[0];
-        Int4Range l1 = n1.ranges[n1.count-1];
-        Int4Range l2 = n2.ranges[n2.count-1];
+        Int4Range f1;
+        Int4Range f2;
+        Int4Range l1;
+        Int4Range l2;
+
+        f1 = n1.ranges[0];
+        f2 = n2.ranges[0];
+        l1 = n1.ranges[n1.count-1];
+        l2 = n2.ranges[n2.count-1];
 
         if (f1.lower > (l2.upper-1)){
             result = 1;
@@ -35,19 +44,28 @@ int range_greater_than(Int4RangeSet a, Int4RangeSet b){
 }
 
 int range_greater_than_equal(Int4RangeSet a, Int4RangeSet b){
+    int result;
+    Int4RangeSet n1;
+    Int4RangeSet n2;
+    
     if (a.count == 0 || b.count == 0){
         return -1;
     }
     
-    int result = -1;
-    Int4RangeSet n1 = normalize(a);
-    Int4RangeSet n2 = normalize(b);
+    result = -1;
+    n1 = normalize(a);
+    n2 = normalize(b);
 
     if (n1.count > 0 && n2.count > 0) {
-        Int4Range f1 = n1.ranges[0];
-        Int4Range f2 = n2.ranges[0];
-        Int4Range l1 = n1.ranges[n1.count-1];
-        Int4Range l2 = n2.ranges[n2.count-1];
+        Int4Range f1;
+        Int4Range f2;
+        Int4Range l1;
+        Int4Range l2;
+
+        f1 = n1.ranges[0];
+        f2 = n2.ranges[0];
+        l1 = n1.ranges[n1.count-1];
+        l2 = n2.ranges[n2.count-1];
 
         if (f1.lower >= (l2.upper-1)){
             result = 1;
@@ -63,20 +81,30 @@ int range_greater_than_equal(Int4RangeSet a, Int4RangeSet b){
     return result;
 }
 
+
 int range_less_than(Int4RangeSet a, Int4RangeSet b){
+    int result;
+    Int4RangeSet n1;
+    Int4RangeSet n2;
+    
     if (a.count == 0 || b.count == 0){
         return -1;
     }
     
-    int result = -1;
-    Int4RangeSet n1 = normalize(a);
-    Int4RangeSet n2 = normalize(b);
+    result = -1;
+    n1 = normalize(a);
+    n2 = normalize(b);
 
     if (n1.count > 0 && n2.count > 0) {
-        Int4Range f1 = n1.ranges[0];
-        Int4Range f2 = n2.ranges[0];
-        Int4Range l1 = n1.ranges[n1.count-1];
-        Int4Range l2 = n2.ranges[n2.count-1];
+        Int4Range f1;
+        Int4Range f2;
+        Int4Range l1;
+        Int4Range l2;
+
+        f1 = n1.ranges[0];
+        f2 = n2.ranges[0];
+        l1 = n1.ranges[n1.count-1];
+        l2 = n2.ranges[n2.count-1];
 
         if (f1.lower > (l2.upper-1)){
             result = 0;
@@ -93,24 +121,33 @@ int range_less_than(Int4RangeSet a, Int4RangeSet b){
 }
 
 int range_less_than_equal(Int4RangeSet a, Int4RangeSet b){
+    int result;
+    Int4RangeSet n1;
+    Int4RangeSet n2;
+    
     if (a.count == 0 || b.count == 0){
         return -1;
     }
     
-    int result = -1;
-    Int4RangeSet n1 = normalize(a);
-    Int4RangeSet n2 = normalize(b);
+    result = -1;
+    n1 = normalize(a);
+    n2 = normalize(b);
 
     if (n1.count > 0 && n2.count > 0) {
-        Int4Range f1 = n1.ranges[0];
-        Int4Range f2 = n2.ranges[0];
-        Int4Range l1 = n1.ranges[n1.count-1];
-        Int4Range l2 = n2.ranges[n2.count-1];
+        Int4Range f1;
+        Int4Range f2;
+        Int4Range l1;
+        Int4Range l2;
 
-        if (f1.lower > (l2.upper-1)){
+        f1 = n1.ranges[0];
+        f2 = n2.ranges[0];
+        l1 = n1.ranges[n1.count-1];
+        l2 = n2.ranges[n2.count-1];
+
+        if (f1.lower >= (l2.upper-1)){
             result = 0;
         }
-        else if ((l1.upper-1) <= f2.lower){
+        else if ((l1.upper-1) < f2.lower){
             result = 1;
         }
     }
