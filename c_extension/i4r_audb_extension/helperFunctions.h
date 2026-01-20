@@ -28,6 +28,13 @@ typedef struct{
     int upper;  //inclusive
 } Multiplicity;
 
+
+typedef struct {
+    Int4RangeSet ranges;        // potential duplicates
+    Multiplicity mult;          // closed interval
+    bool has_null;              // only true if every row contains (0,0) || mult = [0,n]
+} IntervalAggState;
+
 // add extra utilites for working with defined type
 void printRange(Int4Range a);
 void printRangeSet(Int4RangeSet a);
