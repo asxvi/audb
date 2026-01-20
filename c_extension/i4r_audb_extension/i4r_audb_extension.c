@@ -736,6 +736,7 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
 
     // add all values in param1 input1
     for(int i=0; i<n1; i++){
+        
         // the RangeType at this index is NULL
         if (nulls1[i]) {
             // maybe remove?
@@ -1020,45 +1021,62 @@ ArrayType*
 normalizeRange(ArrayType *input1) {
     Oid elemTypeOID;
     TypeCacheEntry *typcache;
-    // Get the element type (should be range type)
-    elemTypeOID = ARR_ELEMTYPE(input1);
-    typcache = lookup_type_cache(elemTypeOID, TYPECACHE_RANGE_INFO);
+
+    elemTypeOID = TypenameGetTypid("int4range");
+    typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
     
     // deconstruct array, create our representation of I4R, call function and get 'normalized' result
     Datum *elems1;
     bool *nulls1;
     int n1;
-
     deconstruct_array(input1, elemTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign, &elems1, &nulls1, &n1);
 
     // Our representation of I4R. Should be freed after normalizing/reducing to potentially smaller range
     Int4RangeSet set1;
+    set1.containsNull = false;
     set1.ranges = palloc(sizeof(Int4Range) * n1);
     
     int currIdx = 0;
-    for(int i=0; i<n1; i++){
-        // only append in valid ranges
-        RangeType *curr = DatumGetRangeTypeP(elems1[i]);
-        RangeBound l1, u1;
-        bool isEmpty;
+    int i;
+    for(i=0; i < n1; i++){
         
-        range_deserialize(typcache, curr, &l1, &u1, &isEmpty);
-        
-        if (!isEmpty) {
-            set1.ranges[currIdx].lower = DatumGetInt32(l1.val);
-            set1.ranges[currIdx].upper = DatumGetInt32(u1.val);
+        // the RangeType at this index is NULL
+        // only insert a NULL entry ONCE into the currIdx
+        if (nulls1[i] && !set1.containsNull) {
+            set1.ranges[currIdx].lower = 0;
+            set1.ranges[currIdx].upper = 0; // maybe remove?
+
+            set1.ranges[currIdx].isNull = true;
+            set1.containsNull = true;
             currIdx++;
+        }
+        // otherwise Extract RangeType elements
+        else {
+            RangeType *curr;
+            RangeBound l1, u1;
+            bool isEmpty1;
+            
+            curr = DatumGetRangeTypeP(elems1[i]);
+            range_deserialize(typcache, curr, &l1, &u1, &isEmpty1);
+
+            // if the RangeType is not empty, append to 
+            if (!isEmpty) {
+                set1.ranges[currIdx].lower = DatumGetInt32(l1.val);
+                set1.ranges[currIdx].upper = DatumGetInt32(u1.val);
+                currIdx++;
+            }
         }
     }
     set1.count = currIdx;
     
     Int4Range *temp;
-    // what to do here?
+
+    // return empty array if there is no result
     if (set1.count == 0) {
         pfree(set1.ranges);
         return construct_empty_array(elemTypeOID);
     }
-    // change size of working set after removing NULL's
+    // change size of working set after removing over allocated arr
     else {
         temp = repalloc(set1.ranges, sizeof(Int4Range) * set1.count);
         if (temp != NULL) set1.ranges = temp;
@@ -1107,7 +1125,7 @@ Parameters:
     Range Type for multiplicity [inclusive bounds]
 */
 Datum
-test_c_range_set_add(PG_FUNCTION_ARGS)
+test_c_range_set_sum(PG_FUNCTION_ARGS)
 {
     int resizeTrigger = 4;
     
@@ -1116,19 +1134,19 @@ test_c_range_set_add(PG_FUNCTION_ARGS)
     ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
     ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
     
-    ArrayType *output = arithmetic_set_helper(a1, a2, range_set_add);
+    ArrayType *sumOutput = arithmetic_set_helper(a1, a2, range_set_add);
 
-    int nelems = ArrayGetNItems(ARR_NDIM(output), ARR_DIMS(output));
+    int nelems = ArrayGetNItems(ARR_NDIM(sumOutput), ARR_DIMS(sumOutput));
 
     ArrayType *rv;
     // call function to resize the array. create new arr and free old one
     if (nelems >= resizeTrigger) {
         // function to create new array
         rv = normalizeRange(output);
-        pfree(output);
+        pfree(sumOutput);
     }
     else {
-        rv = output;
+        rv = sumOutput;
     }
 
     PG_RETURN_ARRAYTYPE_P(rv);

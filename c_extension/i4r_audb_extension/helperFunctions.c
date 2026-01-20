@@ -156,24 +156,121 @@ static int q_sort_compare_ranges(const void* range1, const void* range2){
   return r1.upper < r2.upper ? -1 : 1;
 }
 
-// Allocates space for new array that is sorted on 1)lower, 2)upper using quicksort
+// // Allocates space for new array that is sorted on 1)lower, 2)upper using quicksort
+// // prefilers result removing all potential NULLs. Then sorts.
+// // returns sorted array with NULL appended if necessary.
+// Int4RangeSet sort(Int4RangeSet vals){
+//   Int4RangeSet sorted;
+  
+//   if (vals.count == 0){
+//     sorted.count = 0;
+//     sorted.ranges = NULL;
+//     sorted.containsNull = false;
+//     return sorted;
+//   }
+
+//   // filter out nulls
+//   Int4RangeSet filteredVals;
+//   int idx;
+  
+//   idx = 0;
+//   filteredVals.ranges = malloc((sizeof(Int4Range) * vals.count));
+
+//   if (vals.containsNull) {
+//     int i;
+//     for (i = 0; i < vals.count; i++){
+//       if (!vals.ranges[i].isNull){
+//         filteredVals.ranges[idx].lower = vals.ranges[i].lower;
+//         filteredVals.ranges[idx].upper = vals.ranges[i].upper;
+//         filteredVals.containsNull = false;
+//         idx++;
+//       }
+//     }
+//   }
+//   filteredVals.count = idx;
+
+//   // set sorted accordingly to the original or filtered parameter result
+//   if (filteredVals.count > 0) {
+//     sorted.count = filteredVals.count;
+//     sorted.ranges = malloc(sizeof(Int4Range) * filteredVals.count);
+//     memcpy(sorted.ranges, filteredVals.ranges, sizeof(Int4Range) * filteredVals.count);
+//   }
+//   else{
+//     sorted.count = vals.count;
+//     sorted.ranges = malloc(sizeof(Int4Range) * vals.count);
+//     memcpy(sorted.ranges, vals.ranges, sizeof(Int4Range) * vals.count);  
+//   }
+
+//   // sort values
+//   qsort(sorted.ranges, sorted.count, sizeof(Int4Range), q_sort_compare_ranges);
+  
+//   // append NULL to the array
+//   if (vals.containsNull) {
+//     Int4RangeSet sortedNull;
+//     sortedNull.count = vals.count + 1;
+//     sortedNull.ranges = malloc(sizeof(Int4Range) * sortedNull.count);
+//     memcpy(sortedNull.ranges, sorted.ranges, (sizeof(Int4Range) * sortedNull.count-1));
+    
+//     sortedNull.ranges[sorted.count].isNull = true;
+//     sortedNull.ranges[sorted.count].lower = 0;
+//     sortedNull.ranges[sorted.count].upper = 0;
+//     return sortedNull;
+//   }
+
+//   return sorted;
+// }
+
+
+
+
+///////////
 Int4RangeSet sort(Int4RangeSet vals){
   Int4RangeSet sorted;
   
   if (vals.count == 0){
     sorted.count = 0;
     sorted.ranges = NULL;
+    sorted.containsNull = false;
     return sorted;
   }
 
-  sorted.count = vals.count;
-  sorted.ranges = malloc(sizeof(Int4Range) * vals.count);
-  memcpy(sorted.ranges, vals.ranges, sizeof(Int4Range) * vals.count);
+  // filter out nulls
+  size_t nonNullCount;
+  size_t i;
   
-  qsort(sorted.ranges, vals.count, sizeof(Int4Range), q_sort_compare_ranges);
-  
+  nonNullCount = 0;
+  for (i = 0; i < vals.count; i++) {
+    if (!vals.ranges[i].isNull) nonNullCount++;
+  }
+
+  sorted.count = nonNullCount + (vals.containsNull ? 1 : 0);
+  sorted.ranges = malloc(sizeof(Int4Range) * sorted.count);
+  sorted.containsNull = vals.containsNull;
+
+  size_t idx;
+  idx = 0;
+  for (i = 0; i < vals.count; i++) {
+    if (!vals.ranges[i].isNull) {
+      sorted.ranges[idx++] = vals.ranges[i];
+    }
+  }
+
+  // sort non null ranges
+  if (nonNullCount > 1) {
+    qsort(sorted.ranges, nonNullCount, sizeof(Int4Range), q_sort_compare_ranges);
+  }
+
+  if (vals.containsNull) {
+    sorted.ranges[sorted.count-1].isNull = true;
+    sorted.ranges[sorted.count-1].lower = 0;
+    sorted.ranges[sorted.count-1].upper = 0;
+  }
+
   return sorted;
 }
+////////////
+
+
 
 // Traverses through entire set and looks to merge any possible overlap.
 // Allocates space for new array 
@@ -186,6 +283,7 @@ Int4RangeSet normalize(Int4RangeSet vals){
   if (vals.count == 0){
     normalized.count = 0;
     normalized.ranges = NULL;
+    normalized.containsNull = false;
     return normalized;
   }
   
@@ -339,41 +437,31 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
   return sortedInput;
 }
 
-
-// void reallocRangeSet(Int4RangeSet* a){
-//   int size;
-//   int trueSize 
-//   int i;
-
-//   size = a->count;
-//   trueSize = 0;
-//   for(i=0; i<size; i++){
-//     if (a->ranges[i].lower == 0 && a->ranges[i].upper == 0){
-//       continue;
-//     }
-//     trueSize++;
-    
-//     // https://www.geeksforgeeks.org/c/g-fact-53/
-//     // printf("%d, %d", a->ranges[i].lower, a->ranges[i].upper);   // default ig is (0,0)
-//   }
-// }
-
-// int main(){
-//   Int4Range a = {1,2};
-//   Int4Range b = {10,11};
-//   Int4Range c = {5,6};
-//   Int4Range d = {7,12};
+Int4RangeSet filterOutNulls(Int4RangeSet vals) {
+  if (!vals.containsNull) {
+    return vals;
+  }
+  Int4RangeSet filteredVals;
+  size_t nonNullCount;
+  size_t i;
   
-//   Int4Range a_ranges[] = {a, b};
-//   Int4Range b_ranges[] = {c, d};
-//   Int4RangeSet s1 = {a_ranges, 2};
-//   Int4RangeSet s2 = {b_ranges, 2};
+  nonNullCount = 0;
+  for (i = 0; i < vals.count; i++) {
+    if (!vals.ranges[i].isNull) nonNullCount++;
+  }
 
-//   Int4RangeSet rv  = max_rangeSet(s1, s2);
-//   printRangeSet(rv);
+  filteredVals.count = nonNullCount;
+  filteredVals.ranges = malloc(sizeof(Int4Range) * filteredVals.count);
+  filteredVals.containsNull = vals.containsNull;
 
-//   rv.count = 50;
-//   reallocRangeSet(&rv);
+  int idx;
+  idx = 0;
+  for (i = 0; i < filteredVals.count; i++) {
+    if (!vals.ranges[i].isNull) {
+      filteredVals.ranges[idx].isNull = false;
+      filteredVals.ranges[idx++] = vals.ranges[i];
+    }
+  }
 
-//   return 0;
-// }
+  return filteredVals;
+}

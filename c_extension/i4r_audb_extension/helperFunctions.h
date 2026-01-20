@@ -44,7 +44,7 @@ Int4Range max_range(Int4Range a, Int4Range b);
 Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b);
 Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b);
 
-// Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult);
+Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult);
 bool overlap(Int4Range a, Int4Range b);
 bool contains(Int4Range a, Int4Range b);
 int range_distance(Int4Range a, Int4Range b);
@@ -53,7 +53,7 @@ Int4RangeSet lift_range(Int4Range a);
 Int4RangeSet sort(Int4RangeSet vals);
 Int4RangeSet normalize(Int4RangeSet vals);
 Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep);
-
+Int4RangeSet filterOutNulls(Int4RangeSet vals);
 // void reallocRangeSet(Int4RangeSet* a);
 
 #endif
