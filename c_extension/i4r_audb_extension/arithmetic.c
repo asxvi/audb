@@ -39,6 +39,18 @@ Int4RangeSet range_set_add(Int4RangeSet a, Int4RangeSet b){
     size_t i;
     size_t j;
 
+    // check NULL-only case. returns our null representation
+    if (a.count == 1 && a.containsNull &&
+        b.count == 1 && b.containsNull) {
+        rv.count = 1;
+        rv.containsNull = true;
+        rv.ranges = palloc(sizeof(Int4Range));
+        rv.ranges[0].isNull = true;
+        rv.ranges[0].lower = 0;
+        rv.ranges[0].upper = 0;
+        return rv;
+    }
+    
     rv.count = (a.count*b.count);
     rv.containsNull = a.containsNull && b.containsNull ? true : false;  // NULL {+,-,/,*} NULL == NULL
     

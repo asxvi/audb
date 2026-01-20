@@ -146,7 +146,7 @@ c_range_set_add(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    output = arithmetic_set_helper(a1, a2, range_set_add);
+    output = arithmetic_set_helperOp(a1, a2, range_set_add, '+');
     PG_RETURN_ARRAYTYPE_P(output);
 }
 

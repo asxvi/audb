@@ -202,84 +202,84 @@ Int4Range floatIntervalSetMult2(Int4RangeSet a, Multiplicity mult) {
 // } 
 
 
-Int4Range range_add(Int4Range a, Int4Range b){
-    // check that either operand is NULL
-    if (a.isNull) return b;
-    else if (b.isNull) return a;
+// Int4Range range_add(Int4Range a, Int4Range b){
+//     // check that either operand is NULL
+//     if (a.isNull) return b;
+//     else if (b.isNull) return a;
     
-    Int4Range rv;
+//     Int4Range rv;
     
-    rv.lower = 0;
-    rv.upper = 0;
+//     rv.lower = 0;
+//     rv.upper = 0;
 
-    // postgres raises error on invalid range input. Not sure if this check is useful
-    // if (!validRange(a) || !validRange(b)){
-    //     return rv;
-    // }
+//     // postgres raises error on invalid range input. Not sure if this check is useful
+//     // if (!validRange(a) || !validRange(b)){
+//     //     return rv;
+//     // }
 
-    rv.lower = a.lower+b.lower;
-    rv.upper = a.upper+b.upper-1; // exclusive upper
-    return rv;
-}
+//     rv.lower = a.lower+b.lower;
+//     rv.upper = a.upper+b.upper-1; // exclusive upper
+//     return rv;
+// }
 
-Int4RangeSet range_set_add(Int4RangeSet a, Int4RangeSet b){
-    Int4RangeSet rv;
-    size_t idx;
-    size_t i;
-    size_t j;
+// Int4RangeSet range_set_add(Int4RangeSet a, Int4RangeSet b){
+//     Int4RangeSet rv;
+//     size_t idx;
+//     size_t i;
+//     size_t j;
 
-    rv.ranges = NULL;
-    rv.count = 0;
-    rv.containsNull = a.containsNull && b.containsNull ? true : false;  // NULL {+,-,/,*} NULL == NULL
+//     rv.ranges = NULL;
+//     rv.count = 0;
+//     rv.containsNull = a.containsNull && b.containsNull ? true : false;  // NULL {+,-,/,*} NULL == NULL
 
-    // check for 2 sets with only NULL in them
-    if (a.count == 1 && b.count == 1 && rv.containsNull) return rv;
+//     // check for 2 sets with only NULL in them
+//     if (a.count == 1 && b.count == 1 && rv.containsNull) return rv;
     
-    rv.ranges = malloc(sizeof(Int4Range) * (a.count * b.count));
+//     rv.ranges = malloc(sizeof(Int4Range) * (a.count * b.count));
     
-    // // might need to fix checks
-    // if (!rv.ranges){
-    //     rv.ranges = NULL;
-    //     rv.count = 0;
-    //     rv.containsNull = false
-    //     return rv;
-    // }
+//     // // might need to fix checks
+//     // if (!rv.ranges){
+//     //     rv.ranges = NULL;
+//     //     rv.count = 0;
+//     //     rv.containsNull = false
+//     //     return rv;
+//     // }
 
-    rv.count = (a.count*b.count);
-    idx = 0;
-    for (i=0; i<a.count; i++){
-        for (j=0; j<b.count; j++){
-            int currLow;
-            int currHigh;
+//     rv.count = (a.count*b.count);
+//     idx = 0;
+//     for (i=0; i<a.count; i++){
+//         for (j=0; j<b.count; j++){
+//             int currLow;
+//             int currHigh;
 
-            // if (a.ranges[i].isNull && b.ranges[j].isNull) {
+//             // if (a.ranges[i].isNull && b.ranges[j].isNull) {
 
-            // }
-            // ignore first range if null
-            if (a.ranges[i].isNull) {
-                currLow = b.ranges[j].lower;
-                currHigh = (b.ranges[j].upper); //exclusive upper    
-            }
-            // ignore second range if null
-            else if (b.ranges[j].isNull) {
-                currLow = a.ranges[i].lower;
-                currHigh = (a.ranges[i].upper); //exclusive upper    
-            }
-            // neither ranges are null, normal calculation
-            else {
-                currLow = a.ranges[i].lower + b.ranges[j].lower;
-                currHigh = (a.ranges[i].upper + b.ranges[j].upper)-1; //exclusive upper
-            }
+//             // }
+//             // ignore first range if null
+//             if (a.ranges[i].isNull) {
+//                 currLow = b.ranges[j].lower;
+//                 currHigh = (b.ranges[j].upper); //exclusive upper    
+//             }
+//             // ignore second range if null
+//             else if (b.ranges[j].isNull) {
+//                 currLow = a.ranges[i].lower;
+//                 currHigh = (a.ranges[i].upper); //exclusive upper    
+//             }
+//             // neither ranges are null, normal calculation
+//             else {
+//                 currLow = a.ranges[i].lower + b.ranges[j].lower;
+//                 currHigh = (a.ranges[i].upper + b.ranges[j].upper)-1; //exclusive upper
+//             }
 
-            // assign proper result values, and null flag
-            rv.ranges[idx].lower = currLow;
-            rv.ranges[idx].upper = currHigh;
-            rv.ranges[idx].isNull = a.ranges[i].isNull && b.ranges[j].isNull ? true : false;
-            idx++;
-        }
-    }
-    return rv;
-}
+//             // assign proper result values, and null flag
+//             rv.ranges[idx].lower = currLow;
+//             rv.ranges[idx].upper = currHigh;
+//             rv.ranges[idx].isNull = a.ranges[i].isNull && b.ranges[j].isNull ? true : false;
+//             idx++;
+//         }
+//     }
+//     return rv;
+// }
 
 
 int main(){
