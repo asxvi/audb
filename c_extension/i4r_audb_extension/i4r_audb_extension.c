@@ -736,84 +736,105 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
 
     // add all values in param1 input1
     for(int i=0; i<n1; i++){
-        RangeType *curr = DatumGetRangeTypeP(elems1[i]);
-        RangeBound l1, u1;
-        bool isEmpty;
-        
-        range_deserialize(typcache, curr, &l1, &u1, &isEmpty);
-        
-        // if range 1 not empty then set curr index low and high members. default 0, 0 has no effect on add
-        if (!isEmpty) {
+        // the RangeType at this index is NULL
+        if (nulls1[i]) {
+            // maybe remove?
+            set1.ranges[i].lower = 0;
+            set1.ranges[i].upper = 0;
+
+            set1.ranges[i].isNull = true;
+            set1.containsNull = true;
+        }
+        // otherwise Extract RangeType elements
+        else {
+            RangeType *curr;
+            RangeBound l1, u1;
+            bool isEmpty1;
+            
+            curr = DatumGetRangeTypeP(elems1[i]);
+            range_deserialize(typcache, curr, &l1, &u1, &isEmpty1);
+
+            // need to handle is the RangeType is empty. 
+            // if (!isEmpty) {}
             set1.ranges[i].lower = DatumGetInt32(l1.val);
             set1.ranges[i].upper = DatumGetInt32(u1.val);
-        } 
-        // handle this perhaps better
-        else {
-            // set1.ranges[i].lower = 0;
-            // set1.ranges[i].upper = 0;
-            set1.ranges[i].isNull = true;
-            set1.containsNull = true
+            set1.ranges[i].isNull = false;
         }
     }
 
     // add all values in param2 input2
-    for(int i=0; i<n2; i++){
-        RangeType *curr = DatumGetRangeTypeP(elems2[i]);
-        RangeBound l2, u2;
-        bool isEmpty;
-        
-        range_deserialize(typcache, curr, &l2, &u2, &isEmpty);
-        
-        // if range 1 not empty then set curr index low and high members. default 0, 0 has no effect on add
-        if (!isEmpty) {
+    for(int i=0; i<n2; i++){    
+        // the RangeType at this index is NULL
+        if (nulls2[i]) {
+            // maybe remove?
+            set2.ranges[i].lower = 0;
+            set2.ranges[i].upper = 0;
+
+            set2.ranges[i].isNull = true;
+            set2.containsNull = true;
+        }
+        // otherwise Extract RangeType elements
+        else {
+            RangeType *curr;
+            RangeBound l2, u2;
+            bool isEmpty2;
+            
+            curr = DatumGetRangeTypeP(elems2[i]);
+            range_deserialize(typcache, curr, &l2, &u2, &isEmpty2);
+
+            // need to handle is the RangeType is empty. 
+            // if (!isEmpty) {}
             set2.ranges[i].lower = DatumGetInt32(l2.val);
             set2.ranges[i].upper = DatumGetInt32(u2.val);
-        } else {
-            // set2.ranges[i].lower = 0;
-            // set2.ranges[i].upper = 0;
-            set2.ranges[i].isNull = true;
-            set2.containsNull = true
+            set2.ranges[i].isNull = false;
         }
     }
     
     // callback function in this case is an arithmetic function with params: (Int4RangeSet a, Int4RangeSet b)
-    Int4RangeSet rv = callback(set1, set2);
+    Int4RangeSet rv;
+    rv = callback(set1, set2);
     
-    // convert reult of self defined type Int4RangeSet into a Datum array of RangeTypes
-    Datum *results_out = palloc(sizeof(Datum) * rv.count);
-
-    // only result is {NULL}
-    if (rv.count == 1 && rv.containsNull) {
-        results_out[0] = Datum;
-    }
+    Datum *datums;
+    bool  *nulls;
+    datums = palloc(sizeof(Datum) * rv.count);
+    nulls  = palloc(sizeof(bool) * rv.count);
 
     for(int i=0; i<rv.count; i++){
-        RangeBound lowerRv, upperRv;
-
-        // account for NULL results. must include NULL I4R type in returning ArrayType
-        if (rv.ranges[i].isNull){
-            lowerRv.val = NULL;
-            upperRv.val = NULL;
+        // trigger NULL index properly
+        if (rv.ranges[i].isNull) {
+            nulls[i] = true;
+            datums[i] = (Datum) 0;
+            continue;
         }
-        else {
-            lowerRv.val = Int32GetDatum(rv.ranges[i].lower);    
-            upperRv.val = Int32GetDatum(rv.ranges[i].upper);
-        }
+        
+        nulls[i] = false;
 
-
+        RangeBound lowerRv, upperRv;        
         // lowerRv.val = Int32GetDatum(rv.ranges[i].lower);
+        lowerRv.val = Int32GetDatum(rv.ranges[i].lower);    
         lowerRv.inclusive = true;
         lowerRv.infinite = false;
         lowerRv.lower = true;
-
+        
         // upperRv.val = Int32GetDatum(rv.ranges[i].upper);
+        upperRv.val = Int32GetDatum(rv.ranges[i].upper);
         upperRv.inclusive = false;
         upperRv.infinite = false;
         upperRv.lower = false;
 
         RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
-        results_out[i] = RangeTypePGetDatum(r);
+        datums[i] = RangeTypePGetDatum(r);
     }
+
+    int ndim;
+    int dims[1];
+    int lbs[1];
+    
+    ndim = 1;
+    dims[0] = rv.count;
+    lbs[0] = 1;
+    
+    ArrayType *resultsArrOut = construct_md_array(datums, nulls, ndim, dims, lbs, rangeTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign);
 
     pfree(elems1);
     pfree(nulls1);
@@ -823,7 +844,7 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
     pfree(set2.ranges);
 
     // Convert array of Datums into an ArrayType
-    ArrayType *resultsArrOut = construct_array(results_out, rv.count, rangeTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign);
+    // ArrayType *resultsArrOut = construct_array(results_out, rv.count, rangeTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign);
 
     return resultsArrOut;
 }

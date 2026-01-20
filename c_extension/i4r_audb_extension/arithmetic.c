@@ -10,7 +10,13 @@ Int4Range range_add(Int4Range a, Int4Range b){
     Int4Range rv;
 
     // check that either operand is NULL
-    if (a.isNull) return b;
+    if (a.isNull && b.isNull) {
+        rv.isNull = true;
+        rv.lower = 0;
+        rv.upper = 0;    
+        return rv;
+    }
+    else if (a.isNull) return b;
     else if (b.isNull) return a;    
     
     rv.lower = 0;
@@ -23,6 +29,7 @@ Int4Range range_add(Int4Range a, Int4Range b){
 
     rv.lower = a.lower+b.lower;
     rv.upper = a.upper+b.upper-1; // exclusive upper
+    rv.isNull = false;
     return rv;
 }
 
@@ -32,24 +39,17 @@ Int4RangeSet range_set_add(Int4RangeSet a, Int4RangeSet b){
     size_t i;
     size_t j;
 
-    rv.ranges = NULL;
-    rv.count = 0;
+    rv.count = (a.count*b.count);
     rv.containsNull = a.containsNull && b.containsNull ? true : false;  // NULL {+,-,/,*} NULL == NULL
-
+    
     // check for 2 sets with only NULL in them
-    if (a.count == 1 && b.count == 1 && rv.containsNull) return rv;
+    if (a.count == 1 && b.count == 1 && rv.containsNull) {
+        rv.ranges = NULL;
+        return rv;
+    }
     
     rv.ranges = malloc(sizeof(Int4Range) * (a.count * b.count));
-    
-    // // might need to fix checks
-    // if (!rv.ranges){
-    //     rv.ranges = NULL;
-    //     rv.count = 0;
-    //     rv.containsNull = false
-    //     return rv;
-    // }
 
-    rv.count = (a.count*b.count);
     idx = 0;
     for (i=0; i<a.count; i++){
         for (j=0; j<b.count; j++){
