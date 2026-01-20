@@ -156,74 +156,9 @@ static int q_sort_compare_ranges(const void* range1, const void* range2){
   return r1.upper < r2.upper ? -1 : 1;
 }
 
-// // Allocates space for new array that is sorted on 1)lower, 2)upper using quicksort
-// // prefilers result removing all potential NULLs. Then sorts.
-// // returns sorted array with NULL appended if necessary.
-// Int4RangeSet sort(Int4RangeSet vals){
-//   Int4RangeSet sorted;
-  
-//   if (vals.count == 0){
-//     sorted.count = 0;
-//     sorted.ranges = NULL;
-//     sorted.containsNull = false;
-//     return sorted;
-//   }
-
-//   // filter out nulls
-//   Int4RangeSet filteredVals;
-//   int idx;
-  
-//   idx = 0;
-//   filteredVals.ranges = malloc((sizeof(Int4Range) * vals.count));
-
-//   if (vals.containsNull) {
-//     int i;
-//     for (i = 0; i < vals.count; i++){
-//       if (!vals.ranges[i].isNull){
-//         filteredVals.ranges[idx].lower = vals.ranges[i].lower;
-//         filteredVals.ranges[idx].upper = vals.ranges[i].upper;
-//         filteredVals.containsNull = false;
-//         idx++;
-//       }
-//     }
-//   }
-//   filteredVals.count = idx;
-
-//   // set sorted accordingly to the original or filtered parameter result
-//   if (filteredVals.count > 0) {
-//     sorted.count = filteredVals.count;
-//     sorted.ranges = malloc(sizeof(Int4Range) * filteredVals.count);
-//     memcpy(sorted.ranges, filteredVals.ranges, sizeof(Int4Range) * filteredVals.count);
-//   }
-//   else{
-//     sorted.count = vals.count;
-//     sorted.ranges = malloc(sizeof(Int4Range) * vals.count);
-//     memcpy(sorted.ranges, vals.ranges, sizeof(Int4Range) * vals.count);  
-//   }
-
-//   // sort values
-//   qsort(sorted.ranges, sorted.count, sizeof(Int4Range), q_sort_compare_ranges);
-  
-//   // append NULL to the array
-//   if (vals.containsNull) {
-//     Int4RangeSet sortedNull;
-//     sortedNull.count = vals.count + 1;
-//     sortedNull.ranges = malloc(sizeof(Int4Range) * sortedNull.count);
-//     memcpy(sortedNull.ranges, sorted.ranges, (sizeof(Int4Range) * sortedNull.count-1));
-    
-//     sortedNull.ranges[sorted.count].isNull = true;
-//     sortedNull.ranges[sorted.count].lower = 0;
-//     sortedNull.ranges[sorted.count].upper = 0;
-//     return sortedNull;
-//   }
-
-//   return sorted;
-// }
-
-
-
-
-///////////
+// Allocates space for new array that is sorted on 1)lower, 2)upper using quicksort
+// prefilers result removing all potential NULLs. Then sorts.
+// returns sorted array with NULL appended if necessary.
 Int4RangeSet sort(Int4RangeSet vals){
   Int4RangeSet sorted;
   
@@ -268,12 +203,10 @@ Int4RangeSet sort(Int4RangeSet vals){
 
   return sorted;
 }
-////////////
-
-
 
 // Traverses through entire set and looks to merge any possible overlap.
 // Allocates space for new array 
+// should be strict overlap vs adjacancy: {[1,3) (3, 6]} => {(1,6]} ???
 Int4RangeSet normalize(Int4RangeSet vals){
   Int4RangeSet normalized;
   Int4RangeSet sorted;
@@ -288,10 +221,19 @@ Int4RangeSet normalize(Int4RangeSet vals){
   }
   
   sorted = sort(vals);
+  
+  bool hadNull = sorted.containsNull;
+  // remove null is present
+  if (hadNull) {
+    sorted = filterOutNulls(sorted);
+  }
+
   normalized.count = 0;
   normalized.ranges = malloc(sizeof(Int4Range) * sorted.count);
+  normalized.containsNull = false;
   
   prev = sorted.ranges[0];
+  prev.isNull = false;
 
   for(i=1; i<sorted.count; i++){
     Int4Range curr;
@@ -301,9 +243,9 @@ Int4RangeSet normalize(Int4RangeSet vals){
       prev.lower = (curr.lower < prev.lower) ? curr.lower : prev.lower;
       prev.upper = (curr.upper > prev.upper) ? curr.upper : prev.upper;
     }
-
     // no overlap, so add entire range
     else{
+      prev.isNull = false;
       normalized.ranges[normalized.count++] = prev;
       prev = curr;
     }
@@ -312,42 +254,19 @@ Int4RangeSet normalize(Int4RangeSet vals){
   // account for last range
   normalized.ranges[normalized.count++] = prev;
   
-  free(sorted.ranges);
+  // account for null 
+  if (hadNull) {
+    normalized.ranges = realloc(normalized.ranges, sizeof(Int4Range) * (normalized.count + 1));
+    normalized.ranges[normalized.count].isNull = true;
+    normalized.ranges[normalized.count].lower = 0;
+    normalized.ranges[normalized.count].upper = 0;
+    normalized.containsNull = true;
+    normalized.count++;
+  }
 
+  free(sorted.ranges);
   return normalized;
 }
-
-// // returns the Int4RangeSet of any intervals not empty 
-// Int4RangeSet removeEmpty(Int4RangeSet vals) {
-//   Int4RangeSet result = {NULL, 0};
-
-//   if (vals.count == 0) {
-//     return result;
-//   }
-
-//   size_t nonEmptyCount = 0;
-//   for (size_t i = 0; i < vals.count; i++) {
-//     if (validRangeStrict(vals.ranges[i])) {
-//       nonEmptyCount++;
-//     }
-//   }
-
-//   if (nonEmptyCount == 0){
-//     return result;
-//   }
-
-//   // only add in non empty ranges
-//   int currIdx = 0;
-//   result.ranges = malloc(sizeof(Int4Range) * nonEmptyCount);
-//   for (size_t i = 0; i < vals.count; i++) {
-//     if (validRangeStrict(vals.ranges[i])) {
-//       result.ranges[currIdx] = vals.ranges[i];
-//       currIdx++;
-//     }
-//   }
-
-//   return result;
-// } // free in returning function
 
 // Checks if 2 ranges overlap at all
 bool overlap(Int4Range a, Int4Range b){
@@ -437,10 +356,13 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
   return sortedInput;
 }
 
+// removes any NULLs in the set. returns a set that with containsNULL = false.
+// set no longer knows it contains nulls; this must be tracked when called.
 Int4RangeSet filterOutNulls(Int4RangeSet vals) {
   if (!vals.containsNull) {
     return vals;
   }
+  
   Int4RangeSet filteredVals;
   size_t nonNullCount;
   size_t i;
@@ -452,16 +374,19 @@ Int4RangeSet filterOutNulls(Int4RangeSet vals) {
 
   filteredVals.count = nonNullCount;
   filteredVals.ranges = malloc(sizeof(Int4Range) * filteredVals.count);
-  filteredVals.containsNull = vals.containsNull;
+  filteredVals.containsNull = false;
+  // filteredVals.containsNull = vals.containsNull;
 
   int idx;
   idx = 0;
-  for (i = 0; i < filteredVals.count; i++) {
+  for (i = 0; i < vals.count; i++) {
     if (!vals.ranges[i].isNull) {
       filteredVals.ranges[idx].isNull = false;
       filteredVals.ranges[idx++] = vals.ranges[i];
     }
   }
+
+  free(vals.ranges);
 
   return filteredVals;
 }

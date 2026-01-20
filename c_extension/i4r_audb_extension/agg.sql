@@ -4,6 +4,14 @@
 -- Max naive approach can be optimized
 -- Avg sum/count
 
+-- test sum agg
+
+create aggregate sum_test (int4range[])
+(
+    stype = int4range[],
+    sfunc = test_c_range_set_sum
+);
+
 
 -- deal with blowup with hardcoded value
 -- initcond = NULL by default

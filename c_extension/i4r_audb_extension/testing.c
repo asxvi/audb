@@ -45,34 +45,36 @@ void printRangeSet(Int4RangeSet a){
   printf("}\n");
 }
 
-// Int4RangeSet filterOutNulls(Int4RangeSet vals) {
-//   if (!vals.containsNull) {
-//     return vals;
-//   }
-//   Int4RangeSet filteredVals;
-//   size_t nonNullCount;
-//   size_t i;
+Int4RangeSet filterOutNulls(Int4RangeSet vals) {
+  if (!vals.containsNull) {
+    return vals;
+  }
   
-//   nonNullCount = 0;
-//   for (i = 0; i < vals.count; i++) {
-//     if (!vals.ranges[i].isNull) nonNullCount++;
-//   }
+  Int4RangeSet filteredVals;
+  size_t nonNullCount;
+  size_t i;
+  
+  nonNullCount = 0;
+  for (i = 0; i < vals.count; i++) {
+    if (!vals.ranges[i].isNull) nonNullCount++;
+  }
 
-//   filteredVals.count = nonNullCount;
-//   filteredVals.ranges = malloc(sizeof(Int4Range) * filteredVals.count);
-//   filteredVals.containsNull = vals.containsNull;
+  filteredVals.count = nonNullCount;
+  filteredVals.ranges = malloc(sizeof(Int4Range) * filteredVals.count);
+  filteredVals.containsNull = false;
+  // filteredVals.containsNull = vals.containsNull;
 
-//   int idx;
-//   idx = 0;
-//   for (i = 0; i < filteredVals.count; i++) {
-//     if (!vals.ranges[i].isNull) {
-//       filteredVals.ranges[idx].isNull = false;
-//       filteredVals.ranges[idx++] = vals.ranges[i];
-//     }
-//   }
+  int idx;
+  idx = 0;
+  for (i = 0; i < vals.count; i++) {
+    if (!vals.ranges[i].isNull) {
+      filteredVals.ranges[idx].isNull = false;
+      filteredVals.ranges[idx++] = vals.ranges[i];
+    }
+  }
 
-//   return filteredVals;
-// }
+  return filteredVals;
+}
 
 
 int main(){
@@ -96,8 +98,11 @@ int main(){
   Int4RangeSet s1 = {a_ranges, 3, true};
   Int4RangeSet s2 = {b_ranges, 2, true};
   
-  Int4RangeSet rv1 = range_set_add(s1, s2); 
-  printRangeSet(rv1);
+  // Int4RangeSet rv1 = range_set_add(s1, s2); 
+  // printRangeSet(rv1);
+
+  Int4RangeSet rv2 = filterOutNulls(s1);
+  printRangeSet(rv2);
 
   // Int4Range rv1 = floatIntervalSetMult(s1, mult1);  
   // printRange(rv1);

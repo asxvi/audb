@@ -5,12 +5,12 @@
 ----------------------------------------------------------------------------
 ---------------------------------TESTING------------------------------------
 
--- -- c_range_add takes 2 int4range types and returns the sum
--- CREATE FUNCTION test_c_range_set_add(a int4range[], b int4range[]) 
--- RETURNS int4range[]
--- AS 'MODULE_PATHNAME', 'c_range_add'
--- LANGUAGE c;
--- -- LANGUAGE c STRICT VOLATILE;
+-- test_c_range_set_sum takes 2 int4range types and returns the sum
+CREATE FUNCTION test_c_range_set_sum(a int4range[], b int4range[]) 
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'test_c_range_set_sum'
+LANGUAGE c;
+-- LANGUAGE c STRICT VOLATILE;
 
 ----------------------------------------------------------------------------
 ---------------------------Arithemtic functions-----------------------------

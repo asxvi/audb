@@ -32,7 +32,7 @@ PG_FUNCTION_INFO_V1(c_sort);
 PG_FUNCTION_INFO_V1(c_normalize);
 PG_FUNCTION_INFO_V1(c_reduceSize);
 
-PG_FUNCTION_INFO_V1(test_c_range_set_add);
+PG_FUNCTION_INFO_V1(test_c_range_set_sum);
 
 // check for NULLS parameters. Different from empty range check
 #define CHECK_BINARY_PGARG_NULL_ARGS()                          \
@@ -811,13 +811,11 @@ arithmetic_set_helperOp(ArrayType *input1, ArrayType *input2, Int4RangeSet (*cal
         nulls[i] = false;
 
         RangeBound lowerRv, upperRv;        
-        // lowerRv.val = Int32GetDatum(rv.ranges[i].lower);
         lowerRv.val = Int32GetDatum(rv.ranges[i].lower);    
         lowerRv.inclusive = true;
         lowerRv.infinite = false;
         lowerRv.lower = true;
-        
-        // upperRv.val = Int32GetDatum(rv.ranges[i].upper);
+    
         upperRv.val = Int32GetDatum(rv.ranges[i].upper);
         upperRv.inclusive = false;
         upperRv.infinite = false;
@@ -1023,7 +1021,7 @@ normalizeRange(ArrayType *input1) {
     TypeCacheEntry *typcache;
 
     elemTypeOID = TypenameGetTypid("int4range");
-    typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
+    typcache = lookup_type_cache(elemTypeOID, TYPECACHE_RANGE_INFO);
     
     // deconstruct array, create our representation of I4R, call function and get 'normalized' result
     Datum *elems1;
@@ -1060,9 +1058,10 @@ normalizeRange(ArrayType *input1) {
             range_deserialize(typcache, curr, &l1, &u1, &isEmpty1);
 
             // if the RangeType is not empty, append to 
-            if (!isEmpty) {
+            if (!isEmpty1) {
                 set1.ranges[currIdx].lower = DatumGetInt32(l1.val);
                 set1.ranges[currIdx].upper = DatumGetInt32(u1.val);
+                set1.ranges[currIdx].isNull = false;
                 currIdx++;
             }
         }
@@ -1070,7 +1069,6 @@ normalizeRange(ArrayType *input1) {
     set1.count = currIdx;
     
     Int4Range *temp;
-
     // return empty array if there is no result
     if (set1.count == 0) {
         pfree(set1.ranges);
@@ -1083,40 +1081,58 @@ normalizeRange(ArrayType *input1) {
     }
 
     // Remove all possible overlap.
-    Int4RangeSet outSet = normalize(set1);
+    Int4RangeSet rv;
+    rv = normalize(set1);
 
+    Datum *datums;
+    bool  *nulls;
+    datums = palloc(sizeof(Datum) * rv.count);
+    nulls  = palloc(sizeof(bool) * rv.count);
+    
     // convert self defined type into valid Postgres Type
-    Datum *results_out = palloc(sizeof(Datum) * outSet.count);
-    for(int i=0; i<outSet.count; i++){
+    for(i=0; i<rv.count; i++){
+        // trigger NULL index properly
+        if (rv.ranges[i].isNull) {
+            nulls[i] = true;
+            datums[i] = (Datum) 0;
+            continue;
+        }
+        
+        nulls[i] = false;
+        
         RangeBound lowerRv, upperRv;
-        lowerRv.val = Int32GetDatum(outSet.ranges[i].lower);
+        lowerRv.val = Int32GetDatum(rv.ranges[i].lower);
         lowerRv.inclusive = true;
         lowerRv.infinite = false;
         lowerRv.lower = true;
 
-        upperRv.val = Int32GetDatum(outSet.ranges[i].upper);
+        upperRv.val = Int32GetDatum(rv.ranges[i].upper);
         upperRv.inclusive = false;
         upperRv.infinite = false;
         upperRv.lower = false;
 
-        // wrong typcache?? 
         RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
-        results_out[i] = RangeTypePGetDatum(r);
+        datums[i] = RangeTypePGetDatum(r);
     }
 
     // Convert array of Datums into an ArrayType
-    ArrayType *resultsArrOut = construct_array(results_out, outSet.count, elemTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign);
+    int ndim;
+    int dims[1];
+    int lbs[1];
+    
+    ndim = 1;
+    dims[0] = rv.count;
+    lbs[0] = 1;
+
+    ArrayType *resultsArrOut = construct_md_array(datums, nulls, ndim, dims, lbs, elemTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign);
     
     pfree(elems1);
     pfree(nulls1);
     pfree(set1.ranges);
-    pfree(results_out);
+    pfree(rv.ranges);
 
     return resultsArrOut;
 }
-
-
-
 
 
 /*
@@ -1134,7 +1150,7 @@ test_c_range_set_sum(PG_FUNCTION_ARGS)
     ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
     ArrayType *a2 = PG_GETARG_ARRAYTYPE_P(1);
     
-    ArrayType *sumOutput = arithmetic_set_helper(a1, a2, range_set_add);
+    ArrayType *sumOutput = arithmetic_set_helperOp(a1, a2, range_set_add, '+');
 
     int nelems = ArrayGetNItems(ARR_NDIM(sumOutput), ARR_DIMS(sumOutput));
 
@@ -1142,7 +1158,7 @@ test_c_range_set_sum(PG_FUNCTION_ARGS)
     // call function to resize the array. create new arr and free old one
     if (nelems >= resizeTrigger) {
         // function to create new array
-        rv = normalizeRange(output);
+        rv = normalizeRange(sumOutput);
         pfree(sumOutput);
     }
     else {
