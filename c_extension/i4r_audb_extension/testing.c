@@ -76,8 +76,9 @@ Int4RangeSet filterOutNulls(Int4RangeSet vals) {
   return filteredVals;
 }
 
+#define PRIMARY_DATA_TYPE "int4range"
 
-int main(){
+int main(){  
   Int4Range a = {1,3};
   Int4Range b = {10,21};
   Int4Range c = {5,8};

@@ -65,31 +65,31 @@ create aggregate avg (int4range)
     
 );
 
--- MAX and MIN
--- naive approach without optimizing
--- min_function(A int4range[], B int4range[])
-for every i4r in A
-    for every i4r in B
-        min(a, b) -> i4r == (min(LB(a), LB(B)),  min(UB(a), UB(B)))
+-- -- MAX and MIN
+-- -- naive approach without optimizing
+-- -- min_function(A int4range[], B int4range[])
+-- for every i4r in A
+--     for every i4r in B
+--         min(a, b) -> i4r == (min(LB(a), LB(B)),  min(UB(a), UB(B)))
 
-sum_function (existing_ranges, new_ranges, max_wanted_ranges, num_ranges_to_keep)
-    add all ranges n x m
-    if num_ranges in agg result >= max_wanted_ranges:
-        reduce to num_ranges_to_keep
+-- sum_function (existing_ranges, new_ranges, max_wanted_ranges, num_ranges_to_keep)
+--     add all ranges n x m
+--     if num_ranges in agg result >= max_wanted_ranges:
+--         reduce to num_ranges_to_keep
 
--- AVG
-for every
+-- -- AVG
+-- for every
 
-A                |              B
-[(1,3), (5,7)]          [(1,6), (9,10)]
-[(2,5), (6,7)]          [(1,6), (9,10)]
+-- A                |              B
+-- [(1,3), (5,7)]          [(1,6), (9,10)]
+-- [(2,5), (6,7)]          [(1,6), (9,10)]
 
-count(A) = 2
-sum(A) = [(3,6), (7,8), (7,10), (11,12)]
-avg(A) = [(1,2), (3,3), (3,4), (5,5)]
+-- count(A) = 2
+-- sum(A) = [(3,6), (7,8), (7,10), (11,12)]
+-- avg(A) = [(1,2), (3,3), (3,4), (5,5)]
 
 
-sum(A) after normalize = [(3,6), (7,10), (11,12)]
-avg(A) after normalize = [(1,2), (3,4), (5,5)]
+-- sum(A) after normalize = [(3,6), (7,10), (11,12)]
+-- avg(A) after normalize = [(1,2), (3,4), (5,5)]
 
 

@@ -19,9 +19,6 @@ Int4Range range_add(Int4Range a, Int4Range b){
     else if (a.isNull) return b;
     else if (b.isNull) return a;    
     
-    rv.lower = 0;
-    rv.upper = 0;
-
     // postgres raises error on invalid range input. Not sure if this check is useful
     // if (!validRange(a) || !validRange(b)){
     //     return rv;

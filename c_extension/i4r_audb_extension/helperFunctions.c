@@ -67,11 +67,15 @@ void printRangeSet(Int4RangeSet a){
 
 // Checks if a is increasing: a.lower <= a.upper
 bool validRange(Int4Range a){
+  if (a.isNull) return true;
+
   return a.lower <= a.upper;
 }
 
 // Checks if a is stricly increasing: a.lower < a.upper
 bool validRangeStrict(Int4Range a){
+  if (a.isNull) return true;
+
   return a.lower < a.upper;
 }
 
@@ -206,7 +210,7 @@ Int4RangeSet sort(Int4RangeSet vals){
 
 // Traverses through entire set and looks to merge any possible overlap.
 // Allocates space for new array 
-// should be strict overlap vs adjacancy: {[1,3) (3, 6]} => {(1,6]} ???
+// Confusion: should it be strict overlap vs adjacancy: {[1,3) (3, 6]} => {(1,6]} ???
 Int4RangeSet normalize(Int4RangeSet vals){
   Int4RangeSet normalized;
   Int4RangeSet sorted;
