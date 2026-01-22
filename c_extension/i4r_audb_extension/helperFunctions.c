@@ -304,17 +304,27 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
   Int4RangeSet sortedInput;
   int currNumRanges;
 
-  if (vals.count == 0){
-    normalized.count = 0;
-    normalized.ranges = NULL;
-    return normalized;
-  }
-  else if (vals.count <= numRangesKeep){
+  if (vals.count <= numRangesKeep){
     return vals;
+  }
+  else if (vals.count == 0){
+    normalized.count = 0;
+    normalized.containsNull = false;
+    normalized.ranges = NULL;
+  }
+  else if (vals.containsNull && vals.count == 1){
+    normalized.count = 1;
+    normalized.containsNull = true;
+    normalized.ranges = palloc(sizeof(Int4Range));
+    normalized.ranges[0].isNull = true;
+    normalized.ranges[0].lower = 0;
+    normalized.ranges[0].upper = 0;
   }
 
   sortedInput = sort(vals);
-  currNumRanges = sortedInput.count;
+
+  // ignore the NULL range at sortedInput.ranges[len-1]
+  currNumRanges = sortedInput.count - (sortedInput.containsNull ? 1 : 0);
 
   while(currNumRanges > numRangesKeep){
     int bestDist;

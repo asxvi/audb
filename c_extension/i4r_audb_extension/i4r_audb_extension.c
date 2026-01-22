@@ -302,6 +302,7 @@ c_gte(PG_FUNCTION_ARGS)
 /////////////////////
 
 /* lift expects 1 parameter x for example and returns a valid int4range [x, x+1) */
+// Lift an Integer x into a RangeType [x, x+1)
 Datum
 c_lift_scalar(PG_FUNCTION_ARGS)
 {
@@ -331,62 +332,6 @@ c_lift_scalar(PG_FUNCTION_ARGS)
     PG_RETURN_RANGE_P(output);
 }
 
-/* lift expects 1 parameter x for example and returns a valid int4range [x, x+1) */
-// Datum
-// c_lift_range(PG_FUNCTION_ARGS)
-// {
-//     // // check for NULLS. Diff from empty check
-//     // if (PG_ARGISNULL(0)){
-//     //     PG_RETURN_NULL();
-//     // }
-
-//     // // parse out single RangeType, convert to our I4R, call funciton and convert results back
-//     // RangeType *r = PG_GETARG_RANGE_P(0);
-//     // RangeBound l1, u1;
-//     // bool isEmpty1;
-//     // // require that typecache has range info
-//     // Oid rangeTypeOID = TypenameGetTypid("int4range");
-//     // TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
-//     // range_deserialize(typcache, r1, &l1, &u1, &isEmpty1);
-
-//     // Int4Range a = {DatumGetInt32(l1.val), DatumGetInt32(u1.val)};
-
-//     // Int4Range rv = lift_range(a);
-
-//     // RangeBound lowerRv, upperRv;
-//     // lowerRv.val = Int32GetDatum(rv.lower);
-//     // lowerRv.inclusive = true;
-//     // lowerRv.infinite = false;
-//     // lowerRv.lower = true;
-
-//     // upperRv.val = Int32GetDatum(rv.upper);
-//     // upperRv.inclusive = false;
-//     // upperRv.infinite = false;
-//     // upperRv.lower = false;
-
-//     // Oid rangeTypeOID = TypenameGetTypid("int4range");
-//     // TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
-    
-//     // RangeType *result = make_range(
-//     //     typcache, 
-//     //     &lowerRv, 
-//     //     &upperRv, 
-//     //     false, 
-//     //     NULL
-//     // );
-
-//     // PG_RETURN_RANGE_P(result);
-
-
-//     CHECK_BINARY_PGARG_NULL_OR();
-
-//     RangeType *r = PG_GETARG_RANGE_P(0);
-
-//     RangeType* rv = lift_helper(a1, lift_range);
-    
-//     PGreturn((bool)rv);
-// }
-
 Datum
 c_reduceSize(PG_FUNCTION_ARGS)
 {
@@ -395,85 +340,43 @@ c_reduceSize(PG_FUNCTION_ARGS)
         PG_RETURN_NULL();
     }
 
-    ArrayType *a1 = PG_GETARG_ARRAYTYPE_P(0);
-    int32 numRangesKeep = PG_GETARG_INT32(1);
+    ArrayType *inputArray;
+    int32 numRangesKeep;
+    inputArray = PG_GETARG_ARRAYTYPE_P(0);
+    numRangesKeep = PG_GETARG_INT32(1);
 
-    Datum *elems1;
-    bool *nulls1;
-    int n1;
+    // assign typcache based on RangeType input
+    Oid rangeTypeOID;
+    TypeCacheEntry *typcache;
+    rangeTypeOID = ARR_ELEMTYPE(inputArray);
+    typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
 
-    // hardcoded for int4range. will need to replace for other range implementations
-    // Oid rangeTypeOID = INT4RANGEOID;
-    Oid rangeTypeOID = TypenameGetTypid("int4range");
-
-    int16 typlen;
-    bool typbyval;
-    char typalign;
-    get_typlenbyvalalign(rangeTypeOID, &typlen, &typbyval, &typalign);
-
-    deconstruct_array(a1, rangeTypeOID, typlen, typbyval, typalign, &elems1, &nulls1, &n1);
+    Int4RangeSet set1;
+    set1 = deserialize_ArrayType(inputArray, typcache);
     
-    // NULL on both empty, return non empty otherwise. 
-    if (n1 == 0){
+    // return NULL sorted range == NULL. 
+    if (set1.count == 0){
         PG_RETURN_NULL();
     }
 
-    Int4RangeSet set1;
-    set1.count = n1;
-    set1.ranges = palloc(sizeof(Int4Range) * n1);
+    // reduce the set to numRangesKeep
+    Int4RangeSet result;
+    result = reduceSize(set1, numRangesKeep);
 
-    // require that typecache has range info
-    TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
-    // ereport(INFO, errmsg("(%d)", typcache->type_id));
-
-    // add all values in param1 a1
-    for(int i=0; i<n1; i++){
-        RangeType *curr = DatumGetRangeTypeP(elems1[i]);
-        RangeBound l1, u1;
-        bool isEmpty;
-        
-        range_deserialize(typcache, curr, &l1, &u1, &isEmpty);
-        
-        // if range 1 not empty then set curr index low and high members. default 0, 0 has no effect on add
-        if (!isEmpty) {
-            set1.ranges[i].lower = DatumGetInt32(l1.val);
-            set1.ranges[i].upper = DatumGetInt32(u1.val);
-        } else {
-            set1.ranges[i].lower = 0;
-            set1.ranges[i].upper = 0;
-        }
-        // ereport(INFO, errmsg("(%d, %d)", set1.ranges[i].lower, set1.ranges[i].upper));
+    // the reduced size should always be less than equal to numRangesKeep
+    if (result.count < numRangesKeep) {
+        ereport(ERROR,
+            (errcode(ERRCODE_DATA_CORRUPTED),
+            errmsg("result.count < numRangesKeep when reducing. Impossible result")));
     }
 
-    Int4RangeSet rv = reduceSize(set1, numRangesKeep);
-    rv.count = numRangesKeep;
+    ArrayType *output;
+    output = serialize_ArrayType(result, typcache);
+    
+    pfree(set1.ranges);
+    pfree(result.ranges);
 
-    Datum *results_out = palloc(sizeof(Datum) * rv.count);
-    for(int i=0; i<rv.count; i++){
-        RangeBound lowerRv, upperRv;
-        lowerRv.val = Int32GetDatum(rv.ranges[i].lower);
-        lowerRv.inclusive = true;
-        lowerRv.infinite = false;
-        lowerRv.lower = true;
-
-        upperRv.val = Int32GetDatum(rv.ranges[i].upper);
-        upperRv.inclusive = false;
-        upperRv.infinite = false;
-        upperRv.lower = false;
-
-        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
-        results_out[i] = RangeTypePGetDatum(r);
-    }
-
-    // Convert array of Datums into an ArrayType
-    ArrayType *resultsArrOut = construct_array(results_out, rv.count, rangeTypeOID, typlen, typbyval, typalign);
-
-    // // implemented C functions use c memory allocation. Make sure to free!
-    // if(rv.ranges){
-    //     free(rv.ranges);
-    // }
-
-    PG_RETURN_ARRAYTYPE_P(resultsArrOut);
+    PG_RETURN_ARRAYTYPE_P(output);
 }
 
 Datum
@@ -484,7 +387,8 @@ c_sort(PG_FUNCTION_ARGS)
         PG_RETURN_NULL();
     }
 
-    ArrayType *input = PG_GETARG_ARRAYTYPE_P(0);
+    ArrayType *input;
+    input = PG_GETARG_ARRAYTYPE_P(0);
     Datum *elems;
     bool *nulls;
     int count;
@@ -686,7 +590,8 @@ arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4RangeSet (*callb
     Oid rangeTypeOID2;
     rangeTypeOID1 = ARR_ELEMTYPE(input1);
     rangeTypeOID2 = ARR_ELEMTYPE(input2);
-    TypeCacheEntry *typcache = lookup_type_cache(rangeTypeOID1, TYPECACHE_RANGE_INFO);
+    TypeCacheEntry *typcache;
+    typcache = lookup_type_cache(rangeTypeOID1, TYPECACHE_RANGE_INFO);
     
     if (rangeTypeOID1 != rangeTypeOID2) {
         ereport(ERROR,
@@ -695,15 +600,17 @@ arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4RangeSet (*callb
     }
 
     // convert native PG representaion to our local representation
-    Int4RangeSet set1 = deserialize_ArrayType(input1, typcache);
-    Int4RangeSet set2 = deserialize_ArrayType(input2, typcache);
+    Int4RangeSet set1, set2;
+    set1 = deserialize_ArrayType(input1, typcache);
+    set2 = deserialize_ArrayType(input2, typcache);
 
     // callback function in this case is an arithmetic function with params: (Int4RangeSet a, Int4RangeSet b)
     Int4RangeSet result;
     result = callback(set1, set2);
     
     // convert result back to native PG representation
-    ArrayType *output = serialize_ArrayType(result, typcache);
+    ArrayType *output;
+    output = serialize_ArrayType(result, typcache);
 
     pfree(set1.ranges);
     pfree(set2.ranges);
@@ -765,9 +672,9 @@ static Int4Range
 deserialize_RangeType(RangeType *rng, TypeCacheEntry *typcache)
 {
     Int4Range range;
-
     RangeBound lower, upper;
     bool isEmpty;
+
     range_deserialize(typcache, rng, &lower, &upper, &isEmpty);   
 
     // should we care to store empty ranges? same behavior as NULL
@@ -806,8 +713,8 @@ serialize_RangeType(Int4Range range, TypeCacheEntry *typcache)
     }
 
     RangeType *result;
-
     RangeBound lower, upper;
+
     lower = make_range_bound(range.lower, true);
     upper = make_range_bound(range.upper, false);
 
