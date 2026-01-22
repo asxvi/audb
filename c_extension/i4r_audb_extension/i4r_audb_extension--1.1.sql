@@ -5,10 +5,17 @@
 ----------------------------------------------------------------------------
 ---------------------------------TESTING------------------------------------
 
--- test_c_range_set_sum takes 2 int4range types and returns the sum
-CREATE FUNCTION test_c_range_set_sum(a int4range[], b int4range[]) 
-RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'test_c_range_set_sum'
+-- -- test_c_range_set_sum takes 2 int4range types and returns the sum
+-- CREATE FUNCTION test_c_range_set_sum(a int4range[], b int4range[]) 
+-- RETURNS int4range[]
+-- AS 'MODULE_PATHNAME', 'test_c_range_set_sum'
+-- LANGUAGE c;
+-- -- LANGUAGE c STRICT VOLATILE;
+
+
+CREATE FUNCTION interval_agg_transfunc(internal, int4range[], int4range) 
+RETURNS internal
+AS 'MODULE_PATHNAME', 'interval_agg_transfunc'
 LANGUAGE c;
 -- LANGUAGE c STRICT VOLATILE;
 

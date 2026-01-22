@@ -22,17 +22,19 @@ typedef struct{
     bool containsNull;
 } Int4RangeSet;
 
+// **DELETE ME**
 // [Inlcusive LB, Inclusive UB]
 typedef struct{
     int lower;  //inclusive
     int upper;  //inclusive
 } Multiplicity;
 
-
+// sum aggregate state data type
 typedef struct {
-    Int4RangeSet ranges;        // potential duplicates
-    Multiplicity mult;          // closed interval
+    Int4RangeSet accumulated;        // potential duplicates
+    Int4Range mult;               // closed interval
     bool has_null;              // only true if every row contains (0,0) || mult = [0,n]
+    int triggerSize;
 } IntervalAggState;
 
 // add extra utilites for working with defined type
@@ -62,5 +64,5 @@ Int4RangeSet normalize(Int4RangeSet vals);
 Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep);
 Int4RangeSet filterOutNulls(Int4RangeSet vals);
 // void reallocRangeSet(Int4RangeSet* a);
-
+Int4RangeSet interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult);
 #endif

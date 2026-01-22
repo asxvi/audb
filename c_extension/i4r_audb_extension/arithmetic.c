@@ -12,11 +12,10 @@ summary:
 // mult == repeated addition?
 // add: null survives if in both a and b
     // null + null = null
-    // null + 3 = 3
+    // null + 3 = entire domain
 // mult: null survives if in either a and b 
     // null * null = null
-    // ex: null * 3 = null
-    
+    // ex: null * 3 = entire domain
 */
 
 

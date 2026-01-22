@@ -21,6 +21,12 @@ int MAX(int My_array[], int len) {
   }
   return num;
 }
+
+// Checks if 2 ranges overlap at all
+bool overlap(Int4Range a, Int4Range b){
+  return a.lower < b.upper && b.lower < a.upper;
+}
+
 void printRange(Int4Range a){
   if (a.isNull){
     printf("NULL\n");
@@ -91,7 +97,69 @@ static int q_sort_compare_ranges(const void* range1, const void* range2){
   return r1.upper < r2.upper ? -1 : 1;
 }
 
+// Traverses through entire set and looks to merge any possible overlap.
+// Allocates space for new array 
+// Confusion: should it be strict overlap vs adjacancy: {[1,3) (3, 6]} => {(1,6]} ???
+Int4RangeSet normalize(Int4RangeSet vals){
+  Int4RangeSet normalized;
+  Int4RangeSet sorted;
+  Int4Range prev;
+  size_t i;
 
+  if (vals.count == 0){
+    normalized.count = 0;
+    normalized.ranges = NULL;
+    normalized.containsNull = false;
+    return normalized;
+  }
+  
+  sorted = sort(vals);
+  
+  bool hadNull = sorted.containsNull;
+  // remove null is present
+  if (hadNull) {
+    sorted = filterOutNulls(sorted);
+  }
+
+  normalized.count = 0;
+  normalized.ranges = malloc(sizeof(Int4Range) * sorted.count);
+  normalized.containsNull = false;
+  
+  prev = sorted.ranges[0];
+  prev.isNull = false;
+
+  for(i=1; i<sorted.count; i++){
+    Int4Range curr;
+    curr = sorted.ranges[i];
+    
+    if (overlap(prev, curr)){
+      prev.lower = (curr.lower < prev.lower) ? curr.lower : prev.lower;
+      prev.upper = (curr.upper > prev.upper) ? curr.upper : prev.upper;
+    }
+    // no overlap, so add entire range
+    else{
+      prev.isNull = false;
+      normalized.ranges[normalized.count++] = prev;
+      prev = curr;
+    }
+  }
+  
+  // account for last range
+  normalized.ranges[normalized.count++] = prev;
+  
+  // account for null 
+  if (hadNull) {
+    normalized.ranges = realloc(normalized.ranges, sizeof(Int4Range) * (normalized.count + 1));
+    normalized.ranges[normalized.count].isNull = true;
+    normalized.ranges[normalized.count].lower = 0;
+    normalized.ranges[normalized.count].upper = 0;
+    normalized.containsNull = true;
+    normalized.count++;
+  }
+
+  free(sorted.ranges);
+  return normalized;
+}
 
 // Allocates space for new array that is sorted on 1)lower, 2)upper using quicksort
 // prefilers result removing all potential NULLs. Then sorts.
@@ -141,6 +209,127 @@ Int4RangeSet sort(Int4RangeSet vals){
   return sorted;
 }
 
+Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
+    Int4RangeSet rv;
+    size_t idx;
+    size_t i;
+    size_t j;
+    
+    // check NULL-only case. returns our null representation
+    if ((a.count == 1 && a.containsNull) ||
+        (b.count == 1 && b.containsNull)) {
+        rv.count = 1;
+        rv.containsNull = true;
+        rv.ranges = malloc(sizeof(Int4Range));
+        rv.ranges[0].isNull = true;
+        rv.ranges[0].lower = 0;
+        rv.ranges[0].upper = 0;
+        return rv;
+    }
+    
+    rv.count = (a.count*b.count);
+    rv.containsNull = a.containsNull || b.containsNull ? true : false;  // NULL {+,-,/,*} NULL == NULL
+    rv.ranges = malloc(sizeof(Int4Range) * (a.count * b.count));
+    
+    idx = 0;
+    for (i=0; i<a.count; i++){
+        for (j=0; j<b.count; j++){
+            int arr[4];
+            int currLow;
+            int currHigh;
+
+            // either null -> result null
+            if (a.ranges[i].isNull || b.ranges[j].isNull) {
+                currLow = 0;
+                currHigh = 0;
+            }
+            else {
+                arr[1] = a.ranges[i].lower * (b.ranges[j].upper-1);
+                arr[0] = a.ranges[i].lower * b.ranges[j].lower;
+                arr[2] = (a.ranges[i].upper-1) * b.ranges[j].lower;
+                arr[3] = (a.ranges[i].upper-1) * (b.ranges[j].upper-1);
+                
+                currLow = MIN(arr, 4);
+                currHigh = MAX(arr, 4)+1;   //exclusive UB
+            }
+
+            // assign proper result values, and null flag
+            rv.ranges[idx].lower = currLow;
+            rv.ranges[idx].upper = currHigh;
+            rv.ranges[idx].isNull = a.ranges[i].isNull || b.ranges[j].isNull ? true : false;
+            idx++;
+        }
+    }
+    return rv;
+}
+
+Int4RangeSet
+interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
+    Int4RangeSet result;
+    bool leftNull, rightNull;
+    int total_result_ranges;
+
+    total_result_ranges = set1.count * (mult.upper - mult.lower);
+    
+    result.count = 0;
+    result.containsNull = false;
+    result.ranges = malloc(sizeof(Int4Range) * total_result_ranges);
+
+    // multSet.containsNull = (mult.lower == 0);
+    
+    // check if either side produces null. Append NULL to result later
+    leftNull = set1.containsNull;
+    rightNull = mult.lower == 0;
+    
+    int i, idx;
+    idx = 0;
+    // traverse thru every set/mult combination and union result
+    for (i = mult.lower; i < mult.upper; i++) {
+        // ignore mult == 0 bc it produced NULL flag
+        if (i == 0) {
+            continue;
+        }
+
+        Int4RangeSet multSet;
+
+        multSet.containsNull = false;
+        multSet.count = 1;
+        multSet.ranges = malloc(sizeof(Int4Range));
+        multSet.ranges[0].lower = i;
+        multSet.ranges[0].upper = i+1;      // account for exclusive UB representation 
+        multSet.ranges[0].isNull = false;
+
+        Int4RangeSet tempResult;
+        tempResult = range_set_multiply(set1, multSet);
+        free(multSet.ranges);
+
+        // union in new results
+        int j;
+        for (j = 0; j < tempResult.count; j++) {
+            result.ranges[idx] = tempResult.ranges[j];
+            idx++;
+        }
+
+        free(tempResult.ranges);
+        // have allocated space with count pointer incrementing with each union
+    }
+    result.count = idx;
+
+    if (result.count == 0){
+      free(result.ranges);
+      result.ranges = NULL;
+      return result;
+    }
+
+    Int4RangeSet normOutput;
+    normOutput = normalize(result);
+
+    free(result.ranges);
+    
+    return normOutput;
+}
+
+
 
 #define PRIMARY_DATA_TYPE "int4range"
 
@@ -161,18 +350,20 @@ int main(){
   Multiplicity mult3 = {0,2};
 
   Int4Range a_ranges[] = {f, n, a, c};
-  Int4Range b_ranges[] = {b, n};
+  Int4Range b_ranges[] = {a};
   Int4RangeSet s1 = {a_ranges, 4, true};
-  Int4RangeSet s2 = {b_ranges, 2, true};
+  Int4RangeSet s2 = {b_ranges, 1, false};
   
   // Int4RangeSet rv1 = range_set_add(s1, s2); 
   // printRangeSet(rv1);
 
-  printRangeSet(s1);
-  Int4RangeSet rv2 = sort(s1);
-  printRangeSet(rv2);
+  // printRangeSet(s1);
+  // Int4RangeSet rv2 = sort(s1);
+  // printRangeSet(rv2);
 
 
+  Int4RangeSet rv3 = interval_agg_combine_set_mult(s2, a);
+  printRangeSet(rv3);
 
 
 

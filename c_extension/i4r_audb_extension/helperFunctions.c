@@ -404,3 +404,65 @@ Int4RangeSet filterOutNulls(Int4RangeSet vals) {
 
   return filteredVals;
 }
+
+
+
+// testing agg
+
+Int4RangeSet
+interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
+    Int4RangeSet result;
+    bool leftNull, rightNull;
+    int total_result_ranges;
+
+    total_result_ranges = set1.count * (mult.upper - mult.lower);
+    
+    result.count = 0;
+    result.containsNull = false;
+    result.ranges = palloc(sizeof(Int4Range) * total_result_ranges);
+    
+    // check if either side produces null. Append NULL to result later
+    leftNull = set1.containsNull;
+    rightNull = mult.lower == 0;
+    
+    int i, idx;
+    idx = 0;
+    // traverse thru every set/mult combination and union result
+    for (i = mult.lower; i < mult.upper; i++) {
+        // ignore mult == 0 bc it produced NULL flag
+        if (i == 0) {
+            continue;
+        }
+
+        Int4RangeSet multSet;
+
+        multSet.containsNull = false;
+        multSet.count = 1;
+        multSet.ranges = palloc(sizeof(Int4Range));
+        multSet.ranges[0].lower = i;
+        multSet.ranges[0].upper = i+2;      // account for exclusive UB representation 
+        multSet.ranges[0].isNull = false;
+
+        Int4RangeSet tempResult;
+        tempResult = range_set_multiply(set1, multSet);
+        pfree(multSet.ranges);
+
+        // union in new results
+        int j;
+        for (j = 0; i < tempResult.count; j++) {
+            result.ranges[idx] = tempResult.ranges[j];
+            idx++;
+        }
+
+        pfree(tempResult.ranges);
+        // have allocated space with count pointer incrementing with each union
+    }
+    result.count = idx;
+
+    Int4RangeSet normOutput;
+    normOutput = normalize(result);
+
+    pfree(result.ranges);
+    
+    return normOutput;
+}

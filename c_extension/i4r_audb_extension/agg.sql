@@ -1,15 +1,16 @@
 -- Count is implemented natively
--- Sum works but explodes m^n where m is the avg num of elements in each set, n is number of rows
+-- Sum works but explodes m^n where m is the avg num of elements in each set, n is number of rows. figure out optimizations
 -- Min naive approach can be optimized
 -- Max naive approach can be optimized
 -- Avg sum/count
 
 -- test sum agg
 
-create aggregate sum_test (int4range[])
+create aggregate sum_test (int4range[], int4range)
 (
     stype = internal,       -- Type: IntervalAggState
-    sfunc = test_c_range_set_sum
+    sfunc = interval_agg_transfunc
+    -- finalfunc = interval_agg_finalfunc
 );
 
 -- deal with blowup with hardcoded value
