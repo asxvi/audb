@@ -53,7 +53,7 @@ create aggregate min (int4range[])
 create aggregate min (int4range)
 (
     stype = int4range,
-    -- initcond = array[int4range(0,0)],
+    initcond = int4range(0,0),
     sfunc = 
 );
 

@@ -37,6 +37,12 @@ typedef struct {
     int triggerSize;
 } IntervalAggState;
 
+typedef struct {
+    Int4Range accumulated;
+    Int4Range mult;
+    // bool has_null;
+} RangeRowType;
+
 // add extra utilites for working with defined type
 void printRange(Int4Range a);
 void printRangeSet(Int4RangeSet a);

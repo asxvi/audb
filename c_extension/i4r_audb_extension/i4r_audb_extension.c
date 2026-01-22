@@ -67,6 +67,10 @@ ArrayType* arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4Range
 int logical_operation_helper(ArrayType *input1, ArrayType *input2, int (*callback)(Int4RangeSet, Int4RangeSet) );
 ArrayType* helperFunctions_helper( ArrayType *input, Int4RangeSet (*callback)() );
 
+// for min/max agg
+
+Int4Range range_mult_combine_helper(RangeRowType *input1, int neutralElement);
+
 // serialization and deserialization function declarations
 
 static Int4Range deserialize_RangeType(RangeType *rng, TypeCacheEntry *typcache);
@@ -960,7 +964,7 @@ test_c_range_set_sum(PG_FUNCTION_ARGS)
 
     ArrayType *a1;
     ArrayType *a2;
-    RangeBound *mult;
+    RangeType *mult;
     
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
@@ -991,7 +995,8 @@ test_c_range_set_sum(PG_FUNCTION_ARGS)
     third parameter is the multiplicity
  */
 Datum
-interval_agg_transfunc(PG_FUNCTION_ARGS) {
+interval_agg_transfunc(PG_FUNCTION_ARGS)
+{
     IntervalAggState *state;
     ArrayType *new_rangeSet;
     RangeType *new_mult;
@@ -1077,13 +1082,14 @@ interval_agg_transfunc(PG_FUNCTION_ARGS) {
             state->accumulated = reduced;
         }
     }
-    state;
+    PG_RETURN_POINTER(state);
 }
 
 
 // final func return accumulated 
 Datum
-    (PG_FUNCTION_ARGS) {
+interval_agg_finalfunc(PG_FUNCTION_ARGS)
+{
     IntervalAggState *final;
     ArrayType *output;
     
@@ -1103,4 +1109,43 @@ Datum
     output = serialize_ArrayType(final->accumulated, typcache);
     
     PG_RETURN_ARRAYTYPE_P(output);
+}
+
+
+Datum
+agg_min_max_transfunc(PG_FUNCTION_ARGS)
+{
+    
+    RangeRowType *input1, *input2;
+    int neutral_element_min, neutral_element_max;
+
+    neutral_element_max = INT_MAX;
+    neutral_element_max = INT_MIN;
+
+    input1 = (RangeRowType*) PG_GETARG_POINTER(0);
+    input2 = (RangeRowType*) PG_GETARG_POINTER(1);
+
+    Int4Range clean_input1, clean_input2;
+    clean_input1 = range_mult_combine_helper(input1, neutral_element_max);
+    clean_input2 = range_mult_combine_helper(input2, neutral_element_max);
+    
+    Int4Range minRange;
+    minRange = min_range(clean_input1, clean_input2);
+
+
+
+}
+
+// will need to change the type of neutral element depending on what datatype the user is using
+Int4Range
+range_mult_combine_helper(RangeRowType *input1, int neutralElement)
+{
+    Int4Range result;
+    result.isNull = false; //auto false, not using NULLs
+    if (input1->mult.lower == 0) {
+        result.lower = neutralElement;
+        result.upper = neutralElement;
+        return result;
+    }
+    return input1->accumulated;
 }
