@@ -98,6 +98,24 @@ Int4RangeSet lift_range(Int4Range a){
   return rv;
 }
 
+Int4Range min_range(Int4Range range1, Int4Range range2) {
+  Int4Range result;
+  result.isNull = false;
+  result.lower = min2(range1.lower, range2.lower);
+  result.upper = min2(range1.upper, range2.upper);
+  
+  return result;
+}
+
+Int4Range max_range(Int4Range range1, Int4Range range2) {
+  Int4Range result;
+  result.isNull = false;
+  result.lower = max2(range1.lower, range2.lower);
+  result.upper = max2(range1.upper, range2.upper);
+  
+  return result;
+}
+
 /*Return Int4RangeSet of the non reduced result of taking every range in a and b
   and finding the min result range:= {min(aL, bL), min(aU, bU) a x b}
   

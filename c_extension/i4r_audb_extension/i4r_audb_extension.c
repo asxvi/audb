@@ -34,6 +34,7 @@ PG_FUNCTION_INFO_V1(c_reduceSize);
 
 PG_FUNCTION_INFO_V1(test_c_range_set_sum);
 PG_FUNCTION_INFO_V1(interval_agg_transfunc);
+PG_FUNCTION_INFO_V1(interval_agg_finalfunc);
 
 
 // easy change for future implementation. currently only affects lift funciton
@@ -1076,12 +1077,30 @@ interval_agg_transfunc(PG_FUNCTION_ARGS) {
             state->accumulated = reduced;
         }
     }
-    PG_RETURN_POINTER(state);
+    state;
 }
 
 
 // final func return accumulated 
-ArrayType
-interval_agg_transfunc() {
+Datum
+    (PG_FUNCTION_ARGS) {
+    IntervalAggState *final;
+    ArrayType *output;
+    
+    if (PG_ARGISNULL(0)) {
+        PG_RETURN_NULL();
+    }
 
+    final = (IntervalAggState *) PG_GETARG_POINTER(0);
+
+    // find better way to get OID based on final->accumulated vals. serialize, get type etc...
+    // assign typcache based on RangeType input
+    Oid elemTypeOID;
+    TypeCacheEntry *typcache;
+    elemTypeOID = TypenameGetTypid("int4range");
+    typcache = lookup_type_cache(elemTypeOID, TYPECACHE_RANGE_INFO);
+    
+    output = serialize_ArrayType(final->accumulated, typcache);
+    
+    PG_RETURN_ARRAYTYPE_P(output);
 }

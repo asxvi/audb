@@ -9,8 +9,8 @@
 create aggregate sum_test (int4range[], int4range)
 (
     stype = internal,       -- Type: IntervalAggState
-    sfunc = interval_agg_transfunc
-    -- finalfunc = interval_agg_finalfunc
+    sfunc = interval_agg_transfunc,
+    finalfunc = interval_agg_finalfunc
 );
 
 -- deal with blowup with hardcoded value

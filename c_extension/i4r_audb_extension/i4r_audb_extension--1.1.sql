@@ -19,6 +19,12 @@ AS 'MODULE_PATHNAME', 'interval_agg_transfunc'
 LANGUAGE c;
 -- LANGUAGE c STRICT VOLATILE;
 
+CREATE FUNCTION interval_agg_finalfunc(internal) 
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'interval_agg_finalfunc'
+LANGUAGE c;
+-- LANGUAGE c STRICT VOLATILE;
+
 ----------------------------------------------------------------------------
 ---------------------------Arithemtic functions-----------------------------
 ----------------------------------------------------------------------------

@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define min2(a, b) (((a) < (b)) ? (a) : (b))
-#define max2(a, b) (((a) > (b)) ? (a) : (b))
+#define min2(a, b) (((a) <= (b)) ? (a) : (b))
+#define max2(a, b) (((a) >= (b)) ? (a) : (b))
 
 // [Inclusive LB, Exclusive UB)
 typedef struct{ 
@@ -48,8 +48,8 @@ int MIN(int My_array[], int len);
 int MAX(int My_array[], int len);
 
 // for aggregate functions
-Int4Range min_range(Int4Range a, Int4Range b);
-Int4Range max_range(Int4Range a, Int4Range b);
+Int4Range min_range(Int4Range range1, Int4Range range2);
+Int4Range max_range(Int4Range range1, Int4Range range2);
 Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b);
 Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b);
 
