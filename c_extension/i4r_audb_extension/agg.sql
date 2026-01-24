@@ -12,69 +12,77 @@ create aggregate sum (int4range[], int4range)
     finalfunc = agg_sum_interval_finalfunc
 );
 
--- test min agg
-create aggregate min_range_test (internal)
-(
-    stype = internal,       -- Type: RangeRowType
-    sfunc = agg_min_max_transfunc,
-    finalfunc = agg_min_max_finalfunc
-);
-
-
-
-
--- deal with blowup with hardcoded value
--- initcond = NULL by default
-create aggregate sum (int4range[])
-(
-    stype = int4range[],
-    sfunc = c_range_set_add
-);
-
--- initcond = NULL by default
-create aggregate sum (int4range)
-(
-    stype = int4range,
-    sfunc = c_range_add
-);
-
-create aggregate max (int4range[])
-(
-    stype = int4range[],
-    -- initcond = array[int4range(0,0)],
-    sfunc = 
-);
-
-create aggregate max (int4range)
-(
-    stype = int4range,
-    -- initcond = array[int4range(0,0)],
-    sfunc = 
-);
-
-
-create aggregate min (int4range[])
-(
-    stype = int4range[],
-    -- initcond = array[int4range(0,0)],
-    sfunc = 
-);
+-- -- test min agg
+-- create aggregate min_range_test (internal)
+-- (
+--     stype = internal,       -- Type: RangeRowType
+--     sfunc = agg_min_transfunc,
+--     finalfunc = agg_min_finalfunc
+-- );
 
 create aggregate min (int4range)
 (
     stype = int4range,
-    initcond = int4range(0,0),
-    sfunc = 
+    sfunc = agg_min_transfunc,
+    finalfunc = agg_min_max_finalfunc
 );
-
-create aggregate avg (int4range)
+create aggregate max (int4range)
 (
     stype = int4range,
-    -- stype (sum [], count int)
-    -- finalfunc
-
-    
+    sfunc = agg_max_transfunc,
+    finalfunc = agg_min_max_finalfunc
 );
+
+-- -- deal with blowup with hardcoded value
+-- -- initcond = NULL by default
+-- create aggregate sum (int4range[])
+-- (
+--     stype = int4range[],
+--     sfunc = c_range_set_add
+-- );
+
+-- -- initcond = NULL by default
+-- create aggregate sum (int4range)
+-- (
+--     stype = int4range,
+--     sfunc = c_range_add
+-- );
+
+-- create aggregate max (int4range[])
+-- (
+--     stype = int4range[],
+--     -- initcond = array[int4range(0,0)],
+--     sfunc = 
+-- );
+
+-- create aggregate max (int4range)
+-- (
+--     stype = int4range,
+--     -- initcond = array[int4range(0,0)],
+--     sfunc = 
+-- );
+
+
+-- create aggregate min (int4range[])
+-- (
+--     stype = int4range[],
+--     -- initcond = array[int4range(0,0)],
+--     sfunc = 
+-- );
+
+-- create aggregate min (int4range)
+-- (
+--     stype = int4range,
+--     initcond = int4range(0,0),
+--     sfunc = 
+-- );
+
+-- create aggregate avg (int4range)
+-- (
+--     stype = int4range,
+--     -- stype (sum [], count int)
+--     -- finalfunc
+-- );
 
 -- -- MAX and MIN
 -- -- naive approach without optimizing

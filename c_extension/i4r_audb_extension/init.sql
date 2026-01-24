@@ -52,11 +52,13 @@ INSERT INTO test_rset1 (colA, colB, mult) VALUES
 CREATE TABLE IF NOT EXISTS test_range(
     id int GENERATED ALWAYS AS IDENTITY,
     colA int4range,
-    colB int4range
+    colB int4range,
+    mult int4range
 );
-INSERT INTO test_range (colA, colB) VALUES
-    (int4range(1,3), int4range(2,4) ),
-    (int4range(2,11), int4range(4,9) ),
-    (int4range(10,13), int4range(12,14) );
+
+INSERT INTO test_range (colA, colB, mult) VALUES
+    (int4range(1,3), int4range(2,4), int4range(0,2)),
+    (int4range(2,11), int4range(4,9), int4range(1,2)),
+    (int4range(10,13), int4range(12,14), int4range(6,7));
 
 

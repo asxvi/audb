@@ -430,7 +430,7 @@ Int4RangeSet filterOutNulls(Int4RangeSet vals) {
 Int4RangeSet
 interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
     Int4RangeSet result;
-    bool leftNull, rightNull;
+    // bool leftNull, rightNull;
     int total_result_ranges;
 
     total_result_ranges = set1.count * (mult.upper - mult.lower);
@@ -440,8 +440,8 @@ interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
     result.ranges = palloc(sizeof(Int4Range) * total_result_ranges);
     
     // check if either side produces null. Append NULL to result later
-    leftNull = set1.containsNull;
-    rightNull = mult.lower == 0;
+    // leftNull = set1.containsNull;
+    // rightNull = mult.lower == 0;
     
     int i, idx;
     idx = 0;

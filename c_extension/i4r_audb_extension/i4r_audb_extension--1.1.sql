@@ -24,18 +24,46 @@ AS 'MODULE_PATHNAME', 'agg_sum_interval_finalfunc'
 LANGUAGE c;
 -- LANGUAGE c STRICT VOLATILE;
 
--- min/max
-CREATE FUNCTION agg_min_max_transfunc(internal, internal) 
-RETURNS internal
-AS 'MODULE_PATHNAME', 'agg_min_max_transfunc'
-LANGUAGE c;
--- LANGUAGE c STRICT VOLATILE;
+-- -- min/max
+-- CREATE FUNCTION agg_min_transfunc(internal, internal) 
+-- RETURNS internal
+-- AS 'MODULE_PATHNAME', 'agg_min_transfunc'
+-- LANGUAGE c;
+-- -- LANGUAGE c STRICT VOLATILE;
 
-CREATE FUNCTION agg_min_max_finalfunc(internal) 
+-- CREATE FUNCTION agg_min_finalfunc(internal) 
+-- RETURNS int4range
+-- AS 'MODULE_PATHNAME', 'agg_min_finalfunc'
+-- LANGUAGE c;
+-- -- LANGUAGE c STRICT VOLATILE;
+
+
+
+CREATE FUNCTION combine_range_mult_min(int4range, int4range) 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'combine_range_mult_min'
+LANGUAGE c;
+
+CREATE FUNCTION combine_range_mult_max(int4range, int4range) 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'combine_range_mult_max'
+LANGUAGE c;
+
+CREATE FUNCTION agg_min_transfunc(int4range, int4range) 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'agg_min_transfunc'
+LANGUAGE c;
+
+CREATE FUNCTION agg_max_transfunc(int4range, int4range) 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'agg_max_transfunc'
+LANGUAGE c;
+
+CREATE FUNCTION agg_min_max_finalfunc(int4range) 
 RETURNS int4range
 AS 'MODULE_PATHNAME', 'agg_min_max_finalfunc'
 LANGUAGE c;
--- LANGUAGE c STRICT VOLATILE;
+
 
 ----------------------------------------------------------------------------
 ---------------------------Arithemtic functions-----------------------------
