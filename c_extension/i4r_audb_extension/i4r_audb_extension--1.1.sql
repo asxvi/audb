@@ -3,7 +3,7 @@
 
 
 ----------------------------------------------------------------------------
----------------------------------TESTING------------------------------------
+---------------------------------aggregate testing------------------------------------
 
 -- -- test_c_range_set_sum takes 2 int4range types and returns the sum
 -- CREATE FUNCTION test_c_range_set_sum(a int4range[], b int4range[]) 
@@ -12,16 +12,28 @@
 -- LANGUAGE c;
 -- -- LANGUAGE c STRICT VOLATILE;
 
-
-CREATE FUNCTION interval_agg_transfunc(internal, int4range[], int4range) 
+CREATE FUNCTION agg_sum_interval_transfunc(internal, int4range[], int4range) 
 RETURNS internal
-AS 'MODULE_PATHNAME', 'interval_agg_transfunc'
+AS 'MODULE_PATHNAME', 'agg_sum_interval_transfunc'
 LANGUAGE c;
 -- LANGUAGE c STRICT VOLATILE;
 
-CREATE FUNCTION interval_agg_finalfunc(internal) 
+CREATE FUNCTION agg_sum_interval_finalfunc(internal) 
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'interval_agg_finalfunc'
+AS 'MODULE_PATHNAME', 'agg_sum_interval_finalfunc'
+LANGUAGE c;
+-- LANGUAGE c STRICT VOLATILE;
+
+-- min/max
+CREATE FUNCTION agg_min_max_transfunc(internal, internal) 
+RETURNS internal
+AS 'MODULE_PATHNAME', 'agg_min_max_transfunc'
+LANGUAGE c;
+-- LANGUAGE c STRICT VOLATILE;
+
+CREATE FUNCTION agg_min_max_finalfunc(internal) 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'agg_min_max_finalfunc'
 LANGUAGE c;
 -- LANGUAGE c STRICT VOLATILE;
 

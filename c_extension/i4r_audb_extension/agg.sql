@@ -5,13 +5,23 @@
 -- Avg sum/count
 
 -- test sum agg
-
-create aggregate sum_test (int4range[], int4range)
+create aggregate sum (int4range[], int4range)
 (
     stype = internal,       -- Type: IntervalAggState
-    sfunc = interval_agg_transfunc,
-    finalfunc = interval_agg_finalfunc
+    sfunc = agg_sum_interval_transfunc,
+    finalfunc = agg_sum_interval_finalfunc
 );
+
+-- test min agg
+create aggregate min_range_test (internal)
+(
+    stype = internal,       -- Type: RangeRowType
+    sfunc = agg_min_max_transfunc,
+    finalfunc = agg_min_max_finalfunc
+);
+
+
+
 
 -- deal with blowup with hardcoded value
 -- initcond = NULL by default

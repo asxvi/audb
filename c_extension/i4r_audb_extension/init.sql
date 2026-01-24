@@ -49,14 +49,14 @@ INSERT INTO test_rset1 (colA, colB, mult) VALUES
 --     (array[int4range(2,3)], array[int4range(10,12)]),
 --     (array[int4range(3,4)], array[int4range(8,15)]);
 
--- CREATE TABLE IF NOT EXISTS test_range(
---     id int GENERATED ALWAYS AS IDENTITY,
---     colA int4range,
---     colB int4range
--- );
--- INSERT INTO test_range (colA, colB) VALUES
---     (int4range(1,3), int4range(2,4) ),
---     (int4range(2,11), int4range(4,9) ),
---     (int4range(10,13), int4range(12,14) );
+CREATE TABLE IF NOT EXISTS test_range(
+    id int GENERATED ALWAYS AS IDENTITY,
+    colA int4range,
+    colB int4range
+);
+INSERT INTO test_range (colA, colB) VALUES
+    (int4range(1,3), int4range(2,4) ),
+    (int4range(2,11), int4range(4,9) ),
+    (int4range(10,13), int4range(12,14) );
 
 
