@@ -57,8 +57,14 @@ CREATE TABLE IF NOT EXISTS test_range(
 );
 
 INSERT INTO test_range (colA, colB, mult) VALUES
-    (int4range(1,3), int4range(2,4), int4range(0,2)),
-    (int4range(2,11), int4range(4,9), int4range(1,2)),
-    (int4range(10,13), int4range(12,14), int4range(6,7));
+    (int4range(1,1000), int4range(200,400), int4range(0,2)),
+    (int4range(9,11), int4range(4,9), int4range(1,2)),
+    (int4range(10,13), int4range(1,12), int4range(1,7)),
+    (int4range(100,130), int4range(12,1400), int4range(6,7)),
+    (int4range(6,7), int4range(121,122), int4range(2,4)),
+    (int4range(44,332), int4range(12,14), int4range(5,6)),
+    ('empty'::int4range, int4range(23,34), int4range(5,6)),
+    (int4range(24,34), 'empty'::int4range, int4range(5,6));
+
 
 

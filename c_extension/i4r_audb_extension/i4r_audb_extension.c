@@ -45,7 +45,7 @@ PG_FUNCTION_INFO_V1(combine_range_mult_min);
 PG_FUNCTION_INFO_V1(combine_range_mult_max);
 PG_FUNCTION_INFO_V1(agg_min_transfunc);
 PG_FUNCTION_INFO_V1(agg_max_transfunc);
-PG_FUNCTION_INFO_V1(agg_min_max_finalfunc);
+// PG_FUNCTION_INFO_V1(agg_min_max_finalfunc);
 
 
 // easy change for future implementation. currently only affects lift funciton
@@ -1104,91 +1104,109 @@ agg_sum_interval_finalfunc(PG_FUNCTION_ARGS)
 Datum
 agg_min_transfunc(PG_FUNCTION_ARGS)
 {
-    Int4Range *state, current;
-    RangeType *input;
+    Int4Range state_i4r, input_i4r, result_i4r;
+    RangeType *state, *input, *result;
     TypeCacheEntry *typcache;
 
-    // first call init a new RangeRowType
+    // first call: use the first input as initial state, or non null
     if (PG_ARGISNULL(0)) {
-        state = (Int4Range *) palloc(sizeof(Int4Range));
-        state->isNull = false;
-    }
-    else {
-        state = (Int4Range *) PG_GETARG_POINTER(0);
+        if (PG_ARGISNULL(1)) {
+            PG_RETURN_NULL();
+        }
+        // othrwise value becomes the state
+        PG_RETURN_RANGE_P(PG_GETARG_RANGE_P(1));
     }
     
-    // NULL input == ignore
+    // NULL input: return current state unchanged
     if (PG_ARGISNULL(1)) {
-        PG_RETURN_POINTER(state);
+        PG_RETURN_RANGE_P(PG_GETARG_RANGE_P(0));
     }
 
+    // compare existing min/state to the current input
+    state = PG_GETARG_RANGE_P(0);
     input = PG_GETARG_RANGE_P(1);
-    typcache = lookup_type_cache(input->rangetypid, TYPECACHE_RANGE_INFO);
-    
+
+    // return non empty
+    if (RangeIsEmpty(state)) {
+        PG_RETURN_POINTER(input);
+    }
     if (RangeIsEmpty(input)) {
         PG_RETURN_POINTER(state);
     }
+    
+    typcache = lookup_type_cache(state->rangetypid, TYPECACHE_RANGE_INFO);
+    
+    // deserialize, compare, serialize, return
+    state_i4r = deserialize_RangeType(state, typcache);
+    input_i4r = deserialize_RangeType(input, typcache);
+    result_i4r = min_range(state_i4r, input_i4r);
+    result = serialize_RangeType(result_i4r, typcache);
 
-    current = deserialize_RangeType(input, typcache);
-
-    *state = min_range(*state, current);
-
-    PG_RETURN_POINTER(state);
+    PG_RETURN_POINTER(result);
 }
 
 Datum
 agg_max_transfunc(PG_FUNCTION_ARGS)
 {
-    Int4Range *state, current;
-    RangeType *input;
+    Int4Range state_i4r, input_i4r, result_i4r;
+    RangeType *state, *input, *result;
     TypeCacheEntry *typcache;
 
-    // first call init a new RangeRowType
+    // first call: use the first input as initial state, or non null
     if (PG_ARGISNULL(0)) {
-        state = (Int4Range *) palloc(sizeof(Int4Range));
-        state->isNull = false;
+        if (PG_ARGISNULL(1)) {
+            PG_RETURN_NULL();
+        }
+
+        // othrwise value becomes the state
+        PG_RETURN_POINTER(PG_GETARG_RANGE_P(1));
     }
-    else {
-        state = (Int4Range *) PG_GETARG_POINTER(0);
-    }
-    
-    // NULL input == ignore
+    // NULL input: return current state unchanged
     if (PG_ARGISNULL(1)) {
-        PG_RETURN_POINTER(state);
+        PG_RETURN_RANGE_P(PG_GETARG_RANGE_P(0));
     }
     
+    state = PG_GETARG_RANGE_P(0);
     input = PG_GETARG_RANGE_P(1);
-    typcache = lookup_type_cache(input->rangetypid, TYPECACHE_RANGE_INFO);
     
+    // return non empty
+    if (RangeIsEmpty(state)) {
+        PG_RETURN_POINTER(input);
+    }
     if (RangeIsEmpty(input)) {
         PG_RETURN_POINTER(state);
     }
     
-    current = deserialize_RangeType(input, typcache);
-    *state = max_range(*state, current);
-
-    PG_RETURN_POINTER(state);
-}
-
-Datum
-agg_min_max_finalfunc(PG_FUNCTION_ARGS)
-{
-    Int4Range *state;
-    RangeType *result;
-    TypeCacheEntry *typcache;
-
-    // no values 
-    if (PG_ARGISNULL(0)) {
-        PG_RETURN_NULL();
-    }
-
-    state = (Int4Range *) PG_GETARG_POINTER(0);
-    typcache = lookup_type_cache(TypenameGetTypid(PRIMARY_DATA_TYPE), TYPECACHE_RANGE_INFO);
+    typcache = lookup_type_cache(input->rangetypid, TYPECACHE_RANGE_INFO);
     
-    result = serialize_RangeType(*state, typcache);
+    // deserialize, compare, serialize, return
+    state_i4r = deserialize_RangeType(state, typcache);
+    input_i4r = deserialize_RangeType(input, typcache);
+    result_i4r = max_range(state_i4r, input_i4r);
+    result = serialize_RangeType(result_i4r, typcache);
 
-    PG_RETURN_RANGE_P(result);
+    PG_RETURN_POINTER(result);
 }
+
+// Datum
+// agg_min_max_finalfunc(PG_FUNCTION_ARGS)
+// {
+//     Int4Range *state;
+//     RangeType *result;
+//     TypeCacheEntry *typcache;
+
+//     // no values 
+//     if (PG_ARGISNULL(0)) {
+//         PG_RETURN_NULL();
+//     }
+
+//     state = (Int4Range *) PG_GETARG_POINTER(0);
+//     typcache = lookup_type_cache(TypenameGetTypid(PRIMARY_DATA_TYPE), TYPECACHE_RANGE_INFO);
+    
+//     result = serialize_RangeType(*state, typcache);
+
+//     PG_RETURN_RANGE_P(result);
+// }
 
 // will need to change the type of neutral element depending on what datatype the user is using
 Int4Range
@@ -1207,8 +1225,7 @@ range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement)
     return range;
 }
 
-// agg_min_transfunc( range_mult_combine_helper(colA, mult, ))
-
+// do not set isNull attributes bc they are no longer used
 Datum
 combine_range_mult_min(PG_FUNCTION_ARGS) 
 {
@@ -1229,7 +1246,6 @@ combine_range_mult_min(PG_FUNCTION_ARGS)
 
     range = deserialize_RangeType(range_input, typcacheRange);
     mult = deserialize_RangeType(mult_input, typcacheMult);
-    mult.upper+=1;  // account for inclusive upper
 
     result = range_mult_combine_helper(range, mult, neutral_element);    
     output = serialize_RangeType(result, typcacheRange);
@@ -1237,6 +1253,7 @@ combine_range_mult_min(PG_FUNCTION_ARGS)
     PG_RETURN_RANGE_P(output);
 }
 
+// do not set isNull attributes bc they are no longer used
 Datum
 combine_range_mult_max(PG_FUNCTION_ARGS) 
 {
@@ -1257,12 +1274,9 @@ combine_range_mult_max(PG_FUNCTION_ARGS)
 
     range = deserialize_RangeType(range_input, typcacheRange);
     mult = deserialize_RangeType(mult_input, typcacheMult);
-    mult.upper+=1;  // account for inclusive upper
 
     result = range_mult_combine_helper(range, mult, neutral_element);
     output = serialize_RangeType(result, typcacheRange);
 
     PG_RETURN_RANGE_P(output);
 }
-
-

@@ -23,14 +23,14 @@ create aggregate sum (int4range[], int4range)
 create aggregate min (int4range)
 (
     stype = int4range,
-    sfunc = agg_min_transfunc,
-    finalfunc = agg_min_max_finalfunc
+    sfunc = agg_min_transfunc
+    -- finalfunc -- dont need
 );
 create aggregate max (int4range)
 (
     stype = int4range,
-    sfunc = agg_max_transfunc,
-    finalfunc = agg_min_max_finalfunc
+    sfunc = agg_max_transfunc
+    -- finalfunc -- dont need
 );
 
 -- -- deal with blowup with hardcoded value

@@ -59,12 +59,6 @@ RETURNS int4range
 AS 'MODULE_PATHNAME', 'agg_max_transfunc'
 LANGUAGE c;
 
-CREATE FUNCTION agg_min_max_finalfunc(int4range) 
-RETURNS int4range
-AS 'MODULE_PATHNAME', 'agg_min_max_finalfunc'
-LANGUAGE c;
-
-
 ----------------------------------------------------------------------------
 ---------------------------Arithemtic functions-----------------------------
 ----------------------------------------------------------------------------
