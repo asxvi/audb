@@ -4,28 +4,28 @@ DROP TABLE IF EXISTS test_rset1;
 DROP TABLE IF EXISTS test_rset2;
 DROP TABLE IF EXISTS test_rset3;
 
-CREATE TABLE IF NOT EXISTS test_rset1(
-    id int GENERATED ALWAYS AS IDENTITY,
-    colA int4range[],
-    colB int4range[],
-    mult int4range
-);
-CREATE TABLE IF NOT EXISTS test_rset2(
-    id int GENERATED ALWAYS AS IDENTITY,
-    colA int4range[],
-    colB int4range[],
-    mult int4range
-);
-CREATE TABLE IF NOT EXISTS test_rset3(
-    id int GENERATED ALWAYS AS IDENTITY,
-    colA int4range[],
-    colB int4range[],
-    mult int4range
-);
-INSERT INTO test_rset1 (colA, colB, mult) VALUES
-    (array[int4range(1,2), int4range(10,16)], array[int4range(2,3)], int4range(1,1, '[]')),
-    (array[int4range(2,3), int4range(10,16)], array[int4range(10,12)], int4range(1,1, '[]')),
-    (array[int4range(3,4), int4range(1,3)], array[int4range(8,15)], int4range(1,1, '[]'));
+-- CREATE TABLE IF NOT EXISTS test_rset1(
+--     id int GENERATED ALWAYS AS IDENTITY,
+--     colA int4range[],
+--     colB int4range[],
+--     mult int4range
+-- );
+-- CREATE TABLE IF NOT EXISTS test_rset2(
+--     id int GENERATED ALWAYS AS IDENTITY,
+--     colA int4range[],
+--     colB int4range[],
+--     mult int4range
+-- );
+-- CREATE TABLE IF NOT EXISTS test_rset3(
+--     id int GENERATED ALWAYS AS IDENTITY,
+--     colA int4range[],
+--     colB int4range[],
+--     mult int4range
+-- );
+-- INSERT INTO test_rset1 (colA, colB, mult) VALUES
+--     (array[int4range(1,2), int4range(10,16)], array[int4range(2,3)], int4range(1,1, '[]')),
+--     (array[int4range(2,3), int4range(10,16)], array[int4range(10,12)], int4range(1,1, '[]')),
+--     (array[int4range(3,4), int4range(1,3)], array[int4range(8,15)], int4range(1,1, '[]'));
 
 
 -- INSERT INTO test_rset2 (colA, colB) VALUES
@@ -49,14 +49,18 @@ INSERT INTO test_rset1 (colA, colB, mult) VALUES
 --     (array[int4range(2,3)], array[int4range(10,12)]),
 --     (array[int4range(3,4)], array[int4range(8,15)]);
 
-CREATE TABLE IF NOT EXISTS test_range(
+
+DROP TABLE IF EXISTS r1;
+DROP TABLE IF EXISTS s1;
+
+CREATE TABLE IF NOT EXISTS r1(
     id int GENERATED ALWAYS AS IDENTITY,
     colA int4range,
     colB int4range,
     mult int4range
 );
 
-INSERT INTO test_range (colA, colB, mult) VALUES
+INSERT INTO r1 (colA, colB, mult) VALUES
     (int4range(1,1000), int4range(200,400), int4range(0,2)),
     (int4range(9,11), int4range(4,9), int4range(1,2)),
     (int4range(10,13), int4range(1,12), int4range(1,7)),
@@ -65,6 +69,19 @@ INSERT INTO test_range (colA, colB, mult) VALUES
     (int4range(44,332), int4range(12,14), int4range(5,6)),
     ('empty'::int4range, int4range(23,34), int4range(5,6)),
     (int4range(24,34), 'empty'::int4range, int4range(5,6));
+
+
+CREATE TABLE IF NOT EXISTS s1(
+    id int GENERATED ALWAYS AS IDENTITY,
+    colA int4range[],
+    colB int4range[],
+    mult int4range
+);
+
+INSERT INTO s1 (colA, colB, mult) VALUES
+    (array[int4range(1,2), int4range(10,16)], array[int4range(2,3)], int4range(1,1, '[]')),
+    (array[int4range(2,3), int4range(10,16)], array[int4range(10,12)], int4range(0,1, '[]')),
+    (array[int4range(3,4), int4range(1,3)], array[int4range(8,15)], int4range(1,1, '[]'));
 
 
 

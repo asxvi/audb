@@ -329,22 +329,80 @@ interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
     return normOutput;
 }
 
+/*Return Int4RangeSet of the non reduced result of taking every range in a and b
+  and finding the min result range:= {min(aL, bL), min(aU, bU) a x b}
+  
+  Room for optimization avoiding non overlapping comparisons
+*/
+Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b){
+  Int4RangeSet rv, result;
+  int aptr, bptr;
+  
+  rv.ranges = malloc(sizeof(Int4Range) * (a.count + b.count));
+  rv.count = 0;
+  
+  aptr = 0;
+  bptr = 0;
+  while (aptr < a.count && bptr < b.count) {
+    Int4Range newRange;
+    newRange.isNull = false;
 
+    newRange.lower = min2(a.ranges[aptr].lower, b.ranges[bptr].lower);
+    newRange.upper = min2(a.ranges[aptr].upper, b.ranges[bptr].upper);
+
+    // move pts based on UB
+    a.ranges[aptr].upper <= b.ranges[bptr].upper ? aptr++ : bptr++;
+    rv.ranges[rv.count++] = newRange;
+  }
+  
+  result = normalize(rv);
+  return result;
+}
+
+/*Return Int4RangeSet of the non reduced result of taking every range in a and b
+  and finding the min result range:= {min(aL, bL), min(aU, bU) a x b}
+  
+  Room for optimization avoiding non overlapping comparisons
+*/
+Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b){
+  Int4RangeSet rv, result;
+  int aptr, bptr;
+  
+  rv.ranges = malloc(sizeof(Int4Range) * (a.count + b.count));
+  rv.containsNull = false;
+  result.containsNull = false;
+  rv.count = 0;
+  
+  aptr = 0;
+  bptr = 0;
+  while (aptr < a.count && bptr < b.count) {
+    Int4Range newRange;
+    newRange.isNull = false;
+
+    newRange.lower = max2(a.ranges[aptr].lower, b.ranges[bptr].lower);
+    newRange.upper = max2(a.ranges[aptr].upper, b.ranges[bptr].upper);
+
+    // move pts based on UB
+    a.ranges[aptr].upper <= b.ranges[bptr].upper ? aptr++ : bptr++;
+    rv.ranges[rv.count++] = newRange;
+  }
+  
+  result = normalize(rv);
+  return result;
+}
 
 #define PRIMARY_DATA_TYPE "int4range"
 
 int main(){  
-  Int4Range a = {1,3};
-  Int4Range b = {10,21};
-  Int4Range c = {5,8};
-  Int4Range d = {7,12};
-  Int4Range e = {0,0};
+  Int4Range a = {1,5};
+  Int4Range b = {9,12};
+  Int4Range c = {18,29};
+  Int4Range d = {4,13};
+  Int4Range e = {16,20};
   Int4Range f = {6,11};
 
   Int4Range n;
   n.isNull = true;
-
-
   Multiplicity mult1 = {0,1};
   Multiplicity mult2 = {1,2};
   Multiplicity mult3 = {0,2};
@@ -362,11 +420,18 @@ int main(){
   // printRangeSet(rv2);
 
 
-  Int4RangeSet rv3 = interval_agg_combine_set_mult(s2, a);
-  printRangeSet(rv3);
+  // Int4RangeSet rv3 = interval_agg_combine_set_mult(s2, a);
+  // printRangeSet(rv3);
 
-
-
+  Int4Range c_ranges[] = {a,b,c};
+  Int4Range d_ranges[] = {d,e };
+  Int4RangeSet sC = {c_ranges, 3, false};
+  Int4RangeSet sD = {d_ranges, 2, false};
+  // printRangeSet(normalize(sC));
+  // printRangeSet(normalize(sD));
+  
+  printRangeSet(min_rangeSet(normalize(sC), normalize(sD)));
+  printRangeSet(max_rangeSet(normalize(sC), normalize(sD)));
   // Int4Range rv1 = floatIntervalSetMult(s1, mult1);  
   // printRange(rv1);
   // Int4Range rv2 = floatIntervalSetMult(s1, mult2);  

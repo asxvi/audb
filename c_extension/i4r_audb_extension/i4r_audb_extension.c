@@ -35,7 +35,7 @@ PG_FUNCTION_INFO_V1(c_reduceSize);
 // old
 PG_FUNCTION_INFO_V1(test_c_range_set_sum);
 
-// aggregates
+///// aggregates
 //sum
 PG_FUNCTION_INFO_V1(agg_sum_interval_transfunc);
 PG_FUNCTION_INFO_V1(agg_sum_interval_finalfunc);
@@ -45,6 +45,11 @@ PG_FUNCTION_INFO_V1(combine_range_mult_min);
 PG_FUNCTION_INFO_V1(combine_range_mult_max);
 PG_FUNCTION_INFO_V1(agg_min_transfunc);
 PG_FUNCTION_INFO_V1(agg_max_transfunc);
+
+PG_FUNCTION_INFO_V1(combine_set_mult_min);
+PG_FUNCTION_INFO_V1(combine_set_mult_max);
+PG_FUNCTION_INFO_V1(agg_set_min_transfunc);
+PG_FUNCTION_INFO_V1(agg_set_max_transfunc);
 // PG_FUNCTION_INFO_V1(agg_min_max_finalfunc);
 
 
@@ -80,6 +85,7 @@ ArrayType* helperFunctions_helper( ArrayType *input, Int4RangeSet (*callback)() 
 
 // for min/max agg
 Int4Range range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement);
+Int4RangeSet set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement);
 
 // serialization and deserialization function declarations
 static Int4Range deserialize_RangeType(RangeType *rng, TypeCacheEntry *typcache);
@@ -1188,41 +1194,37 @@ agg_max_transfunc(PG_FUNCTION_ARGS)
     PG_RETURN_POINTER(result);
 }
 
-// Datum
-// agg_min_max_finalfunc(PG_FUNCTION_ARGS)
-// {
-//     Int4Range *state;
-//     RangeType *result;
-//     TypeCacheEntry *typcache;
-
-//     // no values 
-//     if (PG_ARGISNULL(0)) {
-//         PG_RETURN_NULL();
-//     }
-
-//     state = (Int4Range *) PG_GETARG_POINTER(0);
-//     typcache = lookup_type_cache(TypenameGetTypid(PRIMARY_DATA_TYPE), TYPECACHE_RANGE_INFO);
-    
-//     result = serialize_RangeType(*state, typcache);
-
-//     PG_RETURN_RANGE_P(result);
-// }
-
 // will need to change the type of neutral element depending on what datatype the user is using
 Int4Range
 range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement)
 {
-    Int4Range result;
-    result.isNull = false; //auto false, not using NULLs
-
     // return neutral so doesn't affect the aggregate
     if(mult.lower == 0) {
+        Int4Range result;
+        result.isNull = false; //auto false, not using NULLs
         result.lower = neutralElement;
         result.upper = neutralElement;
         return result;
     }
 
     return range;
+}
+// will need to change the type of neutral element depending on what datatype the user is using
+Int4RangeSet
+set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
+{
+    // return neutral so doesn't affect the aggregate
+    if(mult.lower == 0) {
+        Int4RangeSet result;
+        result.count = 1;
+        result.containsNull = false; //auto false, not using NULLs
+        result.ranges = palloc(sizeof(Int4Range));
+        result.ranges[0].lower = neutralElement;
+        result.ranges[0].upper = neutralElement;
+        return result;
+    }
+
+    return set1;
 }
 
 // do not set isNull attributes bc they are no longer used
@@ -1280,3 +1282,166 @@ combine_range_mult_max(PG_FUNCTION_ARGS)
 
     PG_RETURN_RANGE_P(output);
 }
+
+
+
+// range_set min/max
+
+Datum
+combine_set_mult_min(PG_FUNCTION_ARGS) 
+{
+   // inputs/ outputs
+    ArrayType *set_input, *output;
+    RangeType *mult_input;
+    
+    // working type
+    Int4Range mult;
+    Int4RangeSet set1, result;
+
+    int neutral_element;
+    TypeCacheEntry *typcacheSet, *typcacheMult;
+    
+    CHECK_BINARY_PGARG_NULL_OR();
+    
+    set_input = PG_GETARG_ARRAYTYPE_P(0);
+    mult_input = PG_GETARG_RANGE_P(1);
+
+    typcacheSet = lookup_type_cache(set_input->elemtype, TYPECACHE_RANGE_INFO);
+    typcacheMult = lookup_type_cache(mult_input->rangetypid, TYPECACHE_RANGE_INFO);
+
+    // hardcoded //FIXME
+    neutral_element = INT_MAX;
+
+    // deserialize, operate on, serialize, return
+    set1 = deserialize_ArrayType(set_input, typcacheSet);
+    mult = deserialize_RangeType(mult_input, typcacheMult);
+
+    result = set_mult_combine_helper(set1, mult, neutral_element);
+    output = serialize_ArrayType(result, typcacheSet);
+
+    PG_RETURN_ARRAYTYPE_P(output);
+}
+
+Datum
+combine_set_mult_max(PG_FUNCTION_ARGS) 
+{
+    // inputs/ outputs
+    ArrayType *set_input, *output;
+    RangeType *mult_input;
+    
+    // working type
+    Int4Range mult;
+    Int4RangeSet set1, result;
+
+    int neutral_element;
+    TypeCacheEntry *typcacheSet, *typcacheMult;
+    
+    CHECK_BINARY_PGARG_NULL_OR();
+    
+    set_input = PG_GETARG_ARRAYTYPE_P(0);
+    mult_input = PG_GETARG_RANGE_P(1);
+
+    typcacheSet = lookup_type_cache(set_input->elemtype, TYPECACHE_RANGE_INFO);
+    typcacheMult = lookup_type_cache(mult_input->rangetypid, TYPECACHE_RANGE_INFO);
+
+    // hardcoded //FIXME
+    neutral_element = INT_MIN;
+
+    // deserialize, operate on, serialize, return
+    set1 = deserialize_ArrayType(set_input, typcacheSet);
+    mult = deserialize_RangeType(mult_input, typcacheMult);
+
+    result = set_mult_combine_helper(set1, mult, neutral_element);
+    output = serialize_ArrayType(result, typcacheSet);
+
+    PG_RETURN_ARRAYTYPE_P(output);
+}
+
+Datum
+agg_set_min_transfunc(PG_FUNCTION_ARGS)
+{
+    Int4RangeSet state_i4r, input_i4r, n_state_i4r, n_input_i4r, result_i4r;
+    ArrayType *state, *input, *result;
+    TypeCacheEntry *typcache;
+
+    // first call: use the first input as initial state, or non null
+    if (PG_ARGISNULL(0)){
+        if (PG_ARGISNULL(1)){
+            PG_RETURN_NULL();
+        }
+        // othrwise value becomes the state
+        PG_RETURN_ARRAYTYPE_P(PG_GETARG_ARRAYTYPE_P(1));
+    }
+
+    // NULL input: return current state unchanged
+    if(PG_ARGISNULL(1)) {
+        PG_RETURN_ARRAYTYPE_P(PG_GETARG_ARRAYTYPE_P(0));
+    }
+
+    // compare existing min/state to the current input
+    state = PG_GETARG_ARRAYTYPE_P(0);
+    input = PG_GETARG_ARRAYTYPE_P(1);
+
+    // handle empty array, or array with just null maybe
+    // if (array_contains_nulls())
+
+    typcache = lookup_type_cache(state->elemtype, TYPECACHE_RANGE_INFO);
+
+    state_i4r = deserialize_ArrayType(state, typcache);
+    input_i4r = deserialize_ArrayType(input, typcache);
+
+    n_state_i4r = normalize(state_i4r);
+    n_input_i4r = normalize(input_i4r);
+
+    
+    result_i4r = min_rangeSet(n_state_i4r, n_input_i4r);
+    result = serialize_ArrayType(result_i4r, typcache);
+
+    PG_RETURN_ARRAYTYPE_P(result);
+}
+
+
+Datum
+agg_set_max_transfunc(PG_FUNCTION_ARGS)
+{
+    Int4RangeSet state_i4r, input_i4r, n_state_i4r, n_input_i4r, result_i4r;
+    ArrayType *state, *input, *result;
+    TypeCacheEntry *typcache;
+
+    // first call: use the first input as initial state, or non null
+    if (PG_ARGISNULL(0)){
+        if (PG_ARGISNULL(1)){
+            PG_RETURN_NULL();
+        }
+        // othrwise value becomes the state
+        PG_RETURN_ARRAYTYPE_P(PG_GETARG_ARRAYTYPE_P(1));
+    }
+
+    // NULL input: return current state unchanged
+    if(PG_ARGISNULL(1)) {
+        PG_RETURN_ARRAYTYPE_P(PG_GETARG_ARRAYTYPE_P(0));
+    }
+
+    // compare existing min/state to the current input
+    state = PG_GETARG_ARRAYTYPE_P(0);
+    input = PG_GETARG_ARRAYTYPE_P(1);
+
+    // handle empty array, or array with just null maybe
+    // if (array_contains_nulls())
+
+    typcache = lookup_type_cache(state->elemtype, TYPECACHE_RANGE_INFO);
+
+    state_i4r = deserialize_ArrayType(state, typcache);
+    input_i4r = deserialize_ArrayType(input, typcache);
+
+    n_state_i4r = normalize(state_i4r);
+    n_input_i4r = normalize(input_i4r);
+
+    
+    result_i4r = max_rangeSet(n_state_i4r, n_input_i4r);
+    result = serialize_ArrayType(result_i4r, typcache);
+    
+    PG_RETURN_ARRAYTYPE_P(result);
+}
+
+

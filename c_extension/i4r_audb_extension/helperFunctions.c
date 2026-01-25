@@ -122,48 +122,62 @@ Int4Range max_range(Int4Range range1, Int4Range range2) {
   Room for optimization avoiding non overlapping comparisons
 */
 Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b){
-  Int4RangeSet rv;
-  Int4Range newRange;
-  int i;
-  int j;
-
-  rv.ranges = malloc(sizeof(Int4Range)*(a.count*b.count));   // worst case scenario, no overlap
+  Int4RangeSet rv, result;
+  int aptr, bptr;
+  
+  rv.ranges = malloc(sizeof(Int4Range) * (a.count + b.count));
+  rv.containsNull = false;
   rv.count = 0;
   
-  for(i=0; i<a.count; i++){
-    for(j=0; j<b.count; j++){
-      newRange.lower = min2(a.ranges[i].lower, b.ranges[j].lower);
-      newRange.upper = min2(a.ranges[i].upper, b.ranges[j].upper);
-      rv.ranges[rv.count++] = newRange;
-    } 
+  aptr = 0;
+  bptr = 0;
+  while (aptr < a.count && bptr < b.count) {
+    Int4Range newRange;
+    newRange.isNull = false;
+
+    newRange.lower = min2(a.ranges[aptr].lower, b.ranges[bptr].lower);
+    newRange.upper = min2(a.ranges[aptr].upper, b.ranges[bptr].upper);
+
+    // move pts based on UB
+    a.ranges[aptr].upper <= b.ranges[bptr].upper ? aptr++ : bptr++;
+    rv.ranges[rv.count++] = newRange;
   }
-  return rv;
+  
+  result = normalize(rv);
+  return result;
 }
 
 /*Return Int4RangeSet of the non reduced result of taking every range in a and b
-  and finding the max result range:= {max(aL, bL), max(aU, bU) a x b}
-
+  and finding the min result range:= {min(aL, bL), min(aU, bU) a x b}
+  
   Room for optimization avoiding non overlapping comparisons
 */
 Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b){
-  Int4RangeSet rv;
-  Int4Range newRange;
-  int i;
-  int j;
-
-  rv.ranges = malloc(sizeof(Int4Range)*(a.count*b.count));   // worst case scenario, no overlap
+  Int4RangeSet rv, result;
+  int aptr, bptr;
+  
+  rv.ranges = malloc(sizeof(Int4Range) * (a.count + b.count));
+  rv.containsNull = false;
   rv.count = 0;
   
-  for(i=0; i<a.count; i++){
-    for(j=0; j<b.count; j++){
-      newRange.lower = max2(a.ranges[i].lower, b.ranges[j].lower);
-      newRange.upper = max2(a.ranges[i].upper, b.ranges[j].upper);
-      rv.ranges[rv.count++] = newRange;
-    } 
-  }
-  return rv;
-}
+  aptr = 0;
+  bptr = 0;
+  while (aptr < a.count && bptr < b.count) {
+    Int4Range newRange;
+    newRange.isNull = false;
 
+    newRange.lower = max2(a.ranges[aptr].lower, b.ranges[bptr].lower);
+    newRange.upper = max2(a.ranges[aptr].upper, b.ranges[bptr].upper);
+
+    // move pts based on UB
+    a.ranges[aptr].upper <= b.ranges[bptr].upper ? aptr++ : bptr++;
+    rv.ranges[rv.count++] = newRange;
+  }
+  
+  result = normalize(rv);
+  return result;
+}
+ 
 // https://www.geeksforgeeks.org/c/comparator-function-of-qsort-in-c/#
 static int q_sort_compare_ranges(const void* range1, const void* range2){
   Int4Range r1;
