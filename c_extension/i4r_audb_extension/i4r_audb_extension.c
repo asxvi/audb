@@ -1248,6 +1248,7 @@ combine_range_mult_min(PG_FUNCTION_ARGS)
     int neutral_element;
     TypeCacheEntry *typcacheRange, *typcacheMult;
     
+    // need better handling of mult null
     CHECK_BINARY_PGARG_NULL_OR();
 
     range_input = PG_GETARG_RANGE_P(0);
