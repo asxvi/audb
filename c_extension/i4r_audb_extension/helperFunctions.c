@@ -122,6 +122,10 @@ Int4Range max_range(Int4Range range1, Int4Range range2) {
   Room for optimization avoiding non overlapping comparisons
 */
 Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b){
+  // empty sets
+  if (a.count == 0) return b;
+  if (b.count == 0) return a;
+  
   Int4RangeSet rv, result;
   int aptr, bptr;
   
@@ -153,6 +157,10 @@ Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b){
   Room for optimization avoiding non overlapping comparisons
 */
 Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b){
+  // empty sets
+  if (a.count == 0) return b;
+  if (b.count == 0) return a;
+  
   Int4RangeSet rv, result;
   int aptr, bptr;
   

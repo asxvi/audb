@@ -391,6 +391,26 @@ Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b){
   return result;
 }
 
+// will need to change the type of neutral element depending on what datatype the user is using
+Int4RangeSet
+set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
+{
+    // return neutral so doesn't affect the aggregate
+    if(mult.lower == 0) {
+        Int4RangeSet result;
+        result.count = 1;
+        result.containsNull = false; //auto false, not using NULLs
+        result.ranges = malloc(sizeof(Int4Range));
+        result.ranges[0].lower = neutralElement;
+        result.ranges[0].upper = neutralElement;
+        return result;
+    }
+
+    return set1;
+}
+
+
+
 #define PRIMARY_DATA_TYPE "int4range"
 
 int main(){  
@@ -403,15 +423,15 @@ int main(){
 
   Int4Range n;
   n.isNull = true;
-  Multiplicity mult1 = {0,1};
-  Multiplicity mult2 = {1,2};
-  Multiplicity mult3 = {0,2};
+  Int4Range mult1 = {1,4};
+  Int4Range mult2 = {4,8};
+  Int4Range mult3 = {0,2};
 
   Int4Range a_ranges[] = {f, n, a, c};
   Int4Range b_ranges[] = {a};
   Int4RangeSet s1 = {a_ranges, 4, true};
   Int4RangeSet s2 = {b_ranges, 1, false};
-  
+
   // Int4RangeSet rv1 = range_set_add(s1, s2); 
   // printRangeSet(rv1);
 
@@ -424,14 +444,20 @@ int main(){
   // printRangeSet(rv3);
 
   Int4Range c_ranges[] = {a,b,c};
-  Int4Range d_ranges[] = {d,e };
+  Int4Range d_ranges[] = {d,e};
   Int4RangeSet sC = {c_ranges, 3, false};
   Int4RangeSet sD = {d_ranges, 2, false};
-  // printRangeSet(normalize(sC));
-  // printRangeSet(normalize(sD));
+  Int4RangeSet rsC = set_mult_combine_helper(sC, mult1, 1000);
+  Int4RangeSet rsD = set_mult_combine_helper(sD, mult3, 1000);
+
+
+  printRangeSet(normalize(rsC));
+  printRangeSet(normalize(rsD));
+  printRangeSet(min_rangeSet(normalize(rsC), normalize(rsD)));
   
-  printRangeSet(min_rangeSet(normalize(sC), normalize(sD)));
-  printRangeSet(max_rangeSet(normalize(sC), normalize(sD)));
+  
+  // printRangeSet(min_rangeSet(normalize(sC), normalize(sD)));
+  // printRangeSet(max_rangeSet(normalize(sC), normalize(sD)));
   // Int4Range rv1 = floatIntervalSetMult(s1, mult1);  
   // printRange(rv1);
   // Int4Range rv2 = floatIntervalSetMult(s1, mult2);  

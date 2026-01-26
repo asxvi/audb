@@ -682,6 +682,7 @@ Helper function -
 static Int4RangeSet
 deserialize_ArrayType(ArrayType *arr, TypeCacheEntry *typcache)
 {
+    // if (empty??)
     Int4RangeSet set;
 
     // get type information. General this should be RangeType[] where RangeType varies
@@ -1201,7 +1202,7 @@ range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement)
     // return neutral so doesn't affect the aggregate
     if(mult.lower == 0) {
         Int4Range result;
-        result.isNull = false; //auto false, not using NULLs
+        result.isNull = true; //auto false, not using NULLs
         result.lower = neutralElement;
         result.upper = neutralElement;
         return result;
@@ -1210,6 +1211,7 @@ range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement)
     return range;
 }
 // will need to change the type of neutral element depending on what datatype the user is using
+// try containsNull = true to resolve crashing pg
 Int4RangeSet
 set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
 {
@@ -1217,10 +1219,11 @@ set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
     if(mult.lower == 0) {
         Int4RangeSet result;
         result.count = 1;
-        result.containsNull = false; //auto false, not using NULLs
+        result.containsNull = true; //auto false, not using NULLs  
         result.ranges = palloc(sizeof(Int4Range));
-        result.ranges[0].lower = neutralElement;
+        result.ranges[0].lower = neutralElement-2;      //temp change to resolve crashing   
         result.ranges[0].upper = neutralElement;
+        result.ranges[0].isNull = true;
         return result;
     }
 
@@ -1393,7 +1396,6 @@ agg_set_min_transfunc(PG_FUNCTION_ARGS)
     n_state_i4r = normalize(state_i4r);
     n_input_i4r = normalize(input_i4r);
 
-    
     result_i4r = min_rangeSet(n_state_i4r, n_input_i4r);
     result = serialize_ArrayType(result_i4r, typcache);
 
