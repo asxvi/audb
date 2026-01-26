@@ -1219,11 +1219,20 @@ set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
     if(mult.lower == 0) {
         Int4RangeSet result;
         result.count = 1;
-        result.containsNull = true; //auto false, not using NULLs  
+        result.containsNull = false;
         result.ranges = palloc(sizeof(Int4Range));
-        result.ranges[0].lower = neutralElement-2;      //temp change to resolve crashing   
-        result.ranges[0].upper = neutralElement;
-        result.ranges[0].isNull = true;
+        
+        // have to adjust UB + 2 or LB -2 based on if pos or neg
+        if (neutralElement <= 0) {
+            result.ranges[0].lower = neutralElement;      //temp change to resolve crashing   
+            result.ranges[0].upper = neutralElement + 2;
+        }
+        else {
+            result.ranges[0].lower = neutralElement-2;      //temp change to resolve crashing   
+            result.ranges[0].upper = neutralElement;
+        }
+        
+        result.ranges[0].isNull = false;
         return result;
     }
 
@@ -1289,7 +1298,6 @@ combine_range_mult_max(PG_FUNCTION_ARGS)
 
 
 // range_set min/max
-
 Datum
 combine_set_mult_min(PG_FUNCTION_ARGS) 
 {
@@ -1432,6 +1440,21 @@ agg_set_max_transfunc(PG_FUNCTION_ARGS)
     // if (array_contains_nulls())
 
     typcache = lookup_type_cache(state->elemtype, TYPECACHE_RANGE_INFO);
+
+    // if (input_i4r.count > 0 && 
+    //     input_i4r.ranges[0].lower == INT_MIN && 
+    //     input_i4r.ranges[0].upper == INT_MIN + 2) {
+    //     elog(NOTICE, "Skipping MAX sentinel in input");
+    //     PG_RETURN_ARRAYTYPE_P(state);
+    // }
+
+    // // Replace state if it's the MAX sentinel
+    // if (state_i4r.count > 0 && 
+    //     state_i4r.ranges[0].lower == INT_MIN && 
+    //     state_i4r.ranges[0].upper == INT_MIN + 2) {
+    //     elog(NOTICE, "Replacing MAX sentinel in state");
+    //     PG_RETURN_ARRAYTYPE_P(input);
+    // }
 
     state_i4r = deserialize_ArrayType(state, typcache);
     input_i4r = deserialize_ArrayType(input, typcache);

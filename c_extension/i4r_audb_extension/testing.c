@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "helperFunctions.h" 
+#include "limits.h"
 
 int MIN(int My_array[], int len) {
   int num = My_array[0];
@@ -329,16 +330,18 @@ interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
     return normOutput;
 }
 
-/*Return Int4RangeSet of the non reduced result of taking every range in a and b
-  and finding the min result range:= {min(aL, bL), min(aU, bU) a x b}
-  
-  Room for optimization avoiding non overlapping comparisons
-*/
 Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b){
+  // empty sets
+  // if (a.count > 0 && a.ranges[0].isNull) return normalize(b);
+  // if (b.count > 0 && b.ranges[0].isNull) return normalize(a);
+  if (a.count == 0) return b;
+  if (b.count == 0) return a;
+  
   Int4RangeSet rv, result;
   int aptr, bptr;
   
   rv.ranges = malloc(sizeof(Int4Range) * (a.count + b.count));
+  rv.containsNull = false;
   rv.count = 0;
   
   aptr = 0;
@@ -365,12 +368,19 @@ Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b){
   Room for optimization avoiding non overlapping comparisons
 */
 Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b){
+  // empty sets
+   if (a.count > 0 && a.ranges[0].lower == INT_MIN && a.ranges[0].upper == INT_MIN + 2) {
+        return b;  // a is sentinel, return b
+    }
+    if (b.count > 0 && b.ranges[0].lower == INT_MIN && b.ranges[0].upper == INT_MIN + 2) {
+        return a;  // b is sentinel, return a
+    }
+  
   Int4RangeSet rv, result;
   int aptr, bptr;
   
   rv.ranges = malloc(sizeof(Int4Range) * (a.count + b.count));
   rv.containsNull = false;
-  result.containsNull = false;
   rv.count = 0;
   
   aptr = 0;
@@ -392,6 +402,7 @@ Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b){
 }
 
 // will need to change the type of neutral element depending on what datatype the user is using
+// try containsNull = true to resolve crashing pg
 Int4RangeSet
 set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
 {
@@ -399,10 +410,20 @@ set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
     if(mult.lower == 0) {
         Int4RangeSet result;
         result.count = 1;
-        result.containsNull = false; //auto false, not using NULLs
+        result.containsNull = false;
         result.ranges = malloc(sizeof(Int4Range));
-        result.ranges[0].lower = neutralElement;
-        result.ranges[0].upper = neutralElement;
+        
+        // have to adjust UB + 2 or LB -2 based on if pos or neg
+        if (neutralElement <= 0) {
+            result.ranges[0].lower = neutralElement;      //temp change to resolve crashing   
+            result.ranges[0].upper = neutralElement + 2;
+        }
+        else {
+            result.ranges[0].lower = neutralElement-2;      //temp change to resolve crashing   
+            result.ranges[0].upper = neutralElement;
+        }
+        
+        result.ranges[0].isNull = false;
         return result;
     }
 
@@ -447,13 +468,24 @@ int main(){
   Int4Range d_ranges[] = {d,e};
   Int4RangeSet sC = {c_ranges, 3, false};
   Int4RangeSet sD = {d_ranges, 2, false};
-  Int4RangeSet rsC = set_mult_combine_helper(sC, mult1, 1000);
-  Int4RangeSet rsD = set_mult_combine_helper(sD, mult3, 1000);
+  Int4RangeSet sCmin = {c_ranges, 3, false};
+  Int4RangeSet sDmin = {d_ranges, 2, false};
+  
+  Int4RangeSet rsC = set_mult_combine_helper(sC, mult1, INT_MIN);
+  Int4RangeSet rsD = set_mult_combine_helper(sD, mult2, INT_MIN);
+  printRangeSet((sC));
+  printRangeSet((sD));
+  printf("\n\n");
+  printRangeSet(max_rangeSet(normalize(rsC), normalize(rsD)));
+  printf("\n\n");
 
-
-  printRangeSet(normalize(rsC));
-  printRangeSet(normalize(rsD));
-  printRangeSet(min_rangeSet(normalize(rsC), normalize(rsD)));
+  // Int4RangeSet rsCmin = set_mult_combine_helper(sCmin, mult1, INT_MAX);
+  // Int4RangeSet rsDmin = set_mult_combine_helper(sDmin, mult3, INT_MAX);
+  // printRangeSet((rsCmin));
+  // printRangeSet((rsDmin));
+  // printf("\n\n");
+  // printRangeSet(min_rangeSet(normalize(rsCmin), normalize(rsDmin)));
+  
   
   
   // printRangeSet(min_rangeSet(normalize(sC), normalize(sD)));
