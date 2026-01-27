@@ -1108,6 +1108,14 @@ agg_sum_interval_finalfunc(PG_FUNCTION_ARGS)
     PG_RETURN_ARRAYTYPE_P(output);
 }
 
+/*
+State Transition function for max aggregate
+Returns the minimum LB and UB of all ranges in column.
+Simply deserializes data, operates on it, and serializes 
+    State = Int4Range = [a,b)
+    Input = Int4Range = [c,d)
+    Return RangeType: [min(a,c), min(b,d))
+*/
 Datum
 agg_min_transfunc(PG_FUNCTION_ARGS)
 {
@@ -1152,6 +1160,14 @@ agg_min_transfunc(PG_FUNCTION_ARGS)
     PG_RETURN_POINTER(result);
 }
 
+/*
+State Transition function for max aggregate
+Returns the maximum LB and UB of all ranges in column.
+Simply deserializes data, operates on it, and serializes 
+    State = Int4Range = [a,b)
+    Input = Int4Range = [c,d)
+    Return RangeType: [max(a,c), max(b,d))
+*/
 Datum
 agg_max_transfunc(PG_FUNCTION_ARGS)
 {
@@ -1195,7 +1211,11 @@ agg_max_transfunc(PG_FUNCTION_ARGS)
     PG_RETURN_POINTER(result);
 }
 
-// will need to change the type of neutral element depending on what datatype the user is using
+/*
+// Returns naturalElement Range if multiplicity is 0, otherwise original range. 
+// naturalElement Range does not affect min/max calculation
+*/
+// FIXME will need to change the type of neutral element depending on what datatype the user is using
 Int4Range
 range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement)
 {
@@ -1203,15 +1223,27 @@ range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement)
     if(mult.lower == 0) {
         Int4Range result;
         result.isNull = true; //auto false, not using NULLs
-        result.lower = neutralElement;
-        result.upper = neutralElement;
+
+        // have to adjust UB + 2 or LB -2 based on if pos or neg
+        if (neutralElement <= 0) {
+            result.lower = neutralElement;      //temp change to resolve crashing   
+            result.upper = neutralElement + 2;
+        }
+        else {
+            result.lower = neutralElement-2;      //temp change to resolve crashing   
+            result.upper = neutralElement;
+        }
         return result;
     }
 
     return range;
 }
-// will need to change the type of neutral element depending on what datatype the user is using
-// try containsNull = true to resolve crashing pg
+
+/*
+// Returns naturalElement Set if multiplicity is 0, otherwise original Set. 
+// naturalElement Set does not affect min/max calculation
+*/
+// FIXME will need to change the type of neutral element depending on what datatype the user is using
 Int4RangeSet
 set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
 {
@@ -1221,25 +1253,29 @@ set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement)
         result.count = 1;
         result.containsNull = false;
         result.ranges = palloc(sizeof(Int4Range));
-        
+        result.ranges[0].isNull = false;
+    
         // have to adjust UB + 2 or LB -2 based on if pos or neg
         if (neutralElement <= 0) {
-            result.ranges[0].lower = neutralElement;      //temp change to resolve crashing   
-            result.ranges[0].upper = neutralElement + 2;
+            result.ranges[0].lower = neutralElement + 1;      //temp change to resolve crashing   
+            result.ranges[0].upper = neutralElement + 10;
         }
         else {
-            result.ranges[0].lower = neutralElement-2;      //temp change to resolve crashing   
-            result.ranges[0].upper = neutralElement;
+            result.ranges[0].lower = neutralElement-10;      //temp change to resolve crashing   
+            result.ranges[0].upper = neutralElement -1;
         }
-        
-        result.ranges[0].isNull = false;
         return result;
     }
 
     return set1;
 }
 
-// do not set isNull attributes bc they are no longer used
+
+/*
+// To be called inside a MIN aggregation call. This multiplies the range and multuplicity together.
+// neutral_element is the only difference between min/max implementation. This value is HARDCODED //FIXME
+// Returns: a RangeType Datum as argument to MIN()
+*/
 Datum
 combine_range_mult_min(PG_FUNCTION_ARGS) 
 {
@@ -1268,7 +1304,11 @@ combine_range_mult_min(PG_FUNCTION_ARGS)
     PG_RETURN_RANGE_P(output);
 }
 
-// do not set isNull attributes bc they are no longer used
+/*
+// To be called inside a MAX aggregation call. This multiplies the range and multuplicity together.
+// neutral_element is the only difference between min/max implementation. This value is HARDCODED //FIXME
+// Returns: a RangeType Datum as argument to MAX()
+*/
 Datum
 combine_range_mult_max(PG_FUNCTION_ARGS) 
 {
@@ -1298,7 +1338,12 @@ combine_range_mult_max(PG_FUNCTION_ARGS)
 
 
 
-// range_set min/max
+/*
+// To be called inside a MIN aggregation call. This multiplies the Set and multiplicity together.
+// neutral_element is the only difference between min/max implementation. This value is HARDCODED //FIXME
+// Parameter: ArrayType (data col), RangeType (multiplicity)
+// Returns: a ArrayType Datum as argument to MIN()
+*/
 Datum
 combine_set_mult_min(PG_FUNCTION_ARGS) 
 {
@@ -1334,6 +1379,12 @@ combine_set_mult_min(PG_FUNCTION_ARGS)
     PG_RETURN_ARRAYTYPE_P(output);
 }
 
+/*
+// To be called inside a MAX aggregation call. This multiplies the Set and multiplicity together.
+// neutral_element is the only difference between min/max implementation. This value is HARDCODED //FIXME
+// Parameter: ArrayType (data col), RangeType (multiplicity)
+// Returns: a ArrayType Datum as argument to MAX()
+*/
 Datum
 combine_set_mult_max(PG_FUNCTION_ARGS) 
 {
@@ -1369,6 +1420,14 @@ combine_set_mult_max(PG_FUNCTION_ARGS)
     PG_RETURN_ARRAYTYPE_P(output);
 }
 
+/*
+// State Transition function for min aggregate
+// Returns the minimum LB and UB of all ranges in column.
+// Simply deserializes data, operates on it, and serializes back to ArrayType
+//     State = ArrayType = {[a,b) ...}       //(implicit) 
+//     Input = ArrayType = [c,d) ... }
+// Return ArrayType: {[min(a,c), min(b,d)) for all ranges}
+*/
 Datum
 agg_set_min_transfunc(PG_FUNCTION_ARGS)
 {
@@ -1411,7 +1470,14 @@ agg_set_min_transfunc(PG_FUNCTION_ARGS)
     PG_RETURN_ARRAYTYPE_P(result);
 }
 
-
+/*
+// State Transition function for max aggregate
+// Returns the minimum LB and UB of all ranges in column.
+// Simply deserializes data, operates on it, and serializes back to ArrayType
+//     State = ArrayType = {[a,b) ...}       //(implicit) 
+//     Input = ArrayType = [c,d) ... }
+// Return ArrayType: {[max(a,c), max(b,d)) for all ranges}
+*/
 Datum
 agg_set_max_transfunc(PG_FUNCTION_ARGS)
 {
@@ -1462,7 +1528,6 @@ agg_set_max_transfunc(PG_FUNCTION_ARGS)
 
     n_state_i4r = normalize(state_i4r);
     n_input_i4r = normalize(input_i4r);
-
     
     result_i4r = max_rangeSet(n_state_i4r, n_input_i4r);
     result = serialize_ArrayType(result_i4r, typcache);

@@ -265,3 +265,6 @@ INSERT INTO s1 (colA, colB, mult) VALUES
     (array[int4range(1,5), int4range(9,12), int4range(18,29)], array[int4range(4,13), int4range(16,20)], int4range(1,1, '[]')),
     (array[int4range(4,13), int4range(16,20)], array[int4range(22,25), int4range(34,50)], int4range(1,1, '[]')),
     (array[int4range(1,5), int4range(9,12), int4range(18,29)], array[int4range(4,13), int4range(16,20)], int4range(0,1, '[]'));
+
+
+
