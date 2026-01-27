@@ -206,15 +206,22 @@ RETURNS int4range[]
 AS 'MODULE_PATHNAME', 'agg_set_max_transfunc'
 LANGUAGE c;
 
+CREATE FUNCTION set_min_max_finalfunc(int4range[]) 
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'set_min_max_finalfunc'
+LANGUAGE c;
+
 create aggregate min (int4range[])
 (
     stype = int4range[],
-    sfunc = agg_set_min_transfunc
+    sfunc = agg_set_min_transfunc,
+    finalfunc = set_min_max_finalfunc
 );
 create aggregate max (int4range[])
 (
     stype = int4range[],
-    sfunc = agg_set_max_transfunc
+    sfunc = agg_set_max_transfunc,
+    finalfunc = set_min_max_finalfunc
 );
 
 

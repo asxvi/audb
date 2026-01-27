@@ -50,8 +50,7 @@ PG_FUNCTION_INFO_V1(combine_set_mult_min);
 PG_FUNCTION_INFO_V1(combine_set_mult_max);
 PG_FUNCTION_INFO_V1(agg_set_min_transfunc);
 PG_FUNCTION_INFO_V1(agg_set_max_transfunc);
-// PG_FUNCTION_INFO_V1(agg_min_max_finalfunc);
-
+PG_FUNCTION_INFO_V1(set_min_max_finalfunc);
 
 // easy change for future implementation. currently only affects lift funciton
 #define PRIMARY_DATA_TYPE "int4range"
@@ -1535,4 +1534,22 @@ agg_set_max_transfunc(PG_FUNCTION_ARGS)
     PG_RETURN_ARRAYTYPE_P(result);
 }
 
+
+// Simply just normalizes the result. Compressing any ranges if possible
+Datum 
+set_min_max_finalfunc(PG_FUNCTION_ARGS)
+{
+    // check for NULLS. Diff from empty check
+    if (PG_ARGISNULL(0)){
+        PG_RETURN_NULL();
+    }
+
+    ArrayType *inputArray;
+    inputArray = PG_GETARG_ARRAYTYPE_P(0);
+
+    ArrayType *output;
+    output = helperFunctions_helper(inputArray, normalize);
+
+    PG_RETURN_ARRAYTYPE_P(output);
+}
 

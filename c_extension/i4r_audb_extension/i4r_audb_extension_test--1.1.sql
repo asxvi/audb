@@ -233,5 +233,5 @@ CREATE TEMP TABLE IF NOT EXISTS set_min_max_test (
 );
 
 INSERT INTO set_min_max_test (colA, colB, mult) VALUES
-    (array[int4range(1,3), int4range(6,10), int4range(20,30)], array[int4range(1,1000), int4range(2000,3000), int4range(4000,5000)], int4range(1,4)),
-    (array[int4range(2,3), int4range(9,14)], array[int4range(43,99), int4range(2500,3100), int4range(2250,2790), int4range(1,4))
+    ( array[int4range(1,3), int4range(6,10), int4range(20,30)], array[int4range(1,1000), int4range(2000,3000), int4range(4000,5000)], int4range(1,4) ),
+    ( array[int4range(2,3), int4range(9,14)], array[int4range(43,99), int4range(2500,3100), int4range(2250,2790)], int4range(1,4));
