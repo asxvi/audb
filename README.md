@@ -1,7 +1,7 @@
-# Postgres Research
+# GPROM- AUDB Extension
 
 ## Overview
-This project is focused on building the extension for Postgres functions in GPROM (https://github.com/IITDBGroup/gprom). The extension will be used to generate the SQL queries for the Postgres functions. 
+This project implements a range-based uncertainty extension for Postgres functions. Eventual implementation in GPROM (https://github.com/IITDBGroup/gprom).
 
 ## Getting Started
 1. Clone the repository:
@@ -10,9 +10,39 @@ This project is focused on building the extension for Postgres functions in GPRO
     ```
 2. Navigate to the project directory:
     ```sh
-    cd postgres_research
+    cd audb/c_extension/i4r_audb_extension
     ```
-3. If you wish to test this independently of GPROM, set up the environment by creating a Postgres database and cloning this repository within the same directory:
+    
+    1. To make binary locally:
+        ```sh
+        make clean
+        make && make install
+        ```
+     
+    2. To run inside docker container
+        ```sh
+        docker compose up -d
+        docker exec -it audb_test bash
+
+        # Inside container
+        make clean
+        make && make install
+        ```
+    3. Connect to database
+        ```sh
+        psql -U postgres -d audb_test
+        ```
+
+3. Running Basic Test Suite
+    ```sh
+    # inside psql
+    \i i4r_audb_extension_test--1.1.sql
+    ```
+
+4. Examples
+
+
+<!-- 3. If you wish to test this independently of GPROM, set up the environment by creating a Postgres database and cloning this repository within the same directory:
 - Create a Postgres database:
     ```sh
     createdb <database_name>
@@ -25,26 +55,10 @@ This project is focused on building the extension for Postgres functions in GPRO
 - Run the function to test:
     ```sh
     psql -d <database_name> -c "SELECT <function_name>(<arguments>);"
-    ```
+    ``` -->
 
-4. Syntax for SQL Functions:
 
-- Addition, Subtraction, Multiplication
-
-```sh
-SELECT range_set_add(
-    ARRAY[ARRAY[-10, -10], ARRAY[3, 3]],
-    ARRAY[ARRAY[-10, -10], ARRAY[20, 20]]
-);
-```
-
-- Multiplication
-
-```sh
-
-```
 
 
 ## License
 This project is licensed under the Apache 2.0 License. See the `LICENSE` file for more details.
-
