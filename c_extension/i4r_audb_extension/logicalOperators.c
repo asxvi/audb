@@ -157,3 +157,50 @@ int range_less_than_equal(Int4RangeSet a, Int4RangeSet b){
 
     return result;
 }
+
+
+int range_set_equal_internal(Int4RangeSet a, Int4RangeSet b) {
+    // both empty = equal
+    if (a.count == 0 && b.count == 0) {
+        return 1;
+    }
+    
+    // either empty
+    if (a.count == 0 || b.count == 0) {
+        return 0;
+    }
+    
+    // diff count
+    if (a.count != b.count) {
+        return 0;
+    }
+
+    // vacuously true case: both single-element ranges [5,6) = [5,6)
+    // a=b=c=d
+    if (a.count == 1 && b.count == 1) {
+        if ((a.ranges[0].lower == a.ranges[0].upper - 1) &&
+            (b.ranges[0].lower == b.ranges[0].upper - 1) &&
+            (a.ranges[0].lower == b.ranges[0].lower)) {
+            return 1;
+        }
+    }    
+
+    // check for overlap = uncertain
+    for (size_t i = 0; i < a.count; i++) {
+        for (size_t j = 0; j < b.count; j++) {
+            if (overlap(a.ranges[i], b.ranges[j])) {
+                return -1;  // NULL (uncertain)
+            }
+        }
+    }
+
+    // check exact equality
+    for (size_t i = 0; i < a.count; i++) {
+        if (a.ranges[i].lower != b.ranges[i].lower ||
+            a.ranges[i].upper != b.ranges[i].upper) {
+            return 0;  // Not equal
+        }
+    }
+    
+    return 1;  // Equal
+}

@@ -83,6 +83,12 @@ RETURNS boolean
 AS 'MODULE_PATHNAME', 'c_gte'
 LANGUAGE c;
 
+-- equal takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION set_equal(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'set_equal'
+LANGUAGE c;
+
 ------------------------------------------------------------------------------
 --------------------------------Helper functions------------------------------
 ------------------------------------------------------------------------------
@@ -120,7 +126,6 @@ LANGUAGE c;
 
 ----------------------------------------------------------------------------
 -------------------------------Aggregates-----------------------------------
-
 
 ---------- SUM -----------
 

@@ -26,6 +26,7 @@ PG_FUNCTION_INFO_V1(c_lt);
 PG_FUNCTION_INFO_V1(c_lte);
 PG_FUNCTION_INFO_V1(c_gt);
 PG_FUNCTION_INFO_V1(c_gte);
+PG_FUNCTION_INFO_V1(set_equal);
 
 PG_FUNCTION_INFO_V1(c_lift_scalar);
 PG_FUNCTION_INFO_V1(c_sort);
@@ -84,6 +85,7 @@ int logical_operation_helper(ArrayType *input1, ArrayType *input2, int (*callbac
 ArrayType* helperFunctions_helper( ArrayType *input, Int4RangeSet (*callback)() );
 
 // for min/max agg
+// can all be added to helperFunctions.h
 Int4Range range_mult_combine_helper_sum(Int4Range set1, Int4Range mult, int neutralElement);
 Int4RangeSet set_mult_combine_helper_sum(Int4RangeSet set1, Int4Range mult, int neutralElement);
 Int4Range range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement);
@@ -313,6 +315,27 @@ c_gte(PG_FUNCTION_ARGS)
 
     rv = logical_operation_helper(a1, a2, range_greater_than_equal);
     
+    if (rv == -1){
+        PG_RETURN_NULL();
+    }
+
+    PG_RETURN_BOOL((bool)rv);
+}
+
+Datum 
+set_equal(PG_FUNCTION_ARGS)
+{
+    ArrayType *a1;
+    ArrayType *a2;
+    int rv;
+
+    CHECK_BINARY_PGARG_NULL_OR();
+
+    a1 = PG_GETARG_ARRAYTYPE_P(0);
+    a2 = PG_GETARG_ARRAYTYPE_P(1);
+
+    rv = logical_operation_helper(a1, a2, range_set_equal_internal);
+
     if (rv == -1){
         PG_RETURN_NULL();
     }
