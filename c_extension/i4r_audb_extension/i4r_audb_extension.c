@@ -32,13 +32,14 @@ PG_FUNCTION_INFO_V1(c_sort);
 PG_FUNCTION_INFO_V1(c_normalize);
 PG_FUNCTION_INFO_V1(c_reduceSize);
 
-// old
-PG_FUNCTION_INFO_V1(test_c_range_set_sum);
-
 ///// aggregates
 //sum
-PG_FUNCTION_INFO_V1(agg_sum_interval_transfunc);
-PG_FUNCTION_INFO_V1(agg_sum_interval_finalfunc);
+PG_FUNCTION_INFO_V1(combine_range_mult_sum);
+PG_FUNCTION_INFO_V1(agg_sum_transfunc);
+
+PG_FUNCTION_INFO_V1(combine_set_mult_sum);
+PG_FUNCTION_INFO_V1(agg_sum_set_transfunc);
+PG_FUNCTION_INFO_V1(agg_sum_set_finalfunc);
 
 // min/max
 PG_FUNCTION_INFO_V1(combine_range_mult_min);
@@ -48,9 +49,9 @@ PG_FUNCTION_INFO_V1(agg_max_transfunc);
 
 PG_FUNCTION_INFO_V1(combine_set_mult_min);
 PG_FUNCTION_INFO_V1(combine_set_mult_max);
-PG_FUNCTION_INFO_V1(agg_set_min_transfunc);
-PG_FUNCTION_INFO_V1(agg_set_max_transfunc);
-PG_FUNCTION_INFO_V1(set_min_max_finalfunc);
+PG_FUNCTION_INFO_V1(agg_min_set_transfunc);
+PG_FUNCTION_INFO_V1(agg_max_set_transfunc);
+PG_FUNCTION_INFO_V1(agg_min_max_set_finalfunc);
 
 // easy change for future implementation. currently only affects lift funciton
 #define PRIMARY_DATA_TYPE "int4range"
@@ -83,6 +84,8 @@ int logical_operation_helper(ArrayType *input1, ArrayType *input2, int (*callbac
 ArrayType* helperFunctions_helper( ArrayType *input, Int4RangeSet (*callback)() );
 
 // for min/max agg
+Int4Range range_mult_combine_helper_sum(Int4Range set1, Int4Range mult, int neutralElement);
+Int4RangeSet set_mult_combine_helper_sum(Int4RangeSet set1, Int4Range mult, int neutralElement);
 Int4Range range_mult_combine_helper(Int4Range range, Int4Range mult, int neutralElement);
 Int4RangeSet set_mult_combine_helper(Int4RangeSet set1, Int4Range mult, int neutralElement);
 
@@ -831,7 +834,7 @@ normalizeRange(ArrayType *input1) {
     Oid elemTypeOID;
     TypeCacheEntry *typcache;
 
-    elemTypeOID = TypenameGetTypid("int4range");
+    elemTypeOID = input1->elemtype;
     typcache = lookup_type_cache(elemTypeOID, TYPECACHE_RANGE_INFO);
     
     // deconstruct array, create our representation of I4R, call function and get 'normalized' result
@@ -945,166 +948,254 @@ normalizeRange(ArrayType *input1) {
     return resultsArrOut;
 }
 
-
 /*
-Parameters: 
-    ArrayType of Int4Ranges (RangeType) 
-    Range Type for multiplicity [inclusive bounds]
+// Returns naturalElement Set if multiplicity is 0, otherwise original Set. 
+// naturalElement Set does not affect min/max calculation
 */
-Datum
-test_c_range_set_sum(PG_FUNCTION_ARGS)
+// FIXME will need to change the type of neutral element depending on what datatype the user is using
+Int4Range
+range_mult_combine_helper_sum(Int4Range set1, Int4Range mult, int neutralElement)
 {
-    int resizeTrigger;
-    resizeTrigger = 4;
+    // return neutral so doesn't affect the aggregate
+    if(mult.lower == 0) {
+        Int4Range result;
+        result.isNull = false;
     
-    CHECK_BINARY_PGARG_NULL_ARGS();
-
-    ArrayType *a1;
-    ArrayType *a2;
-    RangeType *mult;
-    
-    a1 = PG_GETARG_ARRAYTYPE_P(0);
-    a2 = PG_GETARG_ARRAYTYPE_P(1);
-    mult = PG_GETARG_RANGE_P(2);
-
-    ArrayType *sumOutput = arithmetic_set_helper(a1, a2, range_set_add);
-
-    int nelems = ArrayGetNItems(ARR_NDIM(sumOutput), ARR_DIMS(sumOutput));
-
-    ArrayType *rv;
-    // call function to resize the array. create new arr and free old one
-    if (nelems >= resizeTrigger) {
-        // function to create new array
-        rv = normalizeRange(sumOutput);
-        pfree(sumOutput);
-    }
-    else {
-        rv = sumOutput;
+        // have to adjust UB + 2 or LB -2 based on if pos or neg
+        if (neutralElement <= 0) {
+            result.lower = 0;      //temp change to resolve crashing   
+            result.upper = 1 ;
+        }
+        else {
+            result.lower = neutralElement;      //temp change to resolve crashing   
+            result.upper = neutralElement + 1;
+        }
+        return result;
     }
 
-    PG_RETURN_ARRAYTYPE_P(rv);
+    return set1;
 }
 
-// agg over empty == 00
+/*
+// Returns naturalElement Set if multiplicity is 0, otherwise original Set. 
+// naturalElement Set does not affect min/max calculation
+*/
+// FIXME will need to change the type of neutral element depending on what datatype the user is using
+Int4RangeSet
+set_mult_combine_helper_sum(Int4RangeSet set1, Int4Range mult, int neutralElement)
+{
+    // return neutral so doesn't affect the aggregate
+    if(mult.lower == 0) {
+        Int4RangeSet result;
+        result.count = 1;
+        result.containsNull = false;
+        result.ranges = palloc(sizeof(Int4Range));
+        result.ranges[0].isNull = false;
+    
+        // have to adjust UB + 2 or LB -2 based on if pos or neg
+        if (neutralElement <= 0) {
+            result.ranges[0].lower = 0;      //temp change to resolve crashing   
+            result.ranges[0].upper = 1;
+        }
+        else {
+            result.ranges[0].lower = neutralElement;      //temp change to resolve crashing   
+            result.ranges[0].upper = neutralElement + 1;
+        }
+        return result;
+    }
+
+    return set1;
+}
+
+/*
+// To be called inside a MAX aggregation call. This multiplies the Set and multiplicity together.
+// neutral_element is the only difference between min/max implementation. This value is HARDCODED //FIXME
+// Parameter: ArrayType (data col), RangeType (multiplicity)
+// Returns: a ArrayType Datum as argument to MAX()
+*/
+Datum
+combine_range_mult_sum(PG_FUNCTION_ARGS) 
+{
+    // inputs/ outputs
+    RangeType *input, *mult_input, *output;
+    
+    // working type
+    Int4Range input_i4r, result_i4r, mult_i4r;
+
+    int neutral_element;
+    TypeCacheEntry *typcache, *typcacheMult;
+    
+    CHECK_BINARY_PGARG_NULL_OR();
+    
+    input = PG_GETARG_RANGE_P(0);
+    mult_input = PG_GETARG_RANGE_P(1);
+
+    typcache = lookup_type_cache(input->rangetypid, TYPECACHE_RANGE_INFO);
+    typcacheMult = lookup_type_cache(mult_input->rangetypid, TYPECACHE_RANGE_INFO);
+
+    // hardcoded //FIXME
+    neutral_element = 0;
+
+    // deserialize, operate on, serialize, return
+    input_i4r = deserialize_RangeType(input, typcache);
+    mult_i4r = deserialize_RangeType(mult_input, typcacheMult);
+
+    result_i4r = range_mult_combine_helper_sum(input_i4r, mult_i4r, neutral_element);
+    output = serialize_RangeType(result_i4r, typcache);
+
+    PG_RETURN_ARRAYTYPE_P(output);
+}
+
+/*
+// To be called inside a MAX aggregation call. This multiplies the Set and multiplicity together.
+// neutral_element is the only difference between min/max implementation. This value is HARDCODED //FIXME
+// Parameter: ArrayType (data col), RangeType (multiplicity)
+// Returns: a ArrayType Datum as argument to MAX()
+*/
+Datum
+combine_set_mult_sum(PG_FUNCTION_ARGS) 
+{
+    // inputs/ outputs
+    ArrayType *set_input, *output;
+    RangeType *mult_input;
+    
+    // working type
+    Int4Range mult;
+    Int4RangeSet set1, result;
+
+    int neutral_element;
+    TypeCacheEntry *typcacheSet, *typcacheMult;
+    
+    CHECK_BINARY_PGARG_NULL_OR();
+    
+    set_input = PG_GETARG_ARRAYTYPE_P(0);
+    mult_input = PG_GETARG_RANGE_P(1);
+
+    typcacheSet = lookup_type_cache(set_input->elemtype, TYPECACHE_RANGE_INFO);
+    typcacheMult = lookup_type_cache(mult_input->rangetypid, TYPECACHE_RANGE_INFO);
+
+    // hardcoded //FIXME
+    neutral_element = 0;
+
+    // deserialize, operate on, serialize, return
+    set1 = deserialize_ArrayType(set_input, typcacheSet);
+    mult = deserialize_RangeType(mult_input, typcacheMult);
+
+    result = set_mult_combine_helper(set1, mult, neutral_element);
+    output = serialize_ArrayType(result, typcacheSet);
+
+    PG_RETURN_ARRAYTYPE_P(output);
+}
+
+// agg over empty == 0,0
 /* arbitrary trigger size. doesnt use for now 
     first parameter is the state
     second parameter is the current colA (I4RSet)
     third parameter is the multiplicity
  */
 Datum
-agg_sum_interval_transfunc(PG_FUNCTION_ARGS)
+agg_sum_transfunc(PG_FUNCTION_ARGS)
 {
-    IntervalAggState *state;
-    ArrayType *new_rangeSet;
-    RangeType *new_mult;
-    // RangeBound multLB, multUB;
-
-    int triggerSize;
-    triggerSize = 3;
-
-    // inital state is {NULL, false}. Have to initalize on first run, otherwise get exsiting accumulated state
-    if (PG_ARGISNULL(0)) {
-        state->accumulated.count = 0;
-        state->accumulated.ranges = NULL;
-        state->accumulated.containsNull = false;
-
-        state->mult.lower = 0;
-        state->mult.upper = 0;
-        state->mult.isNull = false;
-
-        state->has_null = false;
-        state->triggerSize = triggerSize;
-    }
-    else {
-        state = (IntervalAggState*) PG_GETARG_POINTER(0);
-    }
-
-    // NULL input doesnt change state
-    if(PG_ARGISNULL(1) || PG_ARGISNULL(2)) {
-        PG_RETURN_POINTER(state);
-    }
+    RangeType *state, *input, *result;
+    TypeCacheEntry *typcache;
     
-    new_rangeSet = PG_GETARG_ARRAYTYPE_P(1);
-    new_mult = PG_GETARG_RANGE_P(2);
-
-    // assign typcache based on RangeType input
-    Oid rangeTypeOID, multTypeOID;
-    TypeCacheEntry *rangeTypcache, *multTypcache;
-    
-    multTypeOID = RangeTypeGetOid(new_mult);
-    rangeTypeOID = ARR_ELEMTYPE(new_rangeSet);
-    multTypcache = lookup_type_cache(multTypeOID, TYPECACHE_RANGE_INFO);
-    rangeTypcache = lookup_type_cache(rangeTypeOID, TYPECACHE_RANGE_INFO);
-
-    Int4Range input_mult;
-    Int4RangeSet input_set;
-    RangeBound lb, ub;
-    bool emptyMult;
-
-    range_deserialize(multTypcache, new_mult, &lb, &ub, &emptyMult);
-    input_mult.lower = lb.val;
-    input_mult.upper = ub.val + 1;  // account for internal exclusive UB
-    input_mult.isNull = false;
-
-    input_set = deserialize_ArrayType(new_rangeSet, rangeTypcache);
-    
-    // check that either the left (range set) or right (mult) side can produce NULL. 
-    // NULL remains possible only if previosuly possible and curently still possible
-    state->has_null = state->has_null & (input_mult.lower == 0 || input_set.containsNull);
-
-    // now we multiply the input_set by the multiplicity
-    Int4RangeSet multipliedSet;
-    multipliedSet = interval_agg_combine_set_mult(input_set, input_mult); // double check contains null and null handling
-    pfree(input_set.ranges);
-
-    // now add the accumulated rset in state with multipliedSet
-    if (state->accumulated.count == 0) {
-        state->accumulated = multipliedSet;
-    }
-    else{
-        Int4RangeSet summed;
-
-        summed = range_set_add(state->accumulated, multipliedSet);
-        pfree(state->accumulated.ranges);
-        pfree(multipliedSet.ranges);
-        state->accumulated = summed;
-
-        // FIXME
-        // reduce size, not normalize if triggered
-        if (state->accumulated.count >= state->triggerSize) {
-            Int4RangeSet reduced;
-            
-            reduced = normalize(state->accumulated);
-            pfree(state->accumulated.ranges);
-            state->accumulated = reduced;
+    // first call: use the first input as initial state, or non null
+    if (PG_ARGISNULL(0)){
+        if (PG_ARGISNULL(1)){
+            PG_RETURN_NULL();
         }
+        // othrwise value becomes the state
+        PG_RETURN_RANGE_P(PG_GETARG_RANGE_P(1));
     }
-    PG_RETURN_POINTER(state);
+
+    // NULL input: return current state unchanged
+    if(PG_ARGISNULL(1)) {
+        PG_RETURN_RANGE_P(PG_GETARG_RANGE_P(0));
+    }
+    
+    // get arguments, call helper to get result, check to normalize after
+    state = PG_GETARG_RANGE_P(0);
+    input = PG_GETARG_RANGE_P(1);
+
+    result = arithmetic_range_helper(state, input, range_add);
+
+    PG_RETURN_ARRAYTYPE_P(result);
 }
+
+// agg over empty == 0,0
+/* arbitrary trigger size. doesnt use for now 
+    first parameter is the state
+    second parameter is the current colA (I4RSet)
+    third parameter is the multiplicity
+ */
+Datum
+agg_sum_set_transfunc(PG_FUNCTION_ARGS)
+{
+    Int4RangeSet state_i4r, input_i4r, n_state_i4r, n_input_i4r, result_i4r;
+    ArrayType *state, *input, *result;
+    TypeCacheEntry *typcache;
+    int resizeTrigger, sizeLimit, nelems;
+    
+    resizeTrigger = 5;
+    sizeLimit = 3; 
+
+    // first call: use the first input as initial state, or non null
+    if (PG_ARGISNULL(0)){
+        if (PG_ARGISNULL(1)){
+            PG_RETURN_NULL();
+        }
+        // othrwise value becomes the state
+        PG_RETURN_ARRAYTYPE_P(PG_GETARG_ARRAYTYPE_P(1));
+    }
+
+    // NULL input: return current state unchanged
+    if(PG_ARGISNULL(1)) {
+        PG_RETURN_ARRAYTYPE_P(PG_GETARG_ARRAYTYPE_P(0));
+    }
+    
+    // get arguments, call helper to get result, check to normalize after
+    state = PG_GETARG_ARRAYTYPE_P(0);
+    input = PG_GETARG_ARRAYTYPE_P(1);
+
+    result = arithmetic_set_helper(state, input, range_set_add);
+
+    // check to normalize //FIXME should be reduce size down to sizeLimit
+    nelems = ArrayGetNItems(ARR_NDIM(result), ARR_DIMS(result));
+    if (nelems <= resizeTrigger) {
+        ArrayType *normResult;
+        normResult = normalizeRange(result);
+        
+        PG_RETURN_ARRAYTYPE_P(normResult);
+    }
+
+    PG_RETURN_ARRAYTYPE_P(result);
+}
+
 // final func return accumulated result as a native postgres type
 Datum
-agg_sum_interval_finalfunc(PG_FUNCTION_ARGS)
+agg_sum_set_finalfunc(PG_FUNCTION_ARGS)
 {
-    IntervalAggState *final;
-    ArrayType *output;
-    
+    ArrayType *final;
+    int resizeTrigger, sizeLimit, nelems;
+    resizeTrigger = 5;
+    sizeLimit = 3; 
+
     // no values in aggregated accum 
     if (PG_ARGISNULL(0)) {
         PG_RETURN_NULL();
     }
 
-    final = (IntervalAggState *) PG_GETARG_POINTER(0);
+    final = PG_GETARG_ARRAYTYPE_P(0);
+    nelems = ArrayGetNItems(ARR_NDIM(final), ARR_DIMS(final));
 
-    // find better way to get OID based on final->accumulated vals. serialize, get type etc...
-    // assign typcache based on RangeType input
-    Oid elemTypeOID;
-    TypeCacheEntry *typcache;
-    elemTypeOID = TypenameGetTypid("int4range");
-    typcache = lookup_type_cache(elemTypeOID, TYPECACHE_RANGE_INFO);
+    // check to reduce size//normalize
+    if (nelems >= resizeTrigger) {
+        ArrayType *result;
+        result = normalizeRange(final);
+        PG_RETURN_ARRAYTYPE_P(result);    
+    }
     
-    output = serialize_ArrayType(final->accumulated, typcache);
-    
-    PG_RETURN_ARRAYTYPE_P(output);
+    PG_RETURN_ARRAYTYPE_P(final);
 }
 
 /*
@@ -1335,8 +1426,6 @@ combine_range_mult_max(PG_FUNCTION_ARGS)
     PG_RETURN_RANGE_P(output);
 }
 
-
-
 /*
 // To be called inside a MIN aggregation call. This multiplies the Set and multiplicity together.
 // neutral_element is the only difference between min/max implementation. This value is HARDCODED //FIXME
@@ -1428,7 +1517,7 @@ combine_set_mult_max(PG_FUNCTION_ARGS)
 // Return ArrayType: {[min(a,c), min(b,d)) for all ranges}
 */
 Datum
-agg_set_min_transfunc(PG_FUNCTION_ARGS)
+agg_min_set_transfunc(PG_FUNCTION_ARGS)
 {
     Int4RangeSet state_i4r, input_i4r, n_state_i4r, n_input_i4r, result_i4r;
     ArrayType *state, *input, *result;
@@ -1478,7 +1567,7 @@ agg_set_min_transfunc(PG_FUNCTION_ARGS)
 // Return ArrayType: {[max(a,c), max(b,d)) for all ranges}
 */
 Datum
-agg_set_max_transfunc(PG_FUNCTION_ARGS)
+agg_max_set_transfunc(PG_FUNCTION_ARGS)
 {
     Int4RangeSet state_i4r, input_i4r, n_state_i4r, n_input_i4r, result_i4r;
     ArrayType *state, *input, *result;
@@ -1537,7 +1626,7 @@ agg_set_max_transfunc(PG_FUNCTION_ARGS)
 
 // Simply just normalizes the result. Compressing any ranges if possible
 Datum 
-set_min_max_finalfunc(PG_FUNCTION_ARGS)
+agg_min_max_set_finalfunc(PG_FUNCTION_ARGS)
 {
     // check for NULLS. Diff from empty check
     if (PG_ARGISNULL(0)){
@@ -1552,4 +1641,3 @@ set_min_max_finalfunc(PG_FUNCTION_ARGS)
 
     PG_RETURN_ARRAYTYPE_P(output);
 }
-

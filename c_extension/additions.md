@@ -27,3 +27,22 @@ or add 2 params, 1 target to start reducing 2
 - [] arithmetic.c (confusion on division)
 - []
 - []
+
+
+1/22
+Get rid of C90 Warnings
+add finalfunc for sum
+work on min/max
+add more reg tests
+
+
+1/25
+- [] serialize and deserialize need empty array checks perhaps
+
+
+1/26
+- [] need better handling of agg mult nulls. if mult is null then entire row should be NULL?
+- [X] min and max return smallest/largest possible range or just smallest vals
+- [] in-range checks. ex  c_range_multiply('[50000,60000)', '[50000,60000)') == overflow
+
+1/27

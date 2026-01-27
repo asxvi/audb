@@ -83,9 +83,9 @@ RETURNS boolean
 AS 'MODULE_PATHNAME', 'c_gte'
 LANGUAGE c;
 
--- ----------------------------------------------------------------------------
--- ------------------------------Helper functions------------------------------
--- ----------------------------------------------------------------------------
+------------------------------------------------------------------------------
+--------------------------------Helper functions------------------------------
+------------------------------------------------------------------------------
 
 -- c_lift takes 1 int32 and returns its equivallent Int4Range 
 CREATE FUNCTION c_lift_scalar(a int4)
@@ -118,38 +118,48 @@ AS 'MODULE_PATHNAME', 'c_normalize'
 LANGUAGE c;
 
 
-
-
 ----------------------------------------------------------------------------
 -------------------------------Aggregates-----------------------------------
 
 
 ---------- SUM -----------
 
--- -- test_c_range_set_sum takes 2 int4range types and returns the sum
--- CREATE FUNCTION test_c_range_set_sum(a int4range[], b int4range[]) 
--- RETURNS int4range[]
--- AS 'MODULE_PATHNAME', 'test_c_range_set_sum'
--- LANGUAGE c;
--- -- LANGUAGE c STRICT VOLATILE;
-
-CREATE FUNCTION agg_sum_interval_transfunc(internal, int4range[], int4range) 
-RETURNS internal
-AS 'MODULE_PATHNAME', 'agg_sum_interval_transfunc'
+CREATE FUNCTION combine_range_mult_sum(int4range, int4range) 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'combine_range_mult_sum'
 LANGUAGE c;
--- LANGUAGE c STRICT VOLATILE;
 
-CREATE FUNCTION agg_sum_interval_finalfunc(internal) 
-RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'agg_sum_interval_finalfunc'
+CREATE FUNCTION agg_sum_transfunc(int4range, int4range) 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'agg_sum_transfunc'
 LANGUAGE c;
--- LANGUAGE c STRICT VOLATILE;
 
-create aggregate sum (int4range[], int4range)
+create aggregate sum (int4range)
 (
-    stype = internal,       -- Type: IntervalAggState
-    sfunc = agg_sum_interval_transfunc,
-    finalfunc = agg_sum_interval_finalfunc
+    stype = int4range,
+    sfunc = agg_sum_transfunc
+);
+
+CREATE FUNCTION combine_set_mult_sum(int4range[], int4range) 
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'combine_set_mult_sum'
+LANGUAGE c;
+
+CREATE FUNCTION agg_sum_set_transfunc(int4range[], int4range[]) 
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'agg_sum_set_transfunc'
+LANGUAGE c;
+
+CREATE FUNCTION agg_sum_set_finalfunc(int4range[]) 
+RETURNS int4range[]
+AS 'MODULE_PATHNAME', 'agg_sum_set_finalfunc'
+LANGUAGE c;
+
+create aggregate sum (int4range[])
+(
+    stype = int4range[],
+    sfunc = agg_sum_set_transfunc,
+    finalfunc = agg_sum_set_finalfunc
 );
 
 ---------- MIN/ MAX -----------
@@ -196,82 +206,30 @@ RETURNS int4range[]
 AS 'MODULE_PATHNAME', 'combine_set_mult_max'
 LANGUAGE c;
 
-CREATE FUNCTION agg_set_min_transfunc(int4range[], int4range[]) 
+CREATE FUNCTION agg_min_set_transfunc(int4range[], int4range[]) 
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'agg_set_min_transfunc'
+AS 'MODULE_PATHNAME', 'agg_min_set_transfunc'
 LANGUAGE c;
 
-CREATE FUNCTION agg_set_max_transfunc(int4range[], int4range[]) 
+CREATE FUNCTION agg_max_set_transfunc(int4range[], int4range[]) 
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'agg_set_max_transfunc'
+AS 'MODULE_PATHNAME', 'agg_max_set_transfunc'
 LANGUAGE c;
 
-CREATE FUNCTION set_min_max_finalfunc(int4range[]) 
+CREATE FUNCTION agg_min_max_set_finalfunc(int4range[]) 
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'set_min_max_finalfunc'
+AS 'MODULE_PATHNAME', 'agg_min_max_set_finalfunc'
 LANGUAGE c;
 
 create aggregate min (int4range[])
 (
     stype = int4range[],
-    sfunc = agg_set_min_transfunc,
-    finalfunc = set_min_max_finalfunc
+    sfunc = agg_min_set_transfunc,
+    finalfunc = agg_min_max_set_finalfunc
 );
 create aggregate max (int4range[])
 (
     stype = int4range[],
-    sfunc = agg_set_max_transfunc,
-    finalfunc = set_min_max_finalfunc
+    sfunc = agg_max_set_transfunc,
+    finalfunc = agg_min_max_set_finalfunc
 );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- init test data
-
-DROP TABLE IF EXISTS r1;
-DROP TABLE IF EXISTS s1;
-
-CREATE TABLE IF NOT EXISTS r1(
-    id int GENERATED ALWAYS AS IDENTITY,
-    colA int4range,
-    colB int4range,
-    mult int4range
-);
-
-INSERT INTO r1 (colA, colB, mult) VALUES
-    (int4range(1,1000), int4range(200,400), int4range(0,2)),
-    (int4range(9,11), int4range(4,9), int4range(1,2)),
-    (int4range(10,13), int4range(1,12), int4range(1,7)),
-    (int4range(100,130), int4range(12,1400), int4range(6,7)),
-    (int4range(6,7), int4range(121,122), int4range(2,4)),
-    (int4range(44,332), int4range(12,14), int4range(5,6)),
-    ('empty'::int4range, int4range(23,34), int4range(5,6)),
-    (int4range(24,34), 'empty'::int4range, int4range(5,6));
-
-
-CREATE TABLE IF NOT EXISTS s1(
-    id int GENERATED ALWAYS AS IDENTITY,
-    colA int4range[],
-    colB int4range[],
-    mult int4range
-);
-
-INSERT INTO s1 (colA, colB, mult) VALUES
-    (array[int4range(1,5), int4range(9,12), int4range(18,29)], array[int4range(4,13), int4range(16,20)], int4range(1,1, '[]')),
-    (array[int4range(4,13), int4range(16,20)], array[int4range(22,25), int4range(34,50)], int4range(1,1, '[]')),
-    (array[int4range(1,5), int4range(9,12), int4range(18,29)], array[int4range(4,13), int4range(16,20)], int4range(0,1, '[]'));
-
-
-
