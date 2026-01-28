@@ -38,14 +38,14 @@ create aggregate max (int4range)
 -- create aggregate sum (int4range[])
 -- (
 --     stype = int4range[],
---     sfunc = c_range_set_add
+--     sfunc = set_add
 -- );
 
 -- -- initcond = NULL by default
 -- create aggregate sum (int4range)
 -- (
 --     stype = int4range,
---     sfunc = c_range_add
+--     sfunc = range_add
 -- );
 
 -- create aggregate max (int4range[])

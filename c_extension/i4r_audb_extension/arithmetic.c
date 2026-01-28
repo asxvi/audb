@@ -19,7 +19,7 @@ summary:
 */
 
 
-Int4Range range_add(Int4Range a, Int4Range b){
+Int4Range range_add_internal(Int4Range a, Int4Range b){
     Int4Range rv;
 
     // check that both operands are NULL, or just 1
@@ -43,7 +43,7 @@ Int4Range range_add(Int4Range a, Int4Range b){
     return rv;
 }
 
-Int4RangeSet range_set_add(Int4RangeSet a, Int4RangeSet b){
+Int4RangeSet range_set_add_internal(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv;
     size_t idx;
     size_t i;
@@ -98,7 +98,7 @@ Int4RangeSet range_set_add(Int4RangeSet a, Int4RangeSet b){
 }
 
 // parameter 1 - parameter 2
-Int4Range range_subtract(Int4Range a, Int4Range b){
+Int4Range range_subtract_internal(Int4Range a, Int4Range b){
     Int4Range rv;
     
     // if first param is null, reuslt is null
@@ -117,7 +117,7 @@ Int4Range range_subtract(Int4Range a, Int4Range b){
     return rv;
 }
 
-Int4RangeSet range_set_subtract(Int4RangeSet a, Int4RangeSet b){
+Int4RangeSet range_set_subtract_internal(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv;
     size_t idx;
     size_t i;
@@ -170,7 +170,7 @@ Int4RangeSet range_set_subtract(Int4RangeSet a, Int4RangeSet b){
     return rv;
 }
 
-Int4Range range_multiply(Int4Range a, Int4Range b){
+Int4Range range_multiply_internal(Int4Range a, Int4Range b){
     Int4Range rv;
     int arr[4];
     
@@ -193,7 +193,7 @@ Int4Range range_multiply(Int4Range a, Int4Range b){
     return rv;
 }
 
-Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
+Int4RangeSet range_set_multiply_internal(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv;
     size_t idx;
     size_t i;
@@ -248,7 +248,7 @@ Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
 }
 
 // divison with a bound crossing 0 should be 0 or ???
-Int4Range range_divide(Int4Range a, Int4Range b){
+Int4Range range_divide_internal(Int4Range a, Int4Range b){
     Int4Range rv;
     int arr[4];
     
@@ -271,7 +271,7 @@ Int4Range range_divide(Int4Range a, Int4Range b){
     return rv;
 }
 
-Int4RangeSet range_set_divide(Int4RangeSet a, Int4RangeSet b){
+Int4RangeSet range_set_divide_internal(Int4RangeSet a, Int4RangeSet b){
     Int4RangeSet rv;
     size_t idx;
     size_t i;

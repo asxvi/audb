@@ -210,7 +210,7 @@
 //   return sorted;
 // }
 
-// Int4RangeSet range_set_multiply(Int4RangeSet a, Int4RangeSet b){
+// Int4RangeSet range_set_multiply_internal(Int4RangeSet a, Int4RangeSet b){
 //     Int4RangeSet rv;
 //     size_t idx;
 //     size_t i;
@@ -301,7 +301,7 @@
 //         multSet.ranges[0].isNull = false;
 
 //         Int4RangeSet tempResult;
-//         tempResult = range_set_multiply(set1, multSet);
+//         tempResult = range_set_multiply_internal(set1, multSet);
 //         free(multSet.ranges);
 
 //         // union in new results

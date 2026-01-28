@@ -5,7 +5,63 @@
 #define free pfree
 
 // 3VL 1 true, -1 null, 0 false 
-int range_greater_than(Int4RangeSet a, Int4RangeSet b){
+int range_greater_than(Int4Range a, Int4Range b){
+    if (a.lower > (b.upper-1)) {
+        return 1;
+    }
+    else if ((a.upper-1) < b.lower) {
+        return 0;
+    }
+    return -1;
+}
+
+int range_less_than(Int4Range a, Int4Range b){
+    if (a.lower > (b.upper-1)) {
+        return 0;
+    }
+    else if ((a.upper-1) < b.lower) {
+        return 1;
+    }
+    return -1;
+}
+
+int range_greater_than_equal(Int4Range a, Int4Range b){
+    if (a.lower >= (b.upper-1)) {
+        return 1;
+    }
+    else if ((a.upper-1) < b.lower) {
+        return 0;
+    }
+    return -1;
+}
+
+int range_less_than_equal(Int4Range a, Int4Range b){
+    if (a.lower > (b.upper-1)) {
+        return 0;
+    }
+    else if ((a.upper-1) <= b.lower) {
+        return 1;
+    }
+    return -1;
+}
+
+int range_equal_internal(Int4Range a, Int4Range b) {
+    if (a.lower == (a.upper-1) && 
+        (a.upper-1) == (b.lower) && 
+        (b.lower) == (b.upper-1)) {
+        
+            return 1;
+    }
+    else if (overlap(a, b)) {
+        return -1;  // NULL (uncertain)
+    }
+    else if (a.lower != b.lower || a.upper != b.upper){
+        return 0;
+    }
+    return 1;
+}
+
+int set_greater_than(Int4RangeSet a, Int4RangeSet b){
     int result;
     Int4RangeSet n1;
     Int4RangeSet n2;
@@ -43,7 +99,7 @@ int range_greater_than(Int4RangeSet a, Int4RangeSet b){
     return result;
 }
 
-int range_greater_than_equal(Int4RangeSet a, Int4RangeSet b){
+int set_greater_than_equal(Int4RangeSet a, Int4RangeSet b){
     int result;
     Int4RangeSet n1;
     Int4RangeSet n2;
@@ -82,7 +138,7 @@ int range_greater_than_equal(Int4RangeSet a, Int4RangeSet b){
 }
 
 
-int range_less_than(Int4RangeSet a, Int4RangeSet b){
+int set_less_than(Int4RangeSet a, Int4RangeSet b){
     int result;
     Int4RangeSet n1;
     Int4RangeSet n2;
@@ -120,7 +176,7 @@ int range_less_than(Int4RangeSet a, Int4RangeSet b){
     return result;
 }
 
-int range_less_than_equal(Int4RangeSet a, Int4RangeSet b){
+int set_less_than_equal(Int4RangeSet a, Int4RangeSet b){
     int result;
     Int4RangeSet n1;
     Int4RangeSet n2;
@@ -144,10 +200,10 @@ int range_less_than_equal(Int4RangeSet a, Int4RangeSet b){
         l1 = n1.ranges[n1.count-1];
         l2 = n2.ranges[n2.count-1];
 
-        if (f1.lower >= (l2.upper-1)){
+        if (f1.lower > (l2.upper-1)){
             result = 0;
         }
-        else if ((l1.upper-1) < f2.lower){
+        else if ((l1.upper-1) <= f2.lower){
             result = 1;
         }
     }
@@ -159,7 +215,7 @@ int range_less_than_equal(Int4RangeSet a, Int4RangeSet b){
 }
 
 
-int range_set_equal_internal(Int4RangeSet a, Int4RangeSet b) {
+int set_equal_internal(Int4RangeSet a, Int4RangeSet b) {
     // both empty = equal
     if (a.count == 0 && b.count == 0) {
         return 1;

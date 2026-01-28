@@ -13,20 +13,26 @@
 
 PG_MODULE_MAGIC;
 
-PG_FUNCTION_INFO_V1(c_range_add);
-PG_FUNCTION_INFO_V1(c_range_subtract);
-PG_FUNCTION_INFO_V1(c_range_multiply);
-PG_FUNCTION_INFO_V1(c_range_divide);
-PG_FUNCTION_INFO_V1(c_range_set_add);
-PG_FUNCTION_INFO_V1(c_range_set_subtract);
-PG_FUNCTION_INFO_V1(c_range_set_multiply);
-PG_FUNCTION_INFO_V1(c_range_set_divide);
+PG_FUNCTION_INFO_V1(range_add);
+PG_FUNCTION_INFO_V1(range_subtract);
+PG_FUNCTION_INFO_V1(range_multiply);
+PG_FUNCTION_INFO_V1(range_divide);
+PG_FUNCTION_INFO_V1(set_add);
+PG_FUNCTION_INFO_V1(set_subtract);
+PG_FUNCTION_INFO_V1(set_multiply);
+PG_FUNCTION_INFO_V1(set_divide);
 
-PG_FUNCTION_INFO_V1(c_lt);
-PG_FUNCTION_INFO_V1(c_lte);
-PG_FUNCTION_INFO_V1(c_gt);
-PG_FUNCTION_INFO_V1(c_gte);
-PG_FUNCTION_INFO_V1(set_equal);
+
+PG_FUNCTION_INFO_V1(range_lt);
+PG_FUNCTION_INFO_V1(range_lte);
+PG_FUNCTION_INFO_V1(range_gt);
+PG_FUNCTION_INFO_V1(range_gte);
+PG_FUNCTION_INFO_V1(range_eq);
+PG_FUNCTION_INFO_V1(set_lt);
+PG_FUNCTION_INFO_V1(set_lte);
+PG_FUNCTION_INFO_V1(set_gt);
+PG_FUNCTION_INFO_V1(set_gte);
+PG_FUNCTION_INFO_V1(set_eq);
 
 PG_FUNCTION_INFO_V1(c_lift_scalar);
 PG_FUNCTION_INFO_V1(c_sort);
@@ -81,7 +87,8 @@ PG_FUNCTION_INFO_V1(agg_min_max_set_finalfunc);
 
 RangeType* arithmetic_range_helper(RangeType *input1, RangeType *input2, Int4Range (*callback)(Int4Range, Int4Range));
 ArrayType* arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4RangeSet (*callback)(Int4RangeSet, Int4RangeSet));
-int logical_operation_helper(ArrayType *input1, ArrayType *input2, int (*callback)(Int4RangeSet, Int4RangeSet) );
+int logical_range_operator(RangeType *input1, RangeType *input2, int (*callback)(Int4Range, Int4Range) );
+int logical_set_helper(ArrayType *input1, ArrayType *input2, int (*callback)(Int4RangeSet, Int4RangeSet) );
 ArrayType* helperFunctions_helper( ArrayType *input, Int4RangeSet (*callback)() );
 
 // for min/max agg
@@ -103,7 +110,7 @@ static ArrayType* serialize_ArrayType(Int4RangeSet set, TypeCacheEntry *typcache
     a single RangeType with provided operator result
 */
 Datum
-c_range_add(PG_FUNCTION_ARGS)
+range_add(PG_FUNCTION_ARGS)
 {   
     RangeType *r1;
     RangeType *r2;
@@ -114,13 +121,13 @@ c_range_add(PG_FUNCTION_ARGS)
     r1 = PG_GETARG_RANGE_P(0);
     r2 = PG_GETARG_RANGE_P(1);
     
-    output = arithmetic_range_helper(r1, r2, range_add);
+    output = arithmetic_range_helper(r1, r2, range_add_internal);
 
     PG_RETURN_RANGE_P(output);
 }
 
 Datum
-c_range_subtract(PG_FUNCTION_ARGS)
+range_subtract(PG_FUNCTION_ARGS)
 {   
     RangeType *r1;
     RangeType *r2;
@@ -131,13 +138,13 @@ c_range_subtract(PG_FUNCTION_ARGS)
     r1 = PG_GETARG_RANGE_P(0);
     r2 = PG_GETARG_RANGE_P(1);
 
-    output = arithmetic_range_helper(r1, r2, range_subtract);
+    output = arithmetic_range_helper(r1, r2, range_subtract_internal);
 
     PG_RETURN_RANGE_P(output);
 }
 
 Datum
-c_range_multiply(PG_FUNCTION_ARGS)
+range_multiply(PG_FUNCTION_ARGS)
 {   
     RangeType *r1;
     RangeType *r2;
@@ -148,13 +155,13 @@ c_range_multiply(PG_FUNCTION_ARGS)
     r1 = PG_GETARG_RANGE_P(0);
     r2 = PG_GETARG_RANGE_P(1);
 
-    output = arithmetic_range_helper(r1, r2, range_multiply);
+    output = arithmetic_range_helper(r1, r2, range_multiply_internal);
 
     PG_RETURN_RANGE_P(output);
 }
 
 Datum
-c_range_divide(PG_FUNCTION_ARGS)
+range_divide(PG_FUNCTION_ARGS)
 {   
     RangeType *r1;
     RangeType *r2;
@@ -165,13 +172,13 @@ c_range_divide(PG_FUNCTION_ARGS)
     r1 = PG_GETARG_RANGE_P(0);
     r2 = PG_GETARG_RANGE_P(1);
 
-    output = arithmetic_range_helper(r1, r2, range_divide);
+    output = arithmetic_range_helper(r1, r2, range_divide_internal);
 
     PG_RETURN_RANGE_P(output);
 }
 
 Datum
-c_range_set_add(PG_FUNCTION_ARGS)
+set_add(PG_FUNCTION_ARGS)
 {
     ArrayType *a1;
     ArrayType *a2;
@@ -182,12 +189,12 @@ c_range_set_add(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    output = arithmetic_set_helper(a1, a2, range_set_add);
+    output = arithmetic_set_helper(a1, a2, range_set_add_internal);
     PG_RETURN_ARRAYTYPE_P(output);
 }
 
 Datum
-c_range_set_subtract(PG_FUNCTION_ARGS)
+set_subtract(PG_FUNCTION_ARGS)
 {
     ArrayType *a1;
     ArrayType *a2;
@@ -198,12 +205,12 @@ c_range_set_subtract(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    output = arithmetic_set_helper(a1, a2, range_set_subtract);
+    output = arithmetic_set_helper(a1, a2, range_set_subtract_internal);
     PG_RETURN_ARRAYTYPE_P(output);
 }
 
 Datum
-c_range_set_multiply(PG_FUNCTION_ARGS)
+set_multiply(PG_FUNCTION_ARGS)
 {
     ArrayType *a1;
     ArrayType *a2;
@@ -214,12 +221,12 @@ c_range_set_multiply(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    output = arithmetic_set_helper(a1, a2, range_set_multiply);
+    output = arithmetic_set_helper(a1, a2, range_set_multiply_internal);
     PG_RETURN_ARRAYTYPE_P(output);
 }
 
 Datum
-c_range_set_divide(PG_FUNCTION_ARGS)
+set_divide(PG_FUNCTION_ARGS)
 {   
     ArrayType *a1;
     ArrayType *a2;
@@ -230,7 +237,7 @@ c_range_set_divide(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    output = arithmetic_set_helper(a1, a2, range_set_divide);
+    output = arithmetic_set_helper(a1, a2, range_set_divide_internal);
     PG_RETURN_ARRAYTYPE_P(output);
 }
 
@@ -239,7 +246,113 @@ c_range_set_divide(PG_FUNCTION_ARGS)
 /////////////////////
 
 Datum
-c_lt(PG_FUNCTION_ARGS)
+range_lt(PG_FUNCTION_ARGS)
+{   
+    RangeType *input1;
+    RangeType *input2;
+    int rv;
+
+    CHECK_BINARY_PGARG_NULL_OR();
+
+    input1 = PG_GETARG_RANGE_P(0);
+    input2 = PG_GETARG_RANGE_P(1);
+
+    rv = logical_range_operator(input1, input2, range_less_than);
+
+    if (rv == -1){
+        PG_RETURN_NULL();
+    }
+
+    PG_RETURN_BOOL((bool)rv);
+}
+
+Datum
+range_gt(PG_FUNCTION_ARGS)
+{   
+    RangeType *input1;
+    RangeType *input2;
+    int rv;
+
+    CHECK_BINARY_PGARG_NULL_OR();
+
+    input1 = PG_GETARG_RANGE_P(0);
+    input2 = PG_GETARG_RANGE_P(1);
+
+    rv = logical_range_operator(input1, input2, range_greater_than);
+
+    if (rv == -1){
+        PG_RETURN_NULL();
+    }
+
+    PG_RETURN_BOOL((bool)rv);
+}
+
+Datum
+range_lte(PG_FUNCTION_ARGS)
+{   
+    RangeType *input1;
+    RangeType *input2;
+    int rv;
+
+    CHECK_BINARY_PGARG_NULL_OR();
+
+    input1 = PG_GETARG_RANGE_P(0);
+    input2 = PG_GETARG_RANGE_P(1);
+
+    rv = logical_range_operator(input1, input2, range_less_than_equal);
+
+    if (rv == -1){
+        PG_RETURN_NULL();
+    }
+
+    PG_RETURN_BOOL((bool)rv);
+}
+
+Datum
+range_gte(PG_FUNCTION_ARGS)
+{   
+    RangeType *input1;
+    RangeType *input2;
+    int rv;
+
+    CHECK_BINARY_PGARG_NULL_OR();
+
+    input1 = PG_GETARG_RANGE_P(0);
+    input2 = PG_GETARG_RANGE_P(1);
+
+    rv = logical_range_operator(input1, input2, range_greater_than_equal);
+
+    if (rv == -1){
+        PG_RETURN_NULL();
+    }
+
+    PG_RETURN_BOOL((bool)rv);
+}
+
+Datum
+range_eq(PG_FUNCTION_ARGS)
+{   
+    RangeType *input1;
+    RangeType *input2;
+    int rv;
+
+    CHECK_BINARY_PGARG_NULL_OR();
+
+    input1 = PG_GETARG_RANGE_P(0);
+    input2 = PG_GETARG_RANGE_P(1);
+
+    rv = logical_range_operator(input1, input2, range_equal_internal);
+
+    if (rv == -1){
+        PG_RETURN_NULL();
+    }
+
+    PG_RETURN_BOOL((bool)rv);
+}
+
+
+Datum
+set_lt(PG_FUNCTION_ARGS)
 {   
     ArrayType *a1;
     ArrayType *a2;
@@ -250,7 +363,7 @@ c_lt(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    rv = logical_operation_helper(a1, a2, range_less_than);
+    rv = logical_set_helper(a1, a2, set_less_than);
 
     if (rv == -1){
         PG_RETURN_NULL();
@@ -260,7 +373,7 @@ c_lt(PG_FUNCTION_ARGS)
 }
 
 Datum
-c_gt(PG_FUNCTION_ARGS)
+set_gt(PG_FUNCTION_ARGS)
 {   
     ArrayType *a1;
     ArrayType *a2;
@@ -271,7 +384,7 @@ c_gt(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
     
-    rv = logical_operation_helper(a1, a2, range_greater_than);
+    rv = logical_set_helper(a1, a2, set_greater_than);
     
     if (rv == -1){
         PG_RETURN_NULL();
@@ -281,7 +394,7 @@ c_gt(PG_FUNCTION_ARGS)
 }
 
 Datum
-c_lte(PG_FUNCTION_ARGS)
+set_lte(PG_FUNCTION_ARGS)
 {   
     ArrayType *a1;
     ArrayType *a2;
@@ -292,7 +405,7 @@ c_lte(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    rv = logical_operation_helper(a1, a2, range_less_than_equal);
+    rv = logical_set_helper(a1, a2, set_less_than_equal);
 
     if (rv == -1){
         PG_RETURN_NULL();
@@ -302,7 +415,7 @@ c_lte(PG_FUNCTION_ARGS)
 }
 
 Datum
-c_gte(PG_FUNCTION_ARGS)
+set_gte(PG_FUNCTION_ARGS)
 {   
     ArrayType *a1;
     ArrayType *a2;
@@ -313,7 +426,7 @@ c_gte(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    rv = logical_operation_helper(a1, a2, range_greater_than_equal);
+    rv = logical_set_helper(a1, a2, set_greater_than_equal);
     
     if (rv == -1){
         PG_RETURN_NULL();
@@ -323,7 +436,7 @@ c_gte(PG_FUNCTION_ARGS)
 }
 
 Datum 
-set_equal(PG_FUNCTION_ARGS)
+set_eq(PG_FUNCTION_ARGS)
 {
     ArrayType *a1;
     ArrayType *a2;
@@ -334,7 +447,7 @@ set_equal(PG_FUNCTION_ARGS)
     a1 = PG_GETARG_ARRAYTYPE_P(0);
     a2 = PG_GETARG_ARRAYTYPE_P(1);
 
-    rv = logical_operation_helper(a1, a2, range_set_equal_internal);
+    rv = logical_set_helper(a1, a2, set_equal_internal);
 
     if (rv == -1){
         PG_RETURN_NULL();
@@ -551,8 +664,8 @@ ArrayType*
 arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4RangeSet (*callback)(Int4RangeSet, Int4RangeSet))
 {   
     // assign typcache based on RangeType input
-    Oid rangeTypeOID1;
-    Oid rangeTypeOID2;
+    Oid rangeTypeOID1, rangeTypeOID2;
+    ArrayType *output;
     rangeTypeOID1 = ARR_ELEMTYPE(input1);
     rangeTypeOID2 = ARR_ELEMTYPE(input2);
     TypeCacheEntry *typcache;
@@ -569,12 +682,20 @@ arithmetic_set_helper(ArrayType *input1, ArrayType *input2, Int4RangeSet (*callb
     set1 = deserialize_ArrayType(input1, typcache);
     set2 = deserialize_ArrayType(input2, typcache);
 
+    if(set1.containsNull && set1.count == 1) {
+        output = serialize_ArrayType(set2, typcache);
+        return output;
+    }
+    else if(set2.containsNull && set2.count == 1) {
+        output = serialize_ArrayType(set1, typcache);
+        return output;
+    }
+
     // callback function in this case is an arithmetic function with params: (Int4RangeSet a, Int4RangeSet b)
     Int4RangeSet result;
     result = callback(set1, set2);
     
     // convert result back to native PG representation
-    ArrayType *output;
     output = serialize_ArrayType(result, typcache);
 
     pfree(set1.ranges);
@@ -595,7 +716,41 @@ Deserializes data, performs operation on data, returns int (3VL boolean) result
     -int result (3VL)
 */
 int 
-logical_operation_helper(ArrayType *input1, ArrayType *input2, int (*callback)(Int4RangeSet, Int4RangeSet) )
+logical_range_operator(RangeType *input1, RangeType *input2, int (*callback)(Int4Range, Int4Range) )
+{   
+    Int4Range input1_ir4, input2_ir4;
+    TypeCacheEntry *typcache;
+
+    typcache = lookup_type_cache(input1->rangetypid, TYPECACHE_RANGE_INFO);
+    if (input1->rangetypid != input2->rangetypid) {
+        ereport(ERROR,
+                (errcode(ERRCODE_DATATYPE_MISMATCH),
+                errmsg("range type mismatch in arithmetic operation")));
+    }
+
+    // convert native PG representaion to our local representation
+    input1_ir4 = deserialize_RangeType(input1, typcache);
+    input2_ir4 = deserialize_RangeType(input2, typcache);
+
+    // callback function in this case is an arithmetic function with params: (Int4RangeSet a, Int4RangeSet b)
+    int result;
+    result = callback(input1_ir4, input2_ir4);
+
+    return result;
+}
+
+/*
+Generic Helper for logical operations on ArrayTypes of RangeTypes.
+Deserializes data, performs operation on data, returns int (3VL boolean) result
+* Parameters(3): 
+    -input1 RangeType: Int4Range, NON-NULL
+    -input2 RangeType: Int4Range, NON-NULL
+    -function ptr callback: Int4Range function()   
+* Return(1):
+    -int result (3VL)
+*/
+int 
+logical_set_helper(ArrayType *input1, ArrayType *input2, int (*callback)(Int4RangeSet, Int4RangeSet) )
 {   
     // assign typcache based on RangeType input
     Oid rangeTypeOID1;
@@ -723,6 +878,16 @@ deserialize_ArrayType(ArrayType *arr, TypeCacheEntry *typcache)
     bool *nulls;
     int count;
     deconstruct_array(arr, rangeTypeOID, typlen, typbyval, typalign, &elems, &nulls, &count);
+
+    // create an empty I4RSet if Array is empty
+    if (count < 1) {
+        set.count = 1;
+        set.containsNull = true;
+        set.ranges = palloc(sizeof(Int4Range));
+        set.ranges[0].isNull = true;
+        set.ranges[0].lower = 0;
+        set.ranges[0].upper = 0;
+    }
 
     // initialize our representation of I4R
     set.containsNull = false;
@@ -1140,7 +1305,7 @@ agg_sum_transfunc(PG_FUNCTION_ARGS)
     state = PG_GETARG_RANGE_P(0);
     input = PG_GETARG_RANGE_P(1);
 
-    result = arithmetic_range_helper(state, input, range_add);
+    result = arithmetic_range_helper(state, input, range_add_internal);
 
     PG_RETURN_ARRAYTYPE_P(result);
 }
@@ -1180,7 +1345,7 @@ agg_sum_set_transfunc(PG_FUNCTION_ARGS)
     state = PG_GETARG_ARRAYTYPE_P(0);
     input = PG_GETARG_ARRAYTYPE_P(1);
 
-    result = arithmetic_set_helper(state, input, range_set_add);
+    result = arithmetic_set_helper(state, input, range_set_add_internal);
 
     // check to normalize //FIXME should be reduce size down to sizeLimit
     nelems = ArrayGetNItems(ARR_NDIM(result), ARR_DIMS(result));

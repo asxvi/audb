@@ -11,30 +11,30 @@ CREATE TEMP TABLE t1_r_arithmetic (
 );
 INSERT INTO t1_r_arithmetic VALUES
     -- basic arithmetic
-    ('add_basic', c_range_add('[1,6)', '[9,21)'), '[10,26)'),
-    ('subtract_basic', c_range_subtract('[1,6)', '[9,21)'), '[-19,-3)'),
-    ('multiply_basic', c_range_multiply('[1,6)', '[9,21)'), '[9,101)'),
-    ('divide_basic', c_range_divide('[3,10)', '[3,4)'), '[1,4)'),
+    ('add_basic', range_add('[1,6)', '[9,21)'), '[10,26)'),
+    ('subtract_basic', range_subtract('[1,6)', '[9,21)'), '[-19,-3)'),
+    ('multiply_basic', range_multiply('[1,6)', '[9,21)'), '[9,101)'),
+    ('divide_basic', range_divide('[3,10)', '[3,4)'), '[1,4)'),
     
     -- empty cases- add
-    ('add_empty_param1', c_range_add('empty'::int4range, '[1,5)'), '[1,5)'),
-    ('add_empty_param2', c_range_add('[1,5)', 'empty'::int4range), '[1,5)'),
-    ('add_both_empty', c_range_add('empty'::int4range, 'empty'::int4range), 'empty'::int4range),
+    ('add_empty_param1', range_add('empty'::int4range, '[1,5)'), '[1,5)'),
+    ('add_empty_param2', range_add('[1,5)', 'empty'::int4range), '[1,5)'),
+    ('add_both_empty', range_add('empty'::int4range, 'empty'::int4range), 'empty'::int4range),
     
     -- empty cases- sub
-    ('subtract_empty_param1', c_range_subtract('empty'::int4range, '[1,5)'), 'empty'::int4range),
-    ('subtract_empty_param2', c_range_subtract('[1,5)', 'empty'::int4range), '[1,5)'),
-    ('subtract_both_empty', c_range_subtract('empty'::int4range, 'empty'::int4range), 'empty'::int4range),
+    ('subtract_empty_param1', range_subtract('empty'::int4range, '[1,5)'), 'empty'::int4range),
+    ('subtract_empty_param2', range_subtract('[1,5)', 'empty'::int4range), '[1,5)'),
+    ('subtract_both_empty', range_subtract('empty'::int4range, 'empty'::int4range), 'empty'::int4range),
     
     -- empty cases- mult
-    ('multiply_empty_param1', c_range_multiply('empty'::int4range, '[1,5)'), 'empty'::int4range),
-    ('multiply_empty_param2', c_range_multiply('[1,5)', 'empty'::int4range), 'empty'::int4range),
-    ('multiply_both_empty', c_range_multiply('empty'::int4range, 'empty'::int4range), 'empty'::int4range),
+    ('multiply_empty_param1', range_multiply('empty'::int4range, '[1,5)'), 'empty'::int4range),
+    ('multiply_empty_param2', range_multiply('[1,5)', 'empty'::int4range), 'empty'::int4range),
+    ('multiply_both_empty', range_multiply('empty'::int4range, 'empty'::int4range), 'empty'::int4range),
     
     -- empty cases- div
-    ('divide_empty_param1', c_range_divide('empty'::int4range, '[1,5)'), 'empty'::int4range),
-    ('divide_empty_param2', c_range_divide('[1,5)', 'empty'::int4range), 'empty'::int4range),
-    ('divide_both_empty', c_range_divide('empty'::int4range, 'empty'::int4range), 'empty'::int4range);
+    ('divide_empty_param1', range_divide('empty'::int4range, '[1,5)'), 'empty'::int4range),
+    ('divide_empty_param2', range_divide('[1,5)', 'empty'::int4range), 'empty'::int4range),
+    ('divide_both_empty', range_divide('empty'::int4range, 'empty'::int4range), 'empty'::int4range);
 
 
 -- ===================================
@@ -49,41 +49,46 @@ CREATE TEMP TABLE t2_s_arithmetic (
 
 INSERT INTO t2_s_arithmetic VALUES
     -- basic arithmetic
-    ('add_basic', c_range_set_add(array[int4range(1,3), int4range(2,4)], array[int4range(1,3), int4range(2,4)]), array[int4range(2,5), int4range(3,6), int4range(3,6), int4range(4,7)]),
-    ('subtract_basic', c_range_set_subtract(array[int4range(10,21), int4range(25,51)], array[int4range(5,11), int4range(10, 16)]), array[int4range(0,15), int4range(-5,10), int4range(15,45), int4range(10,40)]),
-    ('multiply_basic', c_range_set_multiply(array[int4range(1,3), int4range(2,4)], array[int4range(1,3), int4range(2,4)]), array[int4range(1,5), int4range(2,7), int4range(2,7), int4range(4,10)]),
-    ('divide_basic', c_range_set_divide(array[int4range(10,13), int4range(20,41)], array[int4range(2,3), int4range(4,5)]), array[int4range(5,7), int4range(2,4), int4range(10,21), int4range(5,11)]),
+    ('add_basic', set_add(array[int4range(1,3), int4range(2,4)], array[int4range(1,3), int4range(2,4)]), array[int4range(2,5), int4range(3,6), int4range(3,6), int4range(4,7)]),
+    ('subtract_basic', set_subtract(array[int4range(10,21), int4range(25,51)], array[int4range(5,11), int4range(10, 16)]), array[int4range(0,15), int4range(-5,10), int4range(15,45), int4range(10,40)]),
+    ('multiply_basic', set_multiply(array[int4range(1,3), int4range(2,4)], array[int4range(1,3), int4range(2,4)]), array[int4range(1,5), int4range(2,7), int4range(2,7), int4range(4,10)]),
+    ('divide_basic', set_divide(array[int4range(10,13), int4range(20,41)], array[int4range(2,3), int4range(4,5)]), array[int4range(5,7), int4range(2,4), int4range(10,21), int4range(5,11)]),
 
     -- empty cases- add
-    ('set_add_empty_param1', c_range_set_add(array[]::int4range[], array[int4range(1,5)]), array[int4range(1,5)]),
-    ('set_add_empty_param2', c_range_set_add(array[int4range(1,5)], array[]::int4range[]), array[int4range(1,5)]),
-    ('set_add_both_empty', c_range_set_add(array[]::int4range[], array[]::int4range[]), array[]::int4range[]),
+    ('set_add_empty_param1', set_add(array[]::int4range[], array[int4range(1,5)]), array[int4range(1,5)]),
+    ('set_add_empty_param2', set_add(array[int4range(1,5)], array[]::int4range[]), array[int4range(1,5)]),
+    ('set_add_both_empty', set_add(array[]::int4range[], array[]::int4range[]), array[]::int4range[]),
 
     -- empty cases- sub
-    ('set_subtract_empty_param1', c_range_set_subtract(array[]::int4range[], array[int4range(1,5)]), array[]::int4range[]),
-    ('set_subtract_empty_param2', c_range_set_subtract(array[int4range(1,5)], array[]::int4range[]), array[int4range(1,5)]),
-    ('set_subtract_both_empty', c_range_set_subtract(array[]::int4range[], array[]::int4range[]), array[]::int4range[]),
+    ('set_subtract_empty_param1', set_subtract(array[]::int4range[], array[int4range(1,5)]), array[]::int4range[]),
+    ('set_subtract_empty_param2', set_subtract(array[int4range(1,5)], array[]::int4range[]), array[int4range(1,5)]),
+    ('set_subtract_both_empty', set_subtract(array[]::int4range[], array[]::int4range[]), array[]::int4range[]),
 
     -- empty cases- mult
-    ('set_multiply_empty_param1', c_range_set_multiply(array[]::int4range[], array[int4range(1,5)]), array[]::int4range[]),
-    ('set_multiply_empty_param2', c_range_set_multiply(array[int4range(1,5)], array[]::int4range[]), array[]::int4range[]),
-    ('set_multiply_both_empty', c_range_set_multiply(array[]::int4range[], array[]::int4range[]), array[]::int4range[]),
+    ('set_multiply_empty_param1', set_multiply(array[]::int4range[], array[int4range(1,5)]), array[]::int4range[]),
+    ('set_multiply_empty_param2', set_multiply(array[int4range(1,5)], array[]::int4range[]), array[]::int4range[]),
+    ('set_multiply_both_empty', set_multiply(array[]::int4range[], array[]::int4range[]), array[]::int4range[]),
 
     -- empty cases- div
-    ('set_divide_empty_param1', c_range_set_divide(array[]::int4range[], array[int4range(1,5)]), array[]::int4range[]),
-    ('set_divide_empty_param2', c_range_set_divide(array[int4range(1,5)], array[]::int4range[]), array[]::int4range[]),
-    ('set_divide_both_empty', c_range_set_divide(array[]::int4range[], array[]::int4range[]), array[]::int4range[]);
+    ('set_divide_empty_param1', set_divide(array[]::int4range[], array[int4range(1,5)]), array[]::int4range[]),
+    ('set_divide_empty_param2', set_divide(array[int4range(1,5)], array[]::int4range[]), array[]::int4range[]),
+    ('set_divide_both_empty', set_divide(array[]::int4range[], array[]::int4range[]), array[]::int4range[]);
 
 
 -- ===================================
 -- Test3: Logical Operators
 -- ===================================
 
-DROP TABLE IF EXISTS t3
+DROP TABLE IF EXISTS t3_r_logical;
+CREATE TEMP TABLE t3_r_logical (
+    name text,
+    actual int4range,
+    expected int4range
+);
 
-
-
-
+INSERT INTO t3_r_logical VALUES
+    ('lt_basic', set_lt(int4range(1,3), int4range(20,40)), true),
+    
 
 
 

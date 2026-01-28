@@ -5,53 +5,53 @@
 ---------------------------Arithemtic functions-----------------------------
 ----------------------------------------------------------------------------
 
--- c_range_add takes 2 int4range types and returns the sum
-CREATE FUNCTION c_range_add(a int4range, b int4range ) 
+-- range_add takes 2 int4range types and returns the sum
+CREATE FUNCTION range_add(a int4range, b int4range ) 
 RETURNS int4range
-AS 'MODULE_PATHNAME', 'c_range_add'
+AS 'MODULE_PATHNAME', 'range_add'
 LANGUAGE c;
 -- LANGUAGE c STRICT VOLATILE;
 
--- c_range_subtract takes 2 int4range types and returns the difference
-CREATE FUNCTION c_range_subtract(a int4range, b int4range ) 
+-- range_subtract takes 2 int4range types and returns the difference
+CREATE FUNCTION range_subtract(a int4range, b int4range ) 
 RETURNS int4range
-AS 'MODULE_PATHNAME', 'c_range_subtract'
+AS 'MODULE_PATHNAME', 'range_subtract'
 LANGUAGE c;
 
--- c_range_multiply takes 2 int4range types and returns the product
-CREATE FUNCTION c_range_multiply(a int4range, b int4range ) 
+-- range_multiply takes 2 int4range types and returns the product
+CREATE FUNCTION range_multiply(a int4range, b int4range ) 
 RETURNS int4range
-AS 'MODULE_PATHNAME', 'c_range_multiply'
+AS 'MODULE_PATHNAME', 'range_multiply'
 LANGUAGE c;
 
--- c_range_divide takes 2 int4range types and returns the divded result
-CREATE FUNCTION c_range_divide(a int4range, b int4range ) 
+-- range_divide takes 2 int4range types and returns the divded result
+CREATE FUNCTION range_divide(a int4range, b int4range ) 
 RETURNS int4range
-AS 'MODULE_PATHNAME', 'c_range_divide'
+AS 'MODULE_PATHNAME', 'range_divide'
 LANGUAGE c;
 
--- c_range_set_add takes 2 arrays of int4range types and returns an array with added results
-CREATE FUNCTION c_range_set_add(a int4range[], b int4range[])
+-- set_add takes 2 arrays of int4range types and returns an array with added results
+CREATE FUNCTION set_add(a int4range[], b int4range[])
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'c_range_set_add'
+AS 'MODULE_PATHNAME', 'set_add'
 LANGUAGE c;
 
--- c_range_set_subtract takes 2 arrays of int4range types and returns an array with subtracted results
-CREATE FUNCTION c_range_set_subtract(a int4range[], b int4range[])
+-- set_subtract takes 2 arrays of int4range types and returns an array with subtracted results
+CREATE FUNCTION set_subtract(a int4range[], b int4range[])
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'c_range_set_subtract'
+AS 'MODULE_PATHNAME', 'set_subtract'
 LANGUAGE c;
 
--- c_range_set_multiply takes 2 arrays of int4range types and returns an array with subtracted results
-CREATE FUNCTION c_range_set_multiply(a int4range[], b int4range[])
+-- set_multiply takes 2 arrays of int4range types and returns an array with subtracted results
+CREATE FUNCTION set_multiply(a int4range[], b int4range[])
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'c_range_set_multiply'
+AS 'MODULE_PATHNAME', 'set_multiply'
 LANGUAGE c;
 
--- c_range_set_divide takes 2 arrays of int4range types and returns an array with subtracted results
-CREATE FUNCTION c_range_set_divide(a int4range[], b int4range[])
+-- set_divide takes 2 arrays of int4range types and returns an array with subtracted results
+CREATE FUNCTION set_divide(a int4range[], b int4range[])
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'c_range_set_divide'
+AS 'MODULE_PATHNAME', 'set_divide'
 LANGUAGE c;
 
 
@@ -59,34 +59,59 @@ LANGUAGE c;
 -- -------------------------Logical Operator functions-------------------------
 -- ----------------------------------------------------------------------------
 
--- c_lt takes 2 arrays of int4range types and returns bool result of logical expression
-CREATE FUNCTION c_lt(a int4range[], b int4range[])
+CREATE FUNCTION range_lt(a int4range, b int4range)
 RETURNS boolean
-AS 'MODULE_PATHNAME', 'c_lt'
+AS 'MODULE_PATHNAME', 'range_lt'
 LANGUAGE c;
 
--- c_lte takes 2 arrays of int4range types and returns bool result of logical expression
-CREATE FUNCTION c_lte(a int4range[], b int4range[])
+CREATE FUNCTION range_lte(a int4range, b int4range)
 RETURNS boolean
-AS 'MODULE_PATHNAME', 'c_lte'
+AS 'MODULE_PATHNAME', 'range_lte'
 LANGUAGE c;
 
--- c_gt takes 2 arrays of int4range types and returns bool result of logical expression
-CREATE FUNCTION c_gt(a int4range[], b int4range[])
+CREATE FUNCTION range_gt(a int4range, b int4range)
 RETURNS boolean
-AS 'MODULE_PATHNAME', 'c_gt'
+AS 'MODULE_PATHNAME', 'range_gt'
 LANGUAGE c;
 
--- c_gte takes 2 arrays of int4range types and returns bool result of logical expression
-CREATE FUNCTION c_gte(a int4range[], b int4range[])
+CREATE FUNCTION range_gte(a int4range, b int4range)
 RETURNS boolean
-AS 'MODULE_PATHNAME', 'c_gte'
+AS 'MODULE_PATHNAME', 'range_gte'
+LANGUAGE c;
+
+CREATE FUNCTION range_eq(a int4range, b int4range)
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'range_eq'
+LANGUAGE c;
+
+-- set_lt takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION set_lt(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'set_lt'
+LANGUAGE c;
+
+-- set_lte takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION set_lte(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'set_lte'
+LANGUAGE c;
+
+-- set_gt takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION set_gt(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'set_gt'
+LANGUAGE c;
+
+-- set_gte takes 2 arrays of int4range types and returns bool result of logical expression
+CREATE FUNCTION set_gte(a int4range[], b int4range[])
+RETURNS boolean
+AS 'MODULE_PATHNAME', 'set_gte'
 LANGUAGE c;
 
 -- equal takes 2 arrays of int4range types and returns bool result of logical expression
-CREATE FUNCTION set_equal(a int4range[], b int4range[])
+CREATE FUNCTION set_eq(a int4range[], b int4range[])
 RETURNS boolean
-AS 'MODULE_PATHNAME', 'set_equal'
+AS 'MODULE_PATHNAME', 'set_eq'
 LANGUAGE c;
 
 ------------------------------------------------------------------------------

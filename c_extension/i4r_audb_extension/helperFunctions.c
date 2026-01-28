@@ -488,7 +488,7 @@ interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
         multSet.ranges[0].isNull = false;
 
         Int4RangeSet tempResult;
-        tempResult = range_set_multiply(set1, multSet);
+        tempResult = range_set_multiply_internal(set1, multSet);
         pfree(multSet.ranges);
 
         // union in new results
