@@ -263,3 +263,16 @@ create aggregate max (int4range[])
     sfunc = agg_max_set_transfunc,
     finalfunc = agg_min_max_set_finalfunc
 );
+
+---------- Count -----------
+
+CREATE FUNCTION agg_count_transfunc(int4range, int4range) 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'agg_count_transfunc'
+LANGUAGE c;
+
+create aggregate count (int4range)
+(
+    stype = int4range,
+    sfunc = agg_count_transfunc
+);

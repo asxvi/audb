@@ -46,3 +46,5 @@ add more reg tests
 - [] in-range checks. ex  c_range_multiply('[50000,60000)', '[50000,60000)') == overflow
 
 1/27
+- [] arithmetic NULL results in T or F or always unknown (Null) ex range_lt(NULL, int4range(1,3))
+- [] sum doesnt use reduce size, only normalize. test optimal reduction methods

@@ -248,6 +248,21 @@ INSERT INTO t6_s_aggregates VALUES
     ('max_set_ignores_uncertain', 'max(combine_set_mult_max(colA, mult)) WHERE id IN (1,3)', (SELECT max(combine_set_mult_max(colA, mult)) FROM t6_s_agg_data WHERE id IN (1,3)), array[int4range(1,3), int4range(6,10), int4range(20,30)]),
     ('max_set_empty_table', 'max(combine_set_mult_max(colA, mult)) WHERE 1=0', (SELECT max(combine_set_mult_max(colA, mult)) FROM t6_s_agg_data WHERE 1=0), NULL);
 
+
+-- ===================================
+-- Test7: Range Special/edge Cases
+-- ===================================
+DROP TABLE IF EXISTS t7_r_special;
+CREATE TEMP TABLE t7_r_special (
+    name text,
+    code text,
+    actual int4range,
+    expected int4range
+);
+
+INSERT INTO t7_r_special VALUES
+;
+
 -- show failures
 \echo Test1: Range Arithmetic
 SELECT 'Test1: Range Arithmetic' as Test;

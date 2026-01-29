@@ -13,6 +13,7 @@
 
 PG_MODULE_MAGIC;
 
+/*(Arithmetic Functions)*/
 PG_FUNCTION_INFO_V1(range_add);
 PG_FUNCTION_INFO_V1(range_subtract);
 PG_FUNCTION_INFO_V1(range_multiply);
@@ -22,7 +23,7 @@ PG_FUNCTION_INFO_V1(set_subtract);
 PG_FUNCTION_INFO_V1(set_multiply);
 PG_FUNCTION_INFO_V1(set_divide);
 
-
+/*(Logical Operator Functions)*/
 PG_FUNCTION_INFO_V1(range_lt);
 PG_FUNCTION_INFO_V1(range_lte);
 PG_FUNCTION_INFO_V1(range_gt);
@@ -34,16 +35,16 @@ PG_FUNCTION_INFO_V1(set_gt);
 PG_FUNCTION_INFO_V1(set_gte);
 PG_FUNCTION_INFO_V1(set_eq);
 
+/*(Helper Functions)*/
 PG_FUNCTION_INFO_V1(c_lift_scalar);
 PG_FUNCTION_INFO_V1(c_sort);
 PG_FUNCTION_INFO_V1(c_normalize);
 PG_FUNCTION_INFO_V1(c_reduceSize);
 
-///// aggregates
+/*(Aggregate Functions)*/
 //sum
 PG_FUNCTION_INFO_V1(combine_range_mult_sum);
 PG_FUNCTION_INFO_V1(agg_sum_transfunc);
-
 PG_FUNCTION_INFO_V1(combine_set_mult_sum);
 PG_FUNCTION_INFO_V1(agg_sum_set_transfunc);
 PG_FUNCTION_INFO_V1(agg_sum_set_finalfunc);
@@ -53,12 +54,18 @@ PG_FUNCTION_INFO_V1(combine_range_mult_min);
 PG_FUNCTION_INFO_V1(combine_range_mult_max);
 PG_FUNCTION_INFO_V1(agg_min_transfunc);
 PG_FUNCTION_INFO_V1(agg_max_transfunc);
-
 PG_FUNCTION_INFO_V1(combine_set_mult_min);
 PG_FUNCTION_INFO_V1(combine_set_mult_max);
 PG_FUNCTION_INFO_V1(agg_min_set_transfunc);
 PG_FUNCTION_INFO_V1(agg_max_set_transfunc);
 PG_FUNCTION_INFO_V1(agg_min_max_set_finalfunc);
+
+// count -- assumes mult is RangeType.. easy fix if not
+PG_FUNCTION_INFO_V1(agg_count_transfunc);
+
+// avg
+// uses agg_sum_set_transfunc as transition function
+PG_FUNCTION_INFO_V1(agg_avg_set_finalfunc);
 
 // easy change for future implementation. currently only affects lift funciton
 #define PRIMARY_DATA_TYPE "int4range"
@@ -1829,3 +1836,85 @@ agg_min_max_set_finalfunc(PG_FUNCTION_ARGS)
 
     PG_RETURN_ARRAYTYPE_P(output);
 }
+
+Datum
+agg_count_transfunc(PG_FUNCTION_ARGS)
+{
+    RangeType *state, *input, *result;
+    TypeCacheEntry *typcache;
+    
+    // first call: use the first input as initial state, or non null
+    if (PG_ARGISNULL(0)){
+        if (PG_ARGISNULL(1)){
+            PG_RETURN_NULL();
+        }
+        // othrwise value becomes the state
+        PG_RETURN_RANGE_P(PG_GETARG_RANGE_P(1));
+    }
+
+    // NULL input: return current state unchanged
+    if(PG_ARGISNULL(1)) {
+        PG_RETURN_RANGE_P(PG_GETARG_RANGE_P(0));
+    }
+    
+    // get arguments, call helper to get result, check to normalize after
+    state = PG_GETARG_RANGE_P(0);
+    input = PG_GETARG_RANGE_P(1);
+
+    result = arithmetic_range_helper(state, input, range_add_internal);
+
+    PG_RETURN_ARRAYTYPE_P(result);
+}
+
+
+// // need to add in resize logic that is easily modifiable. macro perhaps
+// Datum
+// agg_avg_set_finalfunc(PG_FUNCTION_ARGS)
+// {
+//     ArrayType *state, *input, *result;
+//     TypeCacheEntry *typcache;
+    
+//     // no values in aggregated accum 
+//     if (PG_ARGISNULL(0)) {
+//         PG_RETURN_NULL();
+//     }
+
+//     final = PG_GETARG_ARRAYTYPE_P(0);
+//     nelems = ArrayGetNItems(ARR_NDIM(final), ARR_DIMS(final));
+    
+//     // get arguments, call helper to get result, check to normalize after
+//     state = PG_GETARG_RANGE_P(0);
+//     input = PG_GETARG_RANGE_P(1);
+
+//     result = arithmetic_range_helper(state, input, range_add_internal);
+
+//     PG_RETURN_ARRAYTYPE_P(result);
+// }
+
+
+// // final func return accumulated result as a native postgres type
+// Datum
+// agg_sum_set_finalfunc(PG_FUNCTION_ARGS)
+// {
+//     ArrayType *final;
+//     int resizeTrigger, sizeLimit, nelems;
+//     resizeTrigger = 5;
+//     sizeLimit = 3; 
+
+//     // no values in aggregated accum 
+//     if (PG_ARGISNULL(0)) {
+//         PG_RETURN_NULL();
+//     }
+
+//     final = PG_GETARG_ARRAYTYPE_P(0);
+//     nelems = ArrayGetNItems(ARR_NDIM(final), ARR_DIMS(final));
+
+//     // check to reduce size//normalize
+//     if (nelems >= resizeTrigger) {
+//         ArrayType *result;
+//         result = normalizeRange(final);
+//         PG_RETURN_ARRAYTYPE_P(result);    
+//     }
+    
+//     PG_RETURN_ARRAYTYPE_P(final);
+// }
