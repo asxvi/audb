@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from enum import Enum
 import os
+import datetime
 
 '''
     local represention of postres RangeType. helper methods include arithmetic,
@@ -322,20 +323,39 @@ class ExperimentRunner:
         print(f"{'='*40}")
         
         trial_results = []
-        
+
         with self.connect_db() as conn:
             with conn.cursor() as cur:
                 for trial in range(experiment.num_trials):    
                     # seed_str = f"{experiment.name}_{trial+1}"
 
-                    rows = self.generate_data(experiment, trial+1)
-                    print(rows)
-            
+                    if experiment.insert_to_db:
+                        gen_data = self.generate_data(experiment, trial+1)
+                    else:
+                        gen_data = self.generate_data(experiment, trial+1)
+                    # print(f"Generated data for: {gen_data}")
         # np.random.seed()
+
+    def insert_data_db(self, experiment: ExperimentSettings, trial, data):
+        
+        with self.connect_db() as conn:
+            with conn.cursor() as cur:
+                
+                table_name = f"t_{experiment.name}_trial_{trial}"
+                cur.execute(f"DROP TABLE IF EXISTS {table_name};")
+
+                if experiment.data_type == DataType.RANGE:
+                    cur.execute(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range, mult int4range);")                
+                elif experiment.data_type == DataType.SET:
+                    cur.execute(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range[], mult int4range);")
+
+
+                
+
 
 
     # generates pseudorandom 'fake' data based on user specified values.
-    def generate_data(self, experiment :ExperimentSettings, trial: int):
+    def generate_data_db(self, experiment :ExperimentSettings, trial: int):
         with self.connect_db() as conn:
             with conn.cursor() as cur:
                 table_name = f"t_{experiment.name}_trial_{trial}"
@@ -373,6 +393,16 @@ class ExperimentRunner:
                 conn.commit()
 
         return table_name
+    
+
+    def generate_data_file(self, experiment :ExperimentSettings, trial: int):
+        table_name = f"t_{experiment.name}_trial_{trial}"
+        
+        # replace with generate_name when function finished
+        with open(f"data/{table_name}_{datetime.datetime().now}") as file:
+            if experiment.data_type == DataType.RANGE:
+                file.write(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range, mult int4range);")                
+        
 
     # generate an i4r. can also use psycopg.extras range type: https://www.psycopg.org/docs/extras.html#range-data-types
     def generate_range(self, experiment:ExperimentSettings) -> RangeType:
