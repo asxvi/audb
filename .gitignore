@@ -1,6 +1,11 @@
 .DS_Store
-dbeaver*
+.vscode
 .misc
+
+# dbconfig
+database.ini
+# tests/
+
+dbeaver*
 generated/
 *.o
-.vscode

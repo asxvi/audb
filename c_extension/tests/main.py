@@ -8,10 +8,7 @@ from configparser import ConfigParser
 from dataclasses import dataclass
 import numpy as np
 from enum import Enum
-
-class DataType(Enum):
-    RANGE = "range"
-    SET = "rset"
+import os
 
 '''
     local represention of postres RangeType. helper methods include arithmetic,
@@ -112,7 +109,7 @@ class RangeType:
         return f"int4range({self.lb}, {self.ub})"
     
     # to be used only for local development and testing. 
-    def generate_range(self, experiment:ExperimentSettings) -> RangeType:
+    def generate_values(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
             return RangeType(0,0,True)
@@ -262,7 +259,7 @@ class RangeSetType:
             return self.itv() <= RangeType(o, o)
         return self.itv() <= o.itv()
     
-    def generate_set(self, experiment:ExperimentSettings) -> RangeSetType:
+    def generate_values(self, experiment:ExperimentSettings) -> RangeSetType:
         num_ranges = np.random.randint(*experiment.num_intervals_range)
         
         rset = []
@@ -276,24 +273,40 @@ class RangeSetType:
             ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
             
             rset.append(RangeType(lb,ub,False))
-            print(RangeType(lb,ub,False))
         
         return RangeSetType(rset, cu=False)
 
+# not sure if this is needed anymore, cant we just do type() as a param to class ExperimentSettings
+class DataType(Enum):
+    RANGE = RangeType
+    SET = RangeSetType
+
+
+'''
+    if num_intervals is used, num_intervals_range shouldn't be used
+    if gap_size is used, gap_size_range shouldn't be used
+
+'''
 @dataclass
 class ExperimentSettings:
-    name: str
-    data_type: DataType
-    num_trials: int
-    dataset_size: int
-    uncertain_ratio: float              #uncertainty can be thru mult 0, or missing vals in col.. (more?). we will generate both cases
-    mult_size_range: tuple
-    interval_size_range: tuple
-    num_intervals_range: tuple
-    num_intervals: int
-    gap_size_range: tuple
-    make_csv:bool                   ####
-    insert_to_db:bool               ####
+    name: str                       # required 
+    data_type: DataType             # always Set or Range
+    num_trials: int = 1             # always fixed
+    dataset_size: int = 1           # always fixed
+    uncertain_ratio: float = 0.00   # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
+    make_csv: bool = False          # always T or F
+    insert_to_db: bool = False      # always T or F
+
+    # use these value if not None, otherwise use tuple if not None, both none = error
+    num_intervals: int = None       
+    gap_size: int = None
+
+    # use if scalars are None and tuples are not None, both none = error
+    num_intervals_range: tuple = None
+    gap_size_range: tuple = None    
+    mult_size_range: tuple = None   # required 
+    interval_size_range: tuple = None
+
 
 class ExperimentRunner:
     def __init__(self, db_config):
@@ -339,65 +352,93 @@ class ExperimentRunner:
                 rows = []
                 for i in range(experiment.dataset_size):
                     if experiment.data_type == DataType.RANGE:
-                        val = self.generate_range(experiment)
-                        val = '[0,0)' if val is None else val
-                    elif experiment.data_type == DataType.RANGE:
-                        # val = self.generate_set(experiment)
-                        # val = 'NULL' if val is None else val
-                        val = '[0,0)' if val is None else val
+                        obj = self.generate_range(experiment)
+                        val = str(obj) if not obj.isNone else None
+                    elif experiment.data_type == DataType.SET:
+                        obj = self.generate_set(experiment)
+                        val = str(obj) if (obj.rset and not obj.isNone) else None
                     
-                    mult = self.generate_mult(experiment)
-                    rows.append((val, mult))    
+                    mult_obj = self.generate_mult(experiment)
+                    mult = str(mult_obj)
+                    rows.append((val, mult))
 
                 if experiment.data_type == DataType.RANGE:
-                    template = '(%s::int4range, %s::int4range)'
-                else:
-                    template = '(%s::int4range[], %s::int4range)'
+                    template = "(%s::int4range, %s::int4range)"
+                elif experiment.data_type == DataType.SET:
+                    template = "(%s::int4range[], %s::int4range)"
+                
 
                 sql = f"INSERT INTO {table_name} (val, mult) VALUES %s"
                 psycopg2.extras.execute_values(cur, sql, rows, template)
-
                 conn.commit()
+
         return table_name
 
     # generate an i4r. can also use psycopg.extras range type: https://www.psycopg.org/docs/extras.html#range-data-types
     def generate_range(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
-            return None
+            return RangeType(0, 0, True)
         
         lb = np.random.randint(*experiment.interval_size_range)
         ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
         return RangeType(lb, ub)
     
-    # def generate_set(self, experiment:ExperimentSettings) -> str:
-        num_ranges = np.random.randint(*experiment.num_intervals_range)
+    def generate_set(self, experiment:ExperimentSettings) -> RangeSetType:
+        # if experiment.num_intervals is not None then use, otherwise if experiment.num_intervals_range then use. otherwise raise error
+        if experiment.num_intervals is not None:
+            num_intervals = experiment.num_intervals
+        elif experiment.num_intervals_range is not None:
+            num_intervals = np.random.randint(*experiment.num_intervals_range)
+        else:
+            raise ValueError()
         
-        # for i in range(experiment)
+        rset = []
+        for i in range(num_intervals):    
+            # uncertain ratio. maybe should account for half nulls, half mult 0
+            if np.random.random() < experiment.uncertain_ratio * 0.5:  
+                rset.append(RangeType(0,0,True))
+                continue
+            
+            lb = np.random.randint(*experiment.interval_size_range)
+            ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
+            
+            rset.append(RangeType(lb,ub,False))
         
-        # uncertain ratio. maybe should account for
-        is_uncertain = np.random.random() < experiment.uncertain_ratio
-        if (is_uncertain):
-            return None
-        
-        lb = np.random.randint(experiment.interval_size_range[0], experiment.interval_size_range[1])
-        ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
-        return f'array[{lb}, {ub})'
+        return RangeSetType(rset, cu=False)
 
-    def generate_mult(self, experiment:ExperimentSettings) -> str:
+    def generate_mult(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
-            upper = np.random.randint(1, experiment.mult_size_range[1]+1)
-            return RangeType(0, upper)
+            return RangeType(0, 0, True)
         
         lb = np.random.randint(*experiment.mult_size_range)
         ub = np.random.randint(lb+1, experiment.mult_size_range[1]+1)
-        return f'[{lb}, {ub})'
-
+        return RangeType(lb, ub)
+    
     def connect_db(self):
         return psycopg2.connect(**self.db_config)
 
-    
+    def clean_tables(self, config, find_trigger="t_%"):
+        print(f"Cleaning/ Dropping all Tables starting with '{find_trigger}'")
+        dbname = config['database']
+
+        with self.connect_db() as conn:
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(f"""SELECT tablename 
+                                FROM pg_tables 
+                                WHERE schemaname = 'public' AND tablename LIKE '{find_trigger}';""")
+                    tables = cur.fetchall()
+
+                    for table in tables:
+                        cur.execute(f"DROP TABLE {table[0]};")
+                        print(f" Dropping Table {table[0]}")
+
+                except Exception as e:
+                    print(f"Error cleaning tables: {e}")
+                    conn.rollback()
+
 def load_config(filename='database.ini', section='postgresql'):
     parser = ConfigParser()
     parser.read(filename)
@@ -408,34 +449,38 @@ def load_config(filename='database.ini', section='postgresql'):
         for param in params:
             config[param[0]] = param[1]
     else:
-        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
+        raise Exception(f'Section {section} not found in the {filename} file')
     return config
 
 
 def run_all():
+    # parse config
     try:
         db_config = load_config()    
     except Exception as e:
         print(f"Error loading config: {e}")
         exit(1)
 
+    # start test engine with specific configuration
     runner = ExperimentRunner(db_config)
 
     # create different trials objects we want to test with different parameters modifies
     trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
                                 interval_size_range=(1, 1000), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=True,
-                                num_trials=2, gap_size_range=(0,5))
+                                num_trials=2, gap_size_range=(0,5), gap_size=None)
 
     trial2 = ExperimentSettings(name="test2", data_type=DataType.RANGE, dataset_size=17, uncertain_ratio=0.3, mult_size_range=(1,5),
                                 interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=True,
-                                num_trials=2, gap_size_range=(0,5))
+                                num_trials=2, gap_size_range=(0,5), gap_size=None)
     
     # run the experiment for each of the trial objects.
         # inside run_experiment: 
             # for every trial in Trial
             # generate data (with reproducibilty)
-    # runner.run_experiment(trial1)
-    # runner.run_experiment(trial2)   
+    runner.run_experiment(trial1)
+    runner.run_experiment(trial2)
+
+    # runner.clean_tables(db_config)
 
 
 def create_experiment_name(experiment: ExperimentSettings):

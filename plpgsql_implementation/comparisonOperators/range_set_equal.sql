@@ -4,8 +4,8 @@ DECLARE
     norm1 int4range[] := '{}';
     norm2 int4range[] := '{}';
 BEGIN
-    norm1 := normalize_vals(set1);
-    norm2 := normalize_vals(set2);
+    norm1 := normalize_range(set1);
+    norm2 := normalize_range(set2);
 
     IF array_length(norm1, 1) IS NULL AND array_length(norm2, 1) IS NULL THEN
         RETURN TRUE;
