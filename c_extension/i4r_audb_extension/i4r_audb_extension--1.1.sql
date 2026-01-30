@@ -118,34 +118,34 @@ LANGUAGE c;
 --------------------------------Helper functions------------------------------
 ------------------------------------------------------------------------------
 
--- c_lift takes 1 int32 and returns its equivallent Int4Range 
-CREATE FUNCTION c_lift_scalar(a int4)
+-- lift takes 1 int32 and returns its equivallent Int4Range 
+CREATE FUNCTION lift_scalar(a int4)
 RETURNS int4range
-AS 'MODULE_PATHNAME', 'c_lift_scalar'
+AS 'MODULE_PATHNAME', 'lift_scalar'
 LANGUAGE c;
 
--- -- c_lift takes 1 int4range and returns its equivallent Int4RangeSet: int4range[] 
--- CREATE FUNCTION c_lift_range(a int4range)
+-- -- lift takes 1 int4range and returns its equivallent Int4RangeSet: int4range[] 
+-- CREATE FUNCTION lift_range(a int4range)
 -- RETURNS int4range[]
--- AS 'MODULE_PATHNAME', 'c_lift_range'
+-- AS 'MODULE_PATHNAME', 'lift_range'
 -- LANGUAGE c;
 
--- c_reduceSize takes 1 array of int4range, and an integer and returns reduced size array of int4range
-CREATE FUNCTION c_reduceSize(a int4range[], numRangesKeep integer)
+-- set_reduce_size takes 1 array of int4range, and an integer and returns reduced size array of int4range
+CREATE FUNCTION set_reduce_size(a int4range[], numRangesKeep integer)
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'c_reduceSize'
+AS 'MODULE_PATHNAME', 'set_reduce_size'
 LANGUAGE c;
 
--- c_sort takes 1 array of int4range, and sorts input 
-CREATE FUNCTION c_sort(a int4range[])
+-- set_sort takes 1 array of int4range, and sorts input 
+CREATE FUNCTION set_sort(a int4range[])
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'c_sort'
+AS 'MODULE_PATHNAME', 'set_sort'
 LANGUAGE c;
 
--- c_normalize takes 1 array of int4range, and merges contained ranges
-CREATE FUNCTION c_normalize(a int4range[])
+-- set_normalize takes 1 array of int4range, and merges contained ranges
+CREATE FUNCTION set_normalize(a int4range[])
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'c_normalize'
+AS 'MODULE_PATHNAME', 'set_normalize'
 LANGUAGE c;
 
 

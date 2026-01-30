@@ -36,10 +36,10 @@ PG_FUNCTION_INFO_V1(set_gte);
 PG_FUNCTION_INFO_V1(set_eq);
 
 /*(Helper Functions)*/
-PG_FUNCTION_INFO_V1(c_lift_scalar);
-PG_FUNCTION_INFO_V1(c_sort);
-PG_FUNCTION_INFO_V1(c_normalize);
-PG_FUNCTION_INFO_V1(c_reduceSize);
+PG_FUNCTION_INFO_V1(lift_scalar);
+PG_FUNCTION_INFO_V1(set_sort);
+PG_FUNCTION_INFO_V1(set_normalize);
+PG_FUNCTION_INFO_V1(set_reduce_size);
 
 /*(Aggregate Functions)*/
 //sum
@@ -470,7 +470,7 @@ set_eq(PG_FUNCTION_ARGS)
 /* lift expects 1 parameter x for example and returns a valid int4range [x, x+1) */
 // Lift an Integer x into a RangeType [x, x+1)
 Datum
-c_lift_scalar(PG_FUNCTION_ARGS)
+lift_scalar(PG_FUNCTION_ARGS)
 {
     // check for NULLS. Diff from empty check
     if (PG_ARGISNULL(0)){
@@ -501,7 +501,7 @@ c_lift_scalar(PG_FUNCTION_ARGS)
 // FIXME- fix the local code for this. need to account for NULL. should be simple fix
 // also figure out of can make a single helperFunction_helper that takes in optinal parameters
 Datum
-c_reduceSize(PG_FUNCTION_ARGS)
+set_reduce_size(PG_FUNCTION_ARGS)
 {
     // check for NULLS. Diff from empty check
     if (PG_ARGISNULL(0) || PG_ARGISNULL(1)){
@@ -548,7 +548,7 @@ c_reduceSize(PG_FUNCTION_ARGS)
 }
 
 Datum
-c_sort(PG_FUNCTION_ARGS)
+set_sort(PG_FUNCTION_ARGS)
 {
     // check for NULLS. Diff from empty check
     if (PG_ARGISNULL(0)){
@@ -565,7 +565,7 @@ c_sort(PG_FUNCTION_ARGS)
 }
 
 Datum
-c_normalize(PG_FUNCTION_ARGS)
+set_normalize(PG_FUNCTION_ARGS)
 {
     // check for NULLS. Diff from empty check
     if (PG_ARGISNULL(0)){

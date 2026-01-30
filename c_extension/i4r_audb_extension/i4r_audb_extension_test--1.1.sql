@@ -260,8 +260,8 @@ CREATE TEMP TABLE t7_r_special (
     expected int4range
 );
 
-INSERT INTO t7_r_special VALUES
-;
+-- INSERT INTO t7_r_special VALUES
+-- ;
 
 -- show failures
 \echo Test1: Range Arithmetic
@@ -299,3 +299,9 @@ SELECT 'Test6: Set Aggregates' as Test;
 SELECT *, 't6_s_aggregates' as source
 FROM t6_s_aggregates
 WHERE actual IS DISTINCT FROM expected;
+
+-- \echo Test7: Special Aggregates
+-- SELECT 'Test7: Set Aggregates' as Test;
+-- SELECT *, 't7_s_aggregates' as source
+-- FROM t7_s_aggregates
+-- WHERE actual IS DISTINCT FROM expected;
