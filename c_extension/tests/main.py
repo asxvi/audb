@@ -2,304 +2,20 @@
 
 import argparse
 import os
-from enum import Enum
 import psycopg2
 import psycopg2.extras
-import itertools
 import numpy as np
 from configparser import ConfigParser
 from dataclasses import dataclass
+from DataTypes import RangeType, RangeSetType, DataType
 
-'''
-    local represention of postres RangeType. helper methods include arithmetic,
-    logical operators, and convenience methods
-'''
-class RangeType:
-    def __init__(self, lb=0, ub=0, isNone=False):
-        assert(lb<=ub)
-        self.lb = lb
-        self.ub = ub
-        self.isNone = isNone
-        
-    def __add__(self, o):
-        if isinstance(o, self.__class__):
-            return RangeType(self.lb+o.lb, self.ub+o.ub)
-        elif isinstance(o, int):
-            return RangeType(self.lb+o, self.ub+o)
-        else:
-            raise TypeError("unsupported operand type(s) for +: '{}' and '{}'").format(self.__class__, type(other))
-        
-    
-    def __and__(self, o):
-        if not (isinstance(self.lb, bool) and isinstance(self.ub, bool) and
-                isinstance(o.lb, bool) and isinstance(o.ub, bool)):
-            raise ValueError("Both operands must be RangeType objects with boolean bounds.")
-        
-        # Calculate the new bounds
-        new_lb = self.lb and o.lb
-        new_ub = self.ub and o.ub
-        
-        return RangeType(new_lb, new_ub)
-    
-    def __or__(self, o):
-        if not (isinstance(self.lb, bool) and isinstance(self.ub, bool) and
-                isinstance(o.lb, bool) and isinstance(o.ub, bool)):
-            raise ValueError("Both operands must be RangeType objects with boolean bounds.")
-        
-        # Calculate the new bounds
-        new_lb = self.lb or o.lb
-        new_ub = self.ub or o.ub
-        
-        return RangeType(new_lb, new_ub)
-    
-    def __mul__(self, o):
-        if isinstance(o, self.__class__):
-            lb = min(self.lb*o.lb, self.lb*o.ub, self.ub*o.lb, self.ub*o.ub)
-            ub = max(self.lb*o.lb, self.lb*o.ub, self.ub*o.lb, self.ub*o.ub)
-            return RangeType(lb, ub)
-        elif isinstance(o, int):
-            lb = min(self.lb*o, self.ub*o)
-            ub = max(self.lb*o, self.ub*o)
-            return RangeType(lb, ub)
-        else:
-            raise TypeError("unsupported operand type(s) for *: '{}' and '{}'").format(self.__class__, type(other))
-    
-    def __hash__(self):
-        # Combine the lower and upper bounds into a hashable representation
-        return hash(self.lb, self.ub)
-    
-    def __eq__(self, o):
-        return RangeType(self.lb==self.ub and self.lb==o.lb and o.lb==o.ub, self.i(o) is not None)
-
-    def __gt__(self, o):
-        return RangeType(self.lb > o.ub, self.ub > o.lb)
-
-    def __ge__(self, o):
-        return RangeType(self.lb >= o.ub, self.ub >= o.lb)
-    
-    def __lt__(self, o):
-        return RangeType(self.lb < o.ub, self.ub < o.lb)
-
-    def __le__(self, o):
-        return RangeType(self.lb <= o.ub, self.ub <= o.lb)
-
-    def u(self, o):
-        return RangeType(min(self.lb,o.lb), max(self.ub,o.ub))
-    
-    def i(self, o):
-        lb = max(self.lb,o.lb)
-        ub = min(self.ub,o.ub)
-        if lb <= ub:
-            return RangeType(max(self.lb,o.lb), min(self.ub,o.ub))
-        return None
-    
-    def __eq__(self, other):
-        if self.ub >= other.lb and other.ub >= self.lb:
-            return True
-        return False
-    
-    def __repr__(self):
-        return f"[{self.lb}, {self.ub}]"
-    
-    def __str__(self):
-        return f"[{self.lb}, {self.ub}]"
-
-    # easier to work in postgres    
-    def str_ddl(self):
-        if self.isNone:
-            return "NULL"
-        return f"int4range({self.lb}, {self.ub})"
-    
-    # to be used only for local development and testing. 
-    def generate_values(self, experiment:ExperimentSettings) -> RangeType:
-        # uncertain ratio. maybe should account for half nulls, half mult 0
-        if np.random.random() < experiment.uncertain_ratio * 0.5:  
-            return RangeType(0,0,True)
-        
-        lb = np.random.randint(*experiment.interval_size_range)
-        ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
-        return RangeType(lb, ub)
-
-'''
-    local represention of postres ArrayType. helper methods include arithmetic,
-    logical operators, and convenience methods
-'''
-class RangeSetType:
-    def __init__(self, rset, vtype = RangeType, cu=True):
-        assert(type(rset) is list)
-        self.vtype = vtype
-        self.rset = rset
-        if cu:
-            self.cleanup()
-        
-    def __repr__(self):
-        return f"{self.rset}"
-    
-    def __str__(self):
-        if not self.rset or len(self.rset) == 0:
-            return "{}"
-        
-        items = []
-        for r in self.rset:
-            if r.isNone:
-                items.append("NULL")
-            else:
-                # Postgres array format: {"[1,2]", "[3,4]"}
-                items.append(f'"{str(r)}"')
-                
-        return "{" + ",".join(items) + "}"
-    
-    # easier to work in postgres    
-    def str_ddl(self):
-        items = [f"{i.str_ddl()}" for i in self.rset]
-        return "array[" + ",".join(items) + "]"
-    
-    def __len__(self):
-        return len(self.rset)
-    
-    def cleanup(self):
-        if self.vtype == RangeType:
-            if len(self)<=1:
-                return
-            l = sorted(self.rset, key=lambda r: r.lb)
-            res = []
-            curR = l[0]
-            for rv in sorted(self.rset, key=lambda r: r.lb):
-                if rv.lb <= curR.ub:
-                    curR = curR.u(rv)
-                else:
-                    res.append(curR)
-                    curR = rv
-            res.append(curR)
-            self.rset = res
-        
-    # +
-    def __add__(self, o, cu=True):
-        rst = []
-        if isinstance(o, self.__class__):
-            for p in itertools.product(self.rset,o.rset):
-                rst.append(p[0]+p[1])
-            rt = RangeSetType(rst)
-            if cu:
-                rt.cleanup()
-            return rt
-        elif isinstance(o, int):
-            for p in self.rset:
-                rst.append(p+o)
-            rt = RangeSetType(rst)
-            if cu:
-                rt.cleanup()
-            return rt
-        else:
-            raise TypeError("unsupported operand type(s) for +: '{}' and '{}'").format(self.__class__, type(other))
-        
-    # *
-    def __mul__(self, o, cu=True):
-        rst = []
-        if isinstance(o, self.__class__):
-            for p in itertools.product(self.rset,o.rset):
-                rst.append(p[0]*p[1])
-            rt = RangeSetType(rst)
-            if cu:
-                rt.cleanup()
-            return rt
-        elif isinstance(o, int):
-            for p in self.rset:
-                rst.append(p*o)
-            rt = RangeSetType(rst)
-            if cu:
-                rt.cleanup()
-            return rt
-        else:
-            raise TypeError("unsupported operand type(s) for *: '{}' and '{}'").format(self.__class__, type(other))
-
-    def __eq__(self, o):
-        lb = False
-        if len(self)==1 and len(o)==1: 
-            l = next(iter(self.rset))
-            r = next(iter(o.rset))
-            lb = l.lb==l.ub and l.lb==r.lb and r.lb==r.ub
-        return RangeType(lb, bool(self.i(o)))
-
-    def u(self, o, cu=True):
-        rst = []
-        for p in itertools.product(self.rset,o.rset):
-            rst.append(p[0].u(p[1]))
-        rt = RangeSetType(rst)
-        if cu:
-            rt.cleanup()
-        return rt
-    
-    def i(self, o, cu=True):
-        rst = []
-        for p in itertools.product(self.rset,o.rset):
-            ir = p[0].i(p[1])
-            if ir is not None:
-                rst.append(p[0].i(p[1]))
-        rt = RangeSetType(rst)
-        if cu:
-            rt.cleanup()
-        return rt
-    
-    def lb(self):
-        return sorted(self.rset, key=lambda r: r.lb)[0].lb
-    
-    def ub(self):
-        return sorted(self.rset, key=lambda r: r.ub, reverse=True)[0].ub
-    
-    def itv(self):
-        return RangeType(self.lb(),self.ub())
-    
-    def __gt__(self, o):
-        if isinstance(o, int):
-            return self.itv() > RangeType(o, o)
-        return self.itv() > o.itv()
-
-    def __ge__(self, o):
-        if isinstance(o, int):
-            return self.itv() >= RangeType(o, o)
-        return self.itv() >= o.itv()
-    
-    def __lt__(self, o):
-        if isinstance(o, int):
-            return self.itv() < RangeType(o, o)
-        return self.itv() < o.itv()
-
-    def __le__(self, o):
-        if isinstance(o, int):
-            return self.itv() <= RangeType(o, o)
-        return self.itv() <= o.itv()
-    
-    def generate_values(self, experiment:ExperimentSettings) -> RangeSetType:
-        num_ranges = np.random.randint(*experiment.num_intervals_range)
-        
-        rset = []
-        for i in range(num_ranges):    
-            # uncertain ratio. maybe should account for half nulls, half mult 0
-            if np.random.random() < experiment.uncertain_ratio * 0.5:  
-                rset.append(RangeType(0,0,True))
-                continue
-            
-            lb = np.random.randint(*experiment.interval_size_range)
-            ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
-            
-            rset.append(RangeType(lb,ub,False))
-        
-        return RangeSetType(rset, cu=False)
-
-# not sure if this is needed anymore, cant we just do type() as a param to class ExperimentSettings
-class DataType(Enum):
-    RANGE = RangeType
-    SET = RangeSetType
-
-
-'''
-    if num_intervals is used, num_intervals_range shouldn't be used
-    if gap_size is used, gap_size_range shouldn't be used
-
-'''
 @dataclass
 class ExperimentSettings:
+    '''
+        Class contains the modifiable settings of a test
+        if num_intervals is used, num_intervals_range shouldn't be used
+        if gap_size is used, gap_size_range shouldn't be used
+    '''
     name: str                       # required 
     data_type: DataType             # always Set or Range
     num_trials: int = 1             # always fixed
@@ -320,7 +36,10 @@ class ExperimentSettings:
 
 
 class ExperimentRunner:
-    def __init__(self, db_config):
+    '''
+        ExperimentRunner runs entire or parts of a test (gen_data, insert_db) by taking an ExperimentSettings
+    '''
+    def __init__(self, db_config, args):
         self.db_config = db_config
         self.results = []
 
@@ -501,16 +220,174 @@ def load_config(filename='database.ini', section='postgresql'):
     return config
 
 
+def positive_int(value):
+        x = int(value)
+        if x < 0:
+            raise argparse.ArgumentTypeError("Must be positive")
+        return x
+
+def create_experiment_name(experiment: ExperimentSettings):
+    dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
+    # seed = np.random.seed()
+    return f"t_{experiment.name}_{dtype}_n{experiment.dataset_size}"
+
+    # change up params, creating new experiment config...
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="AUDB Extension Experiment Runner", )
+
+    exp_group = parser.add_mutually_exclusive_group(required=True)
+    exp_group.add_argument(
+        '--experiments-file',
+        type=str,
+        help="YAML file with defined experiments"
+    )
+    exp_group.add_argument(
+        '--quick',
+        action='store_true',
+        help="Quick run experiment fully defined with CLI flags"
+    )
+
+    quick_group = parser.add_argument_group("Quick experiment options (must use --quick)")
+    # experiment settings
+    quick_group.add_argument(
+        '-dt', '--data-type',
+        choices=[ 'r', 's', 'range', 'set'],
+        default='range',
+        help='Data Type: range or set (default=range == r)'
+    )
+    quick_group.add_argument(
+        '-nt', '--num-trials',
+        type=positive_int,
+        default=4,
+        help='Number of trials (default=4)'
+    )
+    quick_group.add_argument(
+        '-sz', '--dataset-size',
+        type=positive_int,
+        default=100,
+        help='Dataset size/ Number rows. (default=100)'
+    )
+    quick_group.add_argument(
+        '-ur', '--uncertainty-ratio',
+        type=float,
+        default=0.30,
+        help='Uncertainty Ratio 0.0 - 1.0 (default=0.3)'
+    )
+    quick_group.add_argument(
+        '-ni', '--num-intervals',
+        type=positive_int,
+        required=False,
+        help='Fixed number of intervals in each Set'
+    )
+    quick_group.add_argument(
+        '-gs', '--gap-size',
+        type=positive_int,
+        required=False,
+        help='Fixed gap size between intervals'
+    )
+    quick_group.add_argument(
+        '-nir', '--num-intervals-range',
+        required=False,
+        type=positive_int,
+        nargs=2,
+        help='Bounds for possible number of intervals in each Set. Ex: -nir lb ub'
+    )
+    quick_group.add_argument(
+        '-gsr', '--gap-size-range',
+        required=False,
+        type=positive_int,
+        nargs=2,
+        help='Bounds for possible gap size between intervals Set. Ex: -gsr lb ub'
+    )
+    quick_group.add_argument(
+        '-msr', '--mult-size-range',
+        required=False,
+        type=positive_int,
+        nargs=2,
+        help='Bounds for possible multiplicity range. Ex: -msr lb ub'
+    )
+    quick_group.add_argument(
+        '-isr', '--interval-size-range',
+        required=False,
+        type=positive_int,
+        nargs=2,
+        help='Bounds for possible interval size. Ex: -isr a b'
+    )
+    
+    # output options
+    quick_group.add_argument(
+        '-csv', '--save_csv',
+        type=str,
+        default='data',
+        help='Directory for output files (default: data/)'
+    )
+
+    quick_group.add_argument(
+        '-ddl', '--save_ddl',
+        type=str,
+        default='data',
+        help='Directory for DDL code (default: data/)'
+    )
+
+    # database options
+    quick_group.add_argument(
+        '-dbc', '--dbconfig',
+        type=str,
+        default='database.ini',
+        help='Database configuration file. (*.ini) (Default=database.ini)'
+    )
+
+    quick_group.add_argument(
+        '-cb', '--clean-before',
+        required=False,
+        type=str,
+        default='t_%',
+        help="Clean existing tables before running. Optional: Default: t_*"
+    )
+
+    quick_group.add_argument(
+        '-ca', '--clean-after',
+        required=False,
+        type=str,
+        default='t_%',
+        help="Clean existing tables after running. Optional: Default: t_*"
+    )
+    
+    quick_group.add_argument(
+        '-q', '--quiet',
+        action='store_true',
+        default='False',
+        help='Quiet mode. Minimal Console output'
+    )
+
+    quick_group.add_argument(
+        '-s', '--seed',
+        type=int,
+        default=None,
+        help='Seed used to generate pseudo-randomness.'
+    )
+
+    return parser.parse_args()
+
 def run_all():
+    args = parse_args()
+
     # parse config
     try:
-        db_config = load_config()    
+        db_config = load_config(args.dbconfig)    
     except Exception as e:
         print(f"Error loading config: {e}")
         exit(1)
 
     # start test engine with specific configuration
-    runner = ExperimentRunner(db_config)
+    runner = ExperimentRunner(db_config, args)
+
+    # clean db before using
+    if args.cb:
+        runner.clean_tables(db_config)
+
 
     # create different trials objects we want to test with different parameters modifies
     trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
@@ -530,10 +407,6 @@ def run_all():
                                 interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=False,
                                 num_trials=2, gap_size_range=(0,5), gap_size=None)
     
-    # run the experiment for each of the trial objects.
-        # inside run_experiment: 
-            # for every trial in Trial
-            # generate data (with reproducibilty)
     runner.run_experiment(trial1)
     runner.run_experiment(trial2)
     runner.run_experiment(trial3)
@@ -542,75 +415,12 @@ def run_all():
     # runner.clean_tables(db_config)
 
 
-def create_experiment_name(experiment: ExperimentSettings):
-    dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
-    # seed = np.random.seed()
-    return f"t_{experiment.name}_{dtype}_n{experiment.dataset_size}"
-
-    # change up params, creating new experiment config...
-
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="AUDB Extension Experiment Runner", )
-
-    input_params
-
-
-    # output options
-    parser.add_argument(
-        '--save_csv',
-        type=str,
-        default='data',
-        help='Directory for output files (default: data/)'
-    )
-
-    parser.add_argument(
-        '--save_ddl',
-        type=str,
-        default='data',
-        help='Directory for DDL code (default: data/)'
-    )
-
-    # database options
-    parser.add_argument(
-        '--dbconfig',
-        type=str,
-        default='database.ini',
-        help='Database configuration file. (*.ini)'
-    )
-
-    parser.add_argument(
-        '--clean-before',
-        action='store_true',
-        help='Clean existing tables before running'
-    )
-
-    parser.add_argument(
-        '--clean-after',
-        action='store_true',
-        help='Clean tables after running'
-    )
+if __name__ == '__main__':    
+    args = parse_args()
 
     
-    parser.add_argument(
-        '-q', '--quiet',
-        action='store_true',
-        default='False',
-        help='Quiet mode. Minimal Console output'
-    )
-
-    parser.add_argument(
-        '-s', '--seed',
-        type=int,
-        default=None,
-        help='Seed used to generate pseudo-randomness.'
-    )
-
-    return parser.parse_args()
-
-
-if __name__ == '__main__':
-    args = parse_args()
-    print(args)
     
     # run_all()
+
+
+# python3 main.py --quick -dt r -nt 5 -sz 200 -ur .40 -nir (1,5) -gsr (0, 10) -msr (0, 5) -isr (1, 200) -csv -ddl -cb -ca 
