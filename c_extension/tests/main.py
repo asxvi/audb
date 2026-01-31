@@ -1,13 +1,12 @@
 # naming q_n1000_i2
-
-import argparse
 import os
 import psycopg2
 import psycopg2.extras
 import numpy as np
-from configparser import ConfigParser
 from dataclasses import dataclass
-from DataTypes import RangeType, RangeSetType, DataType
+
+from cliUtility import *
+from DataTypes import *
 
 @dataclass
 class ExperimentSettings:
@@ -21,9 +20,7 @@ class ExperimentSettings:
     num_trials: int = 1             # always fixed
     dataset_size: int = 1           # always fixed
     uncertain_ratio: float = 0.00   # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
-    make_csv: bool = False          # always T or F
-    insert_to_db: bool = False      # always T or F
-
+    
     # use these value if not None, otherwise use tuple if not None, both none = error
     num_intervals: int = None       
     gap_size: int = None
@@ -34,6 +31,10 @@ class ExperimentSettings:
     mult_size_range: tuple = None   # required 
     interval_size_range: tuple = None
 
+    make_csv: None = str          # always T or F
+    mode: None = str      # always T or F
+
+    insert_to_db = False
 
 class ExperimentRunner:
     '''
@@ -206,25 +207,6 @@ class ExperimentRunner:
                     print(f"Error cleaning tables: {e}")
                     conn.rollback()
 
-def load_config(filename='database.ini', section='postgresql'):
-    parser = ConfigParser()
-    parser.read(filename)
-
-    config = {} 
-    if parser.has_section(section):
-        params = parser.items(section)
-        for param in params:
-            config[param[0]] = param[1]
-    else:
-        raise Exception(f'Section {section} not found in the {filename} file')
-    return config
-
-
-def positive_int(value):
-        x = int(value)
-        if x < 0:
-            raise argparse.ArgumentTypeError("Must be positive")
-        return x
 
 def create_experiment_name(experiment: ExperimentSettings):
     dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
@@ -233,194 +215,60 @@ def create_experiment_name(experiment: ExperimentSettings):
 
     # change up params, creating new experiment config...
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="AUDB Extension Experiment Runner", )
-
-    exp_group = parser.add_mutually_exclusive_group(required=True)
-    exp_group.add_argument(
-        '--experiments-file',
-        type=str,
-        help="YAML file with defined experiments"
-    )
-    exp_group.add_argument(
-        '--quick',
-        action='store_true',
-        help="Quick run experiment fully defined with CLI flags"
-    )
-
-    quick_group = parser.add_argument_group("Quick experiment options (must use --quick)")
-    # experiment settings
-    quick_group.add_argument(
-        '-dt', '--data-type',
-        choices=[ 'r', 's', 'range', 'set'],
-        default='range',
-        help='Data Type: range or set (default=range == r)'
-    )
-    quick_group.add_argument(
-        '-nt', '--num-trials',
-        type=positive_int,
-        default=4,
-        help='Number of trials (default=4)'
-    )
-    quick_group.add_argument(
-        '-sz', '--dataset-size',
-        type=positive_int,
-        default=100,
-        help='Dataset size/ Number rows. (default=100)'
-    )
-    quick_group.add_argument(
-        '-ur', '--uncertainty-ratio',
-        type=float,
-        default=0.30,
-        help='Uncertainty Ratio 0.0 - 1.0 (default=0.3)'
-    )
-    quick_group.add_argument(
-        '-ni', '--num-intervals',
-        type=positive_int,
-        required=False,
-        help='Fixed number of intervals in each Set'
-    )
-    quick_group.add_argument(
-        '-gs', '--gap-size',
-        type=positive_int,
-        required=False,
-        help='Fixed gap size between intervals'
-    )
-    quick_group.add_argument(
-        '-nir', '--num-intervals-range',
-        required=False,
-        type=positive_int,
-        nargs=2,
-        help='Bounds for possible number of intervals in each Set. Ex: -nir lb ub'
-    )
-    quick_group.add_argument(
-        '-gsr', '--gap-size-range',
-        required=False,
-        type=positive_int,
-        nargs=2,
-        help='Bounds for possible gap size between intervals Set. Ex: -gsr lb ub'
-    )
-    quick_group.add_argument(
-        '-msr', '--mult-size-range',
-        required=False,
-        type=positive_int,
-        nargs=2,
-        help='Bounds for possible multiplicity range. Ex: -msr lb ub'
-    )
-    quick_group.add_argument(
-        '-isr', '--interval-size-range',
-        required=False,
-        type=positive_int,
-        nargs=2,
-        help='Bounds for possible interval size. Ex: -isr a b'
-    )
-    
-    # output options
-    quick_group.add_argument(
-        '-csv', '--save_csv',
-        type=str,
-        default='data',
-        help='Directory for output files (default: data/)'
-    )
-
-    quick_group.add_argument(
-        '-ddl', '--save_ddl',
-        type=str,
-        default='data',
-        help='Directory for DDL code (default: data/)'
-    )
-
-    # database options
-    quick_group.add_argument(
-        '-dbc', '--dbconfig',
-        type=str,
-        default='database.ini',
-        help='Database configuration file. (*.ini) (Default=database.ini)'
-    )
-
-    quick_group.add_argument(
-        '-cb', '--clean-before',
-        required=False,
-        type=str,
-        default='t_%',
-        help="Clean existing tables before running. Optional: Default: t_*"
-    )
-
-    quick_group.add_argument(
-        '-ca', '--clean-after',
-        required=False,
-        type=str,
-        default='t_%',
-        help="Clean existing tables after running. Optional: Default: t_*"
-    )
-    
-    quick_group.add_argument(
-        '-q', '--quiet',
-        action='store_true',
-        default='False',
-        help='Quiet mode. Minimal Console output'
-    )
-
-    quick_group.add_argument(
-        '-s', '--seed',
-        type=int,
-        default=None,
-        help='Seed used to generate pseudo-randomness.'
-    )
-
-    return parser.parse_args()
-
 def run_all():
+    ### parse args and config
     args = parse_args()
-
-    # parse config
+    print(args)
     try:
         db_config = load_config(args.dbconfig)    
     except Exception as e:
         print(f"Error loading config: {e}")
         exit(1)
 
-    # start test engine with specific configuration
+    ### start test engine with specific configuration
     runner = ExperimentRunner(db_config, args)
 
     # clean db before using
-    if args.cb:
-        runner.clean_tables(db_config)
+    if args.clean_before:
+        runner.clean_tables(db_config, args.clean_before)
 
 
+    # run experiments in experiment config.yaml, or based on flag input
+    if args.quick:
+        quick_experiment = create_quick_experiment(args)
+    else:
+        experiments = load_experiments_from_file(args)
+
+
+    ### run experiments
     # create different trials objects we want to test with different parameters modifies
-    trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
-                                interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=True,
-                                num_trials=2, gap_size_range=(0,5), gap_size=None)
+    # trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
+    #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=True,
+    #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
 
-    trial2 = ExperimentSettings(name="test2", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
-                                interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=True,
-                                num_trials=2, gap_size_range=(0,5), gap_size=None)
+    # trial2 = ExperimentSettings(name="test2", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
+    #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=True,
+    #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
     
-    # create different trials objects we want to test with different parameters modifies
-    trial3 = ExperimentSettings(name="test3", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
-                                interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=False,
-                                num_trials=2, gap_size_range=(0,5), gap_size=None)
+    # # create different trials objects we want to test with different parameters modifies
+    # trial3 = ExperimentSettings(name="test3", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
+    #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=False,
+    #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
 
-    trial4 = ExperimentSettings(name="test4", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
-                                interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=False,
-                                num_trials=2, gap_size_range=(0,5), gap_size=None)
+    # trial4 = ExperimentSettings(name="test4", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
+    #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=False,
+    #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
     
-    runner.run_experiment(trial1)
-    runner.run_experiment(trial2)
-    runner.run_experiment(trial3)
-    runner.run_experiment(trial4)
+    # runner.run_experiment(trial1)
+    # runner.run_experiment(trial2)
+    # runner.run_experiment(trial3)
+    # runner.run_experiment(trial4)
 
     # runner.clean_tables(db_config)
 
 
 if __name__ == '__main__':    
-    args = parse_args()
-
-    
-    
-    # run_all()
+    run_all()
 
 
 # python3 main.py --quick -dt r -nt 5 -sz 200 -ur .40 -nir (1,5) -gsr (0, 10) -msr (0, 5) -isr (1, 200) -csv -ddl -cb -ca 
