@@ -18,7 +18,7 @@ class ExperimentSettings:
     name: str                       # required 
     data_type: DataType             # always Set or Range
     num_trials: int = 1             # always fixed
-    dataset_size: int = 1           # always fixed
+    dataset_size: int = 100           # always fixed
     uncertain_ratio: float = 0.00   # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
     
     # use these value if not None, otherwise use tuple if not None, both none = error
@@ -31,16 +31,16 @@ class ExperimentSettings:
     mult_size_range: tuple = None   # required 
     interval_size_range: tuple = None
 
-    make_csv: None = str          # always T or F
-    mode: None = str      # always T or F
+    make_csv: str = None          # always T or F
+    mode: str = None      # always T or F
+    insert_to_db: bool = False
 
-    insert_to_db = False
 
 class ExperimentRunner:
     '''
         ExperimentRunner runs entire or parts of a test (gen_data, insert_db) by taking an ExperimentSettings
     '''
-    def __init__(self, db_config, args):
+    def __init__(self, db_config):
         self.db_config = db_config
         self.results = []
 
@@ -57,13 +57,13 @@ class ExperimentRunner:
         
         for i in range(experiment.dataset_size):
             if experiment.data_type == DataType.RANGE:
-                obj = self.generate_range(experiment)
+                obj = self.__generate_range(experiment)
                 val = str(obj) if not obj.isNone else None
             elif experiment.data_type == DataType.SET:
-                obj = self.generate_set(experiment)
+                obj = self.__generate_set(experiment)
                 val = str(obj) if (obj.rset and not getattr(obj, 'isNone', False)) else None
 
-            mult_obj = self.generate_mult(experiment)
+            mult_obj = self.__generate_mult(experiment)
             mult = str(mult_obj)
             db_formatted_rows.append((val, mult))
             
@@ -143,7 +143,7 @@ class ExperimentRunner:
                 file.write(';\n\n')
         
     # generate an i4r. can also use psycopg.extras range type: https://www.psycopg.org/docs/extras.html#range-data-types
-    def generate_range(self, experiment:ExperimentSettings) -> RangeType:
+    def __generate_range(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
             return RangeType(0, 0, True)
@@ -152,7 +152,7 @@ class ExperimentRunner:
         ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
         return RangeType(lb, ub)
     
-    def generate_set(self, experiment:ExperimentSettings) -> RangeSetType:
+    def __generate_set(self, experiment:ExperimentSettings) -> RangeSetType:
         # if experiment.num_intervals is not None then use, otherwise if experiment.num_intervals_range then use. otherwise raise error
         if experiment.num_intervals is not None:
             num_intervals = experiment.num_intervals
@@ -175,7 +175,7 @@ class ExperimentRunner:
         
         return RangeSetType(rset, cu=False)
 
-    def generate_mult(self, experiment:ExperimentSettings) -> RangeType:
+    def __generate_mult(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
             return RangeType(0, 0, True)
@@ -218,7 +218,6 @@ def create_experiment_name(experiment: ExperimentSettings):
 def run_all():
     ### parse args and config
     args = parse_args()
-    print(args)
     try:
         db_config = load_config(args.dbconfig)    
     except Exception as e:
@@ -226,49 +225,23 @@ def run_all():
         exit(1)
 
     ### start test engine with specific configuration
-    runner = ExperimentRunner(db_config, args)
+    runner = ExperimentRunner(db_config)
 
     # clean db before using
     if args.clean_before:
         runner.clean_tables(db_config, args.clean_before)
 
-
     # run experiments in experiment config.yaml, or based on flag input
     if args.quick:
-        quick_experiment = create_quick_experiment(args)
+        experiments = create_quick_experiment(args)
     else:
-        experiments = load_experiments_from_file(args)
+        experiments = load_experiments_from_file(args.experiments_file)
 
-
-    ### run experiments
-    # create different trials objects we want to test with different parameters modifies
-    # trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
-    #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=True,
-    #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
-
-    # trial2 = ExperimentSettings(name="test2", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
-    #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=True,
-    #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
-    
-    # # create different trials objects we want to test with different parameters modifies
-    # trial3 = ExperimentSettings(name="test3", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
-    #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=False,
-    #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
-
-    # trial4 = ExperimentSettings(name="test4", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
-    #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), make_csv=False, insert_to_db=False,
-    #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
-    
-    # runner.run_experiment(trial1)
-    # runner.run_experiment(trial2)
-    # runner.run_experiment(trial3)
-    # runner.run_experiment(trial4)
-
-    # runner.clean_tables(db_config)
-
-
+    # Only run specific mode of ExperimentRunner
+    for exp_name, experiment in experiments.items():
+        runner.run_experiment(experiment)
+        
 if __name__ == '__main__':    
     run_all()
 
-
-# python3 main.py --quick -dt r -nt 5 -sz 200 -ur .40 -nir (1,5) -gsr (0, 10) -msr (0, 5) -isr (1, 200) -csv -ddl -cb -ca 
+# main.py --quick -dt r -nt 5 -sz 200 -ur .40 -nir 1 5 -gsr 0 10 -msr 0 5 -isr 1 200 -csv out.csv -ddl ddl.csv -ca     

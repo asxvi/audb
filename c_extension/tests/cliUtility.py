@@ -178,13 +178,12 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_quick_experiment(args: argparse.Namespace) -> ExperimentSettings:
+def create_quick_experiment(args: argparse.Namespace) -> dict:
     '''
-        parses the arguments into a ExperimentSettings object
+        parses the arguments from CLI into a single item dict {exp_nameTS: ExperimentSettings}
     '''
     name = f"quick_{time.strftime('%Y%m%d_%H%M%S')}"
-
-    return ExperimentSettings(
+    experiment = ExperimentSettings(
         name=name,
         data_type= DataType.RANGE if args.data_type=='range' or 'r' else DataType.SET,
         num_trials=args.num_trials,
@@ -200,7 +199,45 @@ def create_quick_experiment(args: argparse.Namespace) -> ExperimentSettings:
         mode=args.mode
     )
 
+    return {name: experiment}
 
-def load_experiments_from_file(args: argparse.Namespace) -> ExperimentSettings:
-    with open()    
+def load_experiments_from_file(filepath: str) -> dict:
+    '''
+        Opens specified config file, looks for 'experiments' target, returns a dict(name: ExperimentSettings)
+    '''
+    
+    with open(filepath, 'r') as file:
+        config = yaml.safe_load(file)
 
+    experiments = {}    
+
+    for exp_config in config['experiments']:
+        name = exp_config['name']
+        if exp_config['data_type'] == 'RANGE':
+            datatype = DataType.RANGE 
+        elif exp_config['data_type'] == 'SET':
+            datatype = DataType.SET 
+        else:
+            raise Exception(f'Invalid DataType in {filepath}. View DataTypes.py.')
+        
+        experiments[name] = ExperimentSettings(
+            name=name, 
+            data_type=datatype,
+            num_trials=exp_config.get('num_trials', 1),
+            dataset_size=exp_config.get('dataset_size', 100),
+            uncertain_ratio=exp_config.get('uncertain_ratio', 0.0),
+
+            num_intervals=exp_config.get('num_intervals', None),
+            gap_size=exp_config.get('gap_size', None),
+            
+            num_intervals_range=tuple(exp_config['num_intervals_range']) if 'num_intervals_range' in exp_config else None,
+            gap_size_range=tuple(exp_config['gap_size_range']) if 'gap_size_range' in exp_config else None,
+            mult_size_range=tuple(exp_config.get('mult_size_range', None)),
+            interval_size_range=tuple(exp_config.get('interval_size_range', None)),
+
+            make_csv=exp_config.get('make_csv', False),
+            mode=exp_config.get('mode', None),
+            insert_to_db=exp_config.get('insert_to_db', False),
+        )
+
+    return experiments
