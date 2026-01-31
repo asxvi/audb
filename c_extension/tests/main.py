@@ -1,15 +1,14 @@
 # naming q_n1000_i2
 
-import itertools
-import pandas as pd
+import argparse
+import os
+from enum import Enum
 import psycopg2
 import psycopg2.extras
+import itertools
+import numpy as np
 from configparser import ConfigParser
 from dataclasses import dataclass
-import numpy as np
-from enum import Enum
-import os
-import datetime
 
 '''
     local represention of postres RangeType. helper methods include arithmetic,
@@ -136,12 +135,6 @@ class RangeSetType:
     def __repr__(self):
         return f"{self.rset}"
     
-    # def __str__(self):
-    #     return f"{self.rset}"
-    #     # items = [f'"{str(i)}"' for i in self.rset]
-    #     # return "{" + ",".join(items) + "}"
-
-
     def __str__(self):
         if not self.rset or len(self.rset) == 0:
             return "{}"
@@ -151,8 +144,7 @@ class RangeSetType:
             if r.isNone:
                 items.append("NULL")
             else:
-                # Postgres array literal format: {"[1,2]", "[3,4]"}
-                # We wrap the range string in double quotes
+                # Postgres array format: {"[1,2]", "[3,4]"}
                 items.append(f'"{str(r)}"')
                 
         return "{" + ",".join(items) + "}"
@@ -557,5 +549,68 @@ def create_experiment_name(experiment: ExperimentSettings):
 
     # change up params, creating new experiment config...
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="AUDB Extension Experiment Runner", )
+
+    input_params
+
+
+    # output options
+    parser.add_argument(
+        '--save_csv',
+        type=str,
+        default='data',
+        help='Directory for output files (default: data/)'
+    )
+
+    parser.add_argument(
+        '--save_ddl',
+        type=str,
+        default='data',
+        help='Directory for DDL code (default: data/)'
+    )
+
+    # database options
+    parser.add_argument(
+        '--dbconfig',
+        type=str,
+        default='database.ini',
+        help='Database configuration file. (*.ini)'
+    )
+
+    parser.add_argument(
+        '--clean-before',
+        action='store_true',
+        help='Clean existing tables before running'
+    )
+
+    parser.add_argument(
+        '--clean-after',
+        action='store_true',
+        help='Clean tables after running'
+    )
+
+    
+    parser.add_argument(
+        '-q', '--quiet',
+        action='store_true',
+        default='False',
+        help='Quiet mode. Minimal Console output'
+    )
+
+    parser.add_argument(
+        '-s', '--seed',
+        type=int,
+        default=None,
+        help='Seed used to generate pseudo-randomness.'
+    )
+
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
-    run_all()
+    args = parse_args()
+    print(args)
+    
+    # run_all()
