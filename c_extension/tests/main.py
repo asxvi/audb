@@ -1,4 +1,5 @@
 # naming q_n1000_i2
+import random
 import os
 import psycopg2
 import psycopg2.extras
@@ -15,36 +16,35 @@ class ExperimentSettings:
         if num_intervals is used, num_intervals_range shouldn't be used
         if gap_size is used, gap_size_range shouldn't be used
     '''
-    name: str                       # required 
-    data_type: DataType             # always Set or Range
-    num_trials: int = 1             # always fixed
-    dataset_size: int = 100           # always fixed
-    uncertain_ratio: float = 0.00   # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
+    name: str                           # required 
+    data_type: DataType                 # always Set or Range
+    num_trials: int = 1                 # always fixed
+    dataset_size: int = 100             # always fixed
+    uncertain_ratio: float = 0.00       # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
+    interval_size_range: tuple = (1, 100)
+    mult_size_range: tuple = (1,5)      # required 
     
     # use these value if not None, otherwise use tuple if not None, both none = error
     num_intervals: int = None       
     gap_size: int = None
-
     # use if scalars are None and tuples are not None, both none = error
     num_intervals_range: tuple = None
     gap_size_range: tuple = None    
-    mult_size_range: tuple = None   # required 
-    interval_size_range: tuple = None
 
-    make_csv: str = None          # always T or F
-    mode: str = None      # always T or F
-    insert_to_db: bool = False
+    mode: str = None                # what modes of test suite to execute
+    save_ddl:bool = False           # store ddl code to make tables 
+    save_csv: bool = False          # store csv with statistics and results of test
+    # insert_to_db: bool = False      # this is actually stupid, but currently code relies on this
 
 
 class ExperimentRunner:
     '''
         ExperimentRunner runs entire or parts of a test (gen_data, insert_db) by taking an ExperimentSettings
     '''
-    def __init__(self, db_config):
+    def __init__(self, db_config, seed):
         self.db_config = db_config
         self.results = []
-
-        self.ddl_files = False
+        self.master_seed = seed
 
     def generate_data(self, experiment :ExperimentSettings, trial: int):
         '''
@@ -67,8 +67,8 @@ class ExperimentRunner:
             mult = str(mult_obj)
             db_formatted_rows.append((val, mult))
             
-            # change when cli utility
-            if not experiment.insert_to_db:
+            # save in ddl preffered format if requested
+            if experiment.save_ddl:
                 val = obj.str_ddl()
                 mult = mult_obj.str_ddl()
                 file_formatted_rows.append((val, mult))
@@ -89,12 +89,12 @@ class ExperimentRunner:
                     # seed_str = f"{experiment.name}_{trial+1}"
                     db_data_format, file_data_format = self.generate_data(experiment, trial+1)
 
-                    if self.ddl_files or not experiment.insert_to_db:
-                        print("file")
+                    # save in ddl compatible format. Insert into DB regardless... need to run tests
+                    if experiment.save_ddl:
+                        print("ddl")
                         self.insert_data_file(experiment, trial+1, file_data_format)
-                    else:
-                        print("db")
-                        self.insert_data_db(experiment, trial+1, db_data_format)
+                    
+                    self.insert_data_db(experiment, trial+1, db_data_format)
     
     def insert_data_db(self, experiment: ExperimentSettings, trial, data):
         '''Insert data into database specified in config file'''
@@ -147,7 +147,7 @@ class ExperimentRunner:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
             return RangeType(0, 0, True)
-        
+
         lb = np.random.randint(*experiment.interval_size_range)
         ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
         return RangeType(lb, ub)
@@ -218,6 +218,12 @@ def create_experiment_name(experiment: ExperimentSettings):
 def run_all():
     ### parse args and config
     args = parse_args()
+
+    if args.seed:
+        master_seed = generate_seed(args.seed)
+    else:
+        master_seed = generate_seed()
+    
     try:
         db_config = load_config(args.dbconfig)    
     except Exception as e:
@@ -225,7 +231,7 @@ def run_all():
         exit(1)
 
     ### start test engine with specific configuration
-    runner = ExperimentRunner(db_config)
+    runner = ExperimentRunner(db_config, master_seed)
 
     # clean db before using
     if args.clean_before:
@@ -238,10 +244,24 @@ def run_all():
         experiments = load_experiments_from_file(args.experiments_file)
 
     # Only run specific mode of ExperimentRunner
-    for exp_name, experiment in experiments.items():
+    for name, experiment in experiments.items():
+        print(experiment)
         runner.run_experiment(experiment)
+
+
+def generate_seed(in_seed=None):
+    if in_seed is not None:
+        seed = in_seed
+    else:
+        seed = int(time.time() * 1000) % (2**32)
         
+    random.seed(seed)
+    np.random.seed(seed)
+    
+    return seed
+
+
 if __name__ == '__main__':    
     run_all()
 
-# main.py --quick -dt r -nt 5 -sz 200 -ur .40 -nir 1 5 -gsr 0 10 -msr 0 5 -isr 1 200 -csv out.csv -ddl ddl.csv -ca     
+# main.py --quick -dt r -nt 5 -sz 2 -ur .0 -ca        

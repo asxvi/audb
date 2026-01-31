@@ -7,13 +7,21 @@ import time
 import argparse
 import yaml
 from configparser import ConfigParser
+import os
 
 from DataTypes import DataType
 from main import ExperimentRunner, ExperimentSettings
 
+def find(name, path):
+    for root, dirs, files in os.walk(path):
+        if name in files:
+            return os.path.join(root, name)
+
 def load_config(filename='database.ini', section='postgresql'):
+    filepath = find(filename, '.')
+    
     parser = ConfigParser()
-    parser.read(filename)
+    parser.read(filepath)
 
     config = {} 
     if parser.has_section(section):
@@ -21,7 +29,7 @@ def load_config(filename='database.ini', section='postgresql'):
         for param in params:
             config[param[0]] = param[1]
     else:
-        raise Exception(f'Section {section} not found in the {filename} file')
+        raise Exception(f'Section {section} not found in the {filename} file in {filepath}')
     return config
 
 def positive_int(value):
@@ -104,30 +112,42 @@ def parse_args():
     quick_group.add_argument(
         '-msr', '--mult-size-range',
         required=False,
+        default=(1,5),
         type=positive_int,
         nargs=2,
-        help='Bounds for possible multiplicity range. Ex: -msr lb ub'
+        help='Bounds for possible multiplicity range. Ex: -msr lb ub (Default=(1,5))'
     )
     quick_group.add_argument(
         '-isr', '--interval-size-range',
         required=False,
+        default=(1,100),
         type=positive_int,
         nargs=2,
-        help='Bounds for possible interval size. Ex: -isr a b'
+        help='Bounds for possible interval size. Ex: -isr a b (Default=(1,100))'
     )
     
     # output options
     quick_group.add_argument(
         '-csv', '--save_csv',
+        required=False,
         type=str,
         default='data',
         help='Directory for output files (default: data/)'
     )
 
+    # quick_group.add_argument(
+    #     '-ddl', '--save_ddl',
+    #     required=False,
+    #     type=str,
+    #     default='data',
+    #     help='Directory for DDL code (default: data/)'
+    # )
+
     quick_group.add_argument(
         '-ddl', '--save_ddl',
-        type=str,
-        default='data',
+        required=False,
+        action='store_true',
+        default=False,
         help='Directory for DDL code (default: data/)'
     )
 
@@ -137,6 +157,12 @@ def parse_args():
         type=str,
         default='database.ini',
         help='Database configuration file. (*.ini) (Default=database.ini)'
+    )
+    quick_group.add_argument(
+        '-idb', '--insert-to-db',
+        action='store_true',
+        default=False,
+        help='Insert data into Database. (Default=False)'
     )
     quick_group.add_argument(
         '-cb', '--clean-before',
@@ -195,17 +221,19 @@ def create_quick_experiment(args: argparse.Namespace) -> dict:
         gap_size_range=args.gap_size_range,
         mult_size_range=args.mult_size_range,
         interval_size_range=args.interval_size_range,
-        make_csv=args.save_csv,
+        save_csv=args.save_csv,
+        save_ddl= args.save_ddl,
+        # insert_to_db=args.insert_to_db,
         mode=args.mode
     )
 
     return {name: experiment}
 
-def load_experiments_from_file(filepath: str) -> dict:
+def load_experiments_from_file(filename: str) -> dict:
     '''
         Opens specified config file, looks for 'experiments' target, returns a dict(name: ExperimentSettings)
     '''
-    
+    filepath = find(filename, '.')
     with open(filepath, 'r') as file:
         config = yaml.safe_load(file)
 
@@ -233,11 +261,13 @@ def load_experiments_from_file(filepath: str) -> dict:
             num_intervals_range=tuple(exp_config['num_intervals_range']) if 'num_intervals_range' in exp_config else None,
             gap_size_range=tuple(exp_config['gap_size_range']) if 'gap_size_range' in exp_config else None,
             mult_size_range=tuple(exp_config.get('mult_size_range', None)),
-            interval_size_range=tuple(exp_config.get('interval_size_range', None)),
+            interval_size_range=tuple(exp_config.get('interval_size_range', (1,100))),
 
-            make_csv=exp_config.get('make_csv', False),
+            save_ddl=exp_config.get('save_ddl', None),
+            save_csv=exp_config.get('make_csv', None),
+            # insert_to_db=exp_config.get('insert_to_db', False),
+            
             mode=exp_config.get('mode', None),
-            insert_to_db=exp_config.get('insert_to_db', False),
         )
 
     return experiments
