@@ -259,11 +259,13 @@ class ExperimentRunner:
             raise ValueError()
         
         rset = []
+        
         # FIXME account for gapsize
+
         for i in range(num_intervals):    
             # uncertain ratio. maybe should account for half nulls, half mult 0
             if np.random.random() < experiment.uncertain_ratio * 0.5:  
-                rset.append(RangeType(0,0,True))
+                # rset.append(RangeType(0,0,True))
                 continue
             
             lb = np.random.randint(*experiment.interval_size_range)
@@ -352,7 +354,7 @@ class ExperimentRunner:
         os.makedirs(experiment_folder_path, exist_ok=True)        
         
         df = pd.DataFrame(self.results)
-        df.to_csv(f'{experiment_folder_path}/{out_file}', index=True)
+        df.to_csv(f'{experiment_folder_path}/{out_file}.csv', index=True)
 
         return f'{experiment_folder_path}/{out_file}'
 
@@ -445,4 +447,5 @@ def generate_seed(in_seed=None):
 if __name__ == '__main__':    
     run_all()
 
-# main.py --quick -dt r -nt 5 -sz 2 -ur .0 -ca        
+# python3 main.py --quick -dt r -nt 5 -sz 2 -ur .0 -ca        
+# python3 main.py -xf tests_config.yaml -cb   

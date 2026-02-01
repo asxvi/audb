@@ -46,7 +46,7 @@ experiments:
   - name: s_small_100
     data_type: SET
     dataset_size: 100
-    uncertain_ratio: 0.00
+    uncertain_ratio: 0.5
     mult_size_range: [1, 5]
     interval_size_range: [1, 50]
     num_intervals: 2
@@ -56,49 +56,100 @@ experiments:
     save_csv: false
     mode: all
 
-  # - name: s_medium_1000
-  #   data_type: SET
-  #   dataset_size: 1000
-  #   uncertain_ratio: 0.0
-  #   mult_size_range: [1, 5]
-  #   interval_size_range: [1, 50]
-  #   num_intervals_range: [1, 4]
-  #   gap_size_range: [0, 15]
-  #   num_trials: 3
-  #   insert_to_db: true
-  #   save_csv: false
-  #   mode: all
+  - name: s_medium_1000
+    data_type: SET
+    dataset_size: 1000
+    uncertain_ratio: 0.0
+    mult_size_range: [1, 5]
+    interval_size_range: [1, 50]
+    num_intervals: 2
+    gap_size_range: [0, 15]
+    num_trials: 3
+    insert_to_db: true
+    save_csv: false
+    mode: all
 
-  # - name: s_large_10000
-  #   data_type: SET
-  #   dataset_size: 10000
-  #   uncertain_ratio: 0.0
-  #   mult_size_range: [1, 5]
-  #   interval_size_range: [1, 50]
-  #   num_intervals_range: [1, 4]
-  #   gap_size_range: [0, 15]
-  #   num_trials: 3
-  #   insert_to_db: true
-  #   save_csv: false
-  #   mode: all
+  - name: s_large_10000
+    data_type: SET
+    dataset_size: 10000
+    uncertain_ratio: 0.0
+    mult_size_range: [1, 5]
+    interval_size_range: [1, 50]
+    num_intervals: 2
+    gap_size_range: [0, 15]
+    num_trials: 3
+    insert_to_db: true
+    save_csv: false
+    mode: all
 
+  - name: s_xl_25000
+    data_type: SET
+    dataset_size: 25000
+    uncertain_ratio: 0.0
+    mult_size_range: [1, 5]
+    interval_size_range: [1, 50]
+    num_intervals: 2
+    gap_size_range: [0, 15]
+    num_trials: 3
+    insert_to_db: true
+    save_csv: false
+    mode: all
 
-# ### run experiments
-#   # create different trials objects we want to test with different parameters modifies
-#   # trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
-#   #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, insert_to_db=True,
-#   #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
+  - name: s_xxl_50000
+    data_type: SET
+    dataset_size: 50000
+    uncertain_ratio: 0.0
+    mult_size_range: [1, 5]
+    interval_size_range: [1, 50]
+    num_intervals: 2
+    gap_size_range: [0, 15]
+    num_trials: 3
+    insert_to_db: true
+    save_csv: false
+    mode: all
 
-#   # trial2 = ExperimentSettings(name="test2", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
-#   #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, insert_to_db=True,
-#   #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
+  - name: s_xxxl_100000
+    data_type: SET
+    dataset_size: 100000
+    uncertain_ratio: 0.0
+    mult_size_range: [1, 5]
+    interval_size_range: [1, 50]
+    num_intervals: 2
+    gap_size_range: [0, 15]
+    num_trials: 3
+    insert_to_db: true
+    save_csv: false
+    mode: all
+
+  - name: s_4xl_150000
+    data_type: SET
+    dataset_size: 150000
+    uncertain_ratio: 0.0
+    mult_size_range: [1, 5]
+    num_intervals: 2
+    num_intervals_range: [1, 4]
+    gap_size_range: [0, 15]
+    num_trials: 3
+    insert_to_db: true
+    save_csv: false
+    mode: all
+
+### run experiments
+  # create different trials objects we want to test with different parameters modifies
+  # trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
+  #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, insert_to_db=True,
+  #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
+
+  # trial2 = ExperimentSettings(name="test2", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
+  #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, insert_to_db=True,
+  #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
   
-#   # # create different trials objects we want to test with different parameters modifies
-#   # trial3 = ExperimentSettings(name="test3", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
-#   #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, insert_to_db=False,
-#   #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
+  # # create different trials objects we want to test with different parameters modifies
+  # trial3 = ExperimentSettings(name="test3", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
+  #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, insert_to_db=False,
+  #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
 
-#   # trial4 = ExperimentSettings(name="test4", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
-#   #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, insert_to_db=False,
-#   #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
+  # trial4 = ExperimentSettings(name="test4", data_type=DataType.SET, dataset_size=10, uncertain_ratio=0.3, mult_size_range=(1,5),
+  #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, insert_to_db=False,
+  #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
   
