@@ -146,9 +146,7 @@ class ExperimentRunner:
                 with conn.cursor() as cur:
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
-                    
                     if experiment.data_type == DataType.RANGE:
-                        
                         # MIN
                         start = time.perf_counter()
                         cur.execute(f"SELECT MIN(combine_range_mult_min(val, mult)) from {table}")
@@ -261,6 +259,7 @@ class ExperimentRunner:
             raise ValueError()
         
         rset = []
+        # FIXME account for gapsize
         for i in range(num_intervals):    
             # uncertain ratio. maybe should account for half nulls, half mult 0
             if np.random.random() < experiment.uncertain_ratio * 0.5:  

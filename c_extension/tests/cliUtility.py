@@ -269,10 +269,9 @@ def load_experiments_from_file(filename: str) -> dict:
             interval_size_range=tuple(exp_config.get('interval_size_range', (1,100))),
 
             save_ddl=exp_config.get('save_ddl', None),
-            save_csv=exp_config.get('make_csv', None),
-            # insert_to_db=exp_config.get('insert_to_db', False),
-            
+            save_csv=exp_config.get('save_csv', None),
             mode=exp_config.get('mode', None),
+            # insert_to_db=exp_config.get('insert_to_db', False),
         )
 
     return experiments
