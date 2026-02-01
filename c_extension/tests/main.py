@@ -18,6 +18,7 @@ class ExperimentSettings:
     '''
     name: str                           # required 
     data_type: DataType                 # always Set or Range
+    experiment_id: str = None           # unique string name that identifies specific experiment
     num_trials: int = 1                 # always fixed
     dataset_size: int = 100             # always fixed
     uncertain_ratio: float = 0.00       # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
@@ -45,13 +46,13 @@ class ExperimentRunner:
         self.db_config = db_config
         self.results = []
         self.master_seed = seed
+        self.trial_seed = None
 
     def generate_data(self, experiment :ExperimentSettings, trial: int):
         '''
             Generates pseudorandom data based on user specified experiment settings. 
             * NOTE Specfic data serialization for different formats (i.e file and db ddl differs)
         '''
-        # add reprod hash
         db_formatted_rows = []
         file_formatted_rows = []
         
@@ -77,16 +78,18 @@ class ExperimentRunner:
 
     def run_experiment(self, experiment :ExperimentSettings) -> list:
         '''an experiement has N trials. gen data for each trial, run queries//benchmark results, and append to results'''    
-        print(f"\n{'='*40}")
-        print(f"Experiment: {experiment.name}")
-        print(f"{'='*40}")
-        
         trial_results = []
 
+        # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
         with self.connect_db() as conn:
             with conn.cursor() as cur:
                 for trial in range(experiment.num_trials):    
-                    # seed_str = f"{experiment.name}_{trial+1}"
+                    
+                    # create a trial seed dependent on the master seed, and specific trial number
+                    self.trial_seed = (self.master_seed + trial + 1) % (2**32)
+                    np.random.seed(self.trial_seed)
+                    experiment.experiment_id = self.__generate_name(experiment, trial+1)
+
                     db_data_format, file_data_format = self.generate_data(experiment, trial+1)
 
                     # save in ddl compatible format. Insert into DB regardless... need to run tests
@@ -100,7 +103,7 @@ class ExperimentRunner:
         '''Insert data into database specified in config file'''
         with self.connect_db() as conn:
             with conn.cursor() as cur:
-                table_name = f"t_{experiment.name}_trial_{trial}"
+                table_name = experiment.experiment_id
                 cur.execute(f"DROP TABLE IF EXISTS {table_name};")
 
                 if experiment.data_type == DataType.RANGE:
@@ -115,16 +118,16 @@ class ExperimentRunner:
                 conn.commit()
 
     def insert_data_file(self, experiment: ExperimentSettings, trial, data):
-        """Write data to SQL file for later loading
-        
-        * FIX filename when make name funcion works
+        """
+            Write data to SQL file for later loading
         """
 
-        os.makedirs(f'data/{experiment.name}', exist_ok=True)        
-        table_name = f"t_{experiment.name}_trial_{trial}"
-        filename = f"data/{experiment.name}/{table_name}.sql"
+        experiment_folder_path = f'data/{experiment.name + "_s" + str(self.master_seed)}'
+        table_name = experiment.experiment_id
+        os.makedirs(experiment_folder_path, exist_ok=True)        
+        filepath = f"{experiment_folder_path}/{table_name}.sql"
             
-        with open(filename, 'w') as file:
+        with open(filepath, 'w') as file:
             if experiment.data_type == DataType.RANGE:
                 file.write(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range, mult int4range);\n\n")
             elif experiment.data_type == DataType.SET:
@@ -142,7 +145,6 @@ class ExperimentRunner:
                 file.write(',\n'.join(values))
                 file.write(';\n\n')
         
-    # generate an i4r. can also use psycopg.extras range type: https://www.psycopg.org/docs/extras.html#range-data-types
     def __generate_range(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
@@ -207,13 +209,13 @@ class ExperimentRunner:
                     print(f"Error cleaning tables: {e}")
                     conn.rollback()
 
+    def __generate_name(self, experiment: ExperimentSettings, trialNum: int) -> str:
+        '''
+            name format: t_experiment.name_{r | s}_{tX}_{master.seed}_{trial.seed}
+        '''
+        dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
 
-def create_experiment_name(experiment: ExperimentSettings):
-    dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
-    # seed = np.random.seed()
-    return f"t_{experiment.name}_{dtype}_n{experiment.dataset_size}"
-
-    # change up params, creating new experiment config...
+        return f"t_{experiment.name}_{dtype}_t{trialNum}_s{self.master_seed}_ts{self.trial_seed}"
 
 def run_all():
     ### parse args and config
@@ -245,11 +247,14 @@ def run_all():
 
     # Only run specific mode of ExperimentRunner
     for name, experiment in experiments.items():
-        print(experiment)
+        # experiment.name = runner.__generate_name(experiment)
         runner.run_experiment(experiment)
 
 
 def generate_seed(in_seed=None):
+    '''
+        genrate the master seed of this programs run. (can be included in runner or settings class)
+    '''
     if in_seed is not None:
         seed = in_seed
     else:
