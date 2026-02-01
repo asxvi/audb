@@ -47,7 +47,7 @@ def parse_args():
 
     exp_group = parser.add_mutually_exclusive_group(required=True)
     exp_group.add_argument(
-        '--experiments-file',
+        '-xf', '--experiments-file',
         type=str,
         help="YAML file with defined experiments"
     )
@@ -55,6 +55,11 @@ def parse_args():
         '--quick',
         action='store_true',
         help="Quick run experiment fully defined with CLI flags"
+    )
+    exp_group.add_argument(
+        '--code',
+        action='store_true',
+        help="Use inline code to run experiment. Good for range based testing."
     )
 
     quick_group = parser.add_argument_group("Quick experiment options (must use --quick)")

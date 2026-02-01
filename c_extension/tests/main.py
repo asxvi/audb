@@ -1,9 +1,12 @@
 # naming q_n1000_i2
+import csv
 import random
+import time
 import os
 import psycopg2
 import psycopg2.extras
 import numpy as np
+import pandas as pd
 from dataclasses import dataclass
 
 from cliUtility import *
@@ -18,6 +21,7 @@ class ExperimentSettings:
     '''
     name: str                           # required 
     data_type: DataType                 # always Set or Range
+    curr_trial: int = 0                 # keep track locally 
     experiment_id: str = None           # unique string name that identifies specific experiment
     num_trials: int = 1                 # always fixed
     dataset_size: int = 100             # always fixed
@@ -37,6 +41,24 @@ class ExperimentSettings:
     save_csv: bool = False          # store csv with statistics and results of test
     # insert_to_db: bool = False      # this is actually stupid, but currently code relies on this
 
+    def asdict(self):
+        dt = 'range' if self.data_type == DataType.RANGE else 'set'
+        return {
+            'name': self.name,
+            'data_type': dt,
+            'curr_trial': self.curr_trial,
+            'experiment_id': self.experiment_id,
+            'num_trials': self.num_trials,
+            'dataset_size': self.dataset_size,
+            'uncertain_ratio': self.uncertain_ratio,
+            "interval_size_range": self.interval_size_range,
+            'mult_size_range': self.mult_size_range,
+            'num_intervals': self.num_intervals,
+            'gap_size': self.gap_size,
+            'num_intervals_range': self.num_intervals_range,
+            'gap_size_range': self.gap_size_range
+        }
+
 
 class ExperimentRunner:
     '''
@@ -48,7 +70,37 @@ class ExperimentRunner:
         self.master_seed = seed
         self.trial_seed = None
 
-    def generate_data(self, experiment :ExperimentSettings, trial: int):
+    def run_experiment(self, experiment :ExperimentSettings) -> list:
+        '''an experiement has N trials. gen data for each trial, run queries//benchmark results, and append to results'''    
+        # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
+        experiment_results = []
+        for trial in range(experiment.num_trials):    
+            # create a trial seed dependent on the master seed, and specific trial number
+            self.trial_seed = (self.master_seed + experiment.curr_trial + 1) % (2**32)
+            np.random.seed(self.trial_seed)
+            experiment.curr_trial = trial+1
+            experiment.experiment_id = self.__generate_name(experiment)
+            
+            # get randomly generated data for curr seed
+            db_data_format, file_data_format = self.generate_data(experiment)
+
+            # save in ddl compatible format. Insert into DB regardless... need to run tests
+            if experiment.save_ddl:
+                print("ddl")
+                self.insert_data_file(experiment, file_data_format)
+            
+            self.insert_data_db(experiment, db_data_format)
+
+            # run queries and benchmark
+            trial_results = self.run_queries(experiment)
+            experiment_results.append(trial_results)
+
+        aggregated_results = self.__calc_aggregate_results(experiment, experiment_results)
+        self.results.append(aggregated_results)
+
+        return experiment_results
+
+    def generate_data(self, experiment :ExperimentSettings):
         '''
             Generates pseudorandom data based on user specified experiment settings. 
             * NOTE Specfic data serialization for different formats (i.e file and db ddl differs)
@@ -76,30 +128,77 @@ class ExperimentRunner:
                 
         return db_formatted_rows, file_formatted_rows
 
-    def run_experiment(self, experiment :ExperimentSettings) -> list:
-        '''an experiement has N trials. gen data for each trial, run queries//benchmark results, and append to results'''    
-        trial_results = []
-
-        # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
-        with self.connect_db() as conn:
-            with conn.cursor() as cur:
-                for trial in range(experiment.num_trials):    
+    def run_queries(self, experiment: ExperimentSettings):
+        '''Run same aggregation tests on both DataTypes.'''
+        
+        results = {
+            'row_count' : 0,
+            'min_time' : None,
+            'min_result' : None,
+            'max_time' : None,
+            'max_result' : None,
+            'sum_time' : None,
+            'sum_result' : None,
+        }
+        table = experiment.experiment_id
+        try:
+            with self.connect_db() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(f"SELECT COUNT(*) FROM {table};")
+                    results['row_count'] = cur.fetchone()[0]
                     
-                    # create a trial seed dependent on the master seed, and specific trial number
-                    self.trial_seed = (self.master_seed + trial + 1) % (2**32)
-                    np.random.seed(self.trial_seed)
-                    experiment.experiment_id = self.__generate_name(experiment, trial+1)
+                    if experiment.data_type == DataType.RANGE:
+                        
+                        # MIN
+                        start = time.perf_counter()
+                        cur.execute(f"SELECT MIN(combine_range_mult_min(val, mult)) from {table}")
+                        results['min_time'] = time.perf_counter() - start
+                        result = cur.fetchone()[0]
+                        results['min_result'] = str(result) if result else None
 
-                    db_data_format, file_data_format = self.generate_data(experiment, trial+1)
+                        # MAX
+                        start = time.perf_counter()
+                        cur.execute(f"SELECT MAX(combine_range_mult_max(val, mult)) from {table}")
+                        results["max_time"] = time.perf_counter() - start
+                        result = cur.fetchone()[0]
+                        results['max_result'] = str(result) if result else None
 
-                    # save in ddl compatible format. Insert into DB regardless... need to run tests
-                    if experiment.save_ddl:
-                        print("ddl")
-                        self.insert_data_file(experiment, trial+1, file_data_format)
+                        # SUM
+                        start = time.perf_counter()
+                        cur.execute(f"SELECT SUM(combine_range_mult_sum(val, mult)) from {table}")
+                        results["sum_time"] = time.perf_counter() - start
+                        result = cur.fetchone()[0]
+                        results['sum_result'] = str(result) if result else None
+
+                    elif experiment.data_type == DataType.SET:
+                        # MIN
+                        start = time.perf_counter()
+                        cur.execute(f"SELECT MIN(combine_set_mult_min(val, mult)) from {table}")
+                        results['min_time'] = time.perf_counter() - start
+                        result = cur.fetchone()[0]
+                        results['min_result'] = str(result) if result else None
+
+                        # MAX
+                        start = time.perf_counter()
+                        cur.execute(f"SELECT MAX(combine_set_mult_max(val, mult)) from {table}")
+                        results["max_time"] = time.perf_counter() - start
+                        result = cur.fetchone()[0]
+                        results['max_result'] = str(result) if result else None
+
+                        # SUM
+                        start = time.perf_counter()
+                        cur.execute(f"SELECT SUM(combine_set_mult_sum(val, mult)) from {table}")
+                        results["sum_time"] = time.perf_counter() - start
+                        result = cur.fetchone()[0]
+                        results['sum_result'] = str(result) if result else None
+        
+        except Exception as e:
+            print(f"Error running queries for {experiment.experiment_id}: {e}")
+            exit(1)
+        
+        return results
                     
-                    self.insert_data_db(experiment, trial+1, db_data_format)
-    
-    def insert_data_db(self, experiment: ExperimentSettings, trial, data):
+    def insert_data_db(self, experiment: ExperimentSettings, data):
         '''Insert data into database specified in config file'''
         with self.connect_db() as conn:
             with conn.cursor() as cur:
@@ -117,10 +216,8 @@ class ExperimentRunner:
                 psycopg2.extras.execute_values(cur, sql, data, template)
                 conn.commit()
 
-    def insert_data_file(self, experiment: ExperimentSettings, trial, data):
-        """
-            Write data to SQL file for later loading
-        """
+    def insert_data_file(self, experiment: ExperimentSettings, data):
+        ''' Write data to SQL file for later loading '''
 
         experiment_folder_path = f'data/{experiment.name + "_s" + str(self.master_seed)}'
         table_name = experiment.experiment_id
@@ -186,6 +283,39 @@ class ExperimentRunner:
         ub = np.random.randint(lb+1, experiment.mult_size_range[1]+1)
         return RangeType(lb, ub)
     
+    def __calc_aggregate_results(self, experiment: ExperimentSettings, trial_results: dict) -> dict:
+        min_times = [r['min_time'] for r in trial_results if r['min_time'] is not None]
+        max_times = [r['max_time'] for r in trial_results if r['max_time'] is not None]
+        sum_times = [r['sum_time'] for r in trial_results if r['sum_time'] is not None]
+
+        aggregated = {
+            'uid' : self.__generate_name(experiment, True),
+            'data_type' : 'range' if experiment.data_type == DataType.RANGE else 'set',
+            'dataset_size' : experiment.dataset_size,
+            'num_trials': experiment.num_trials,
+            'master_seed' : self.master_seed,
+
+            # MIN stats
+            'min_time_mean': np.mean(min_times) if min_times else None,
+            'min_time_std': np.std(min_times) if min_times else None,
+            'min_time_min': np.min(min_times) if min_times else None,
+            'min_time_max': np.max(min_times) if min_times else None,
+            
+            # MAX stats
+            'max_time_mean': np.mean(max_times) if max_times else None,
+            'max_time_std': np.std(max_times) if max_times else None,
+            'max_time_min': np.min(max_times) if max_times else None,
+            'max_time_max': np.max(max_times) if max_times else None,
+            
+            # SUM stats 
+            'sum_time_mean': np.mean(sum_times) if sum_times else None,
+            'sum_time_std': np.std(sum_times) if sum_times else None,
+            'sum_time_min': np.min(sum_times) if sum_times else None,
+            'sum_time_max': np.max(sum_times) if sum_times else None,
+        }
+        
+        return aggregated
+
     def connect_db(self):
         return psycopg2.connect(**self.db_config)
 
@@ -201,6 +331,10 @@ class ExperimentRunner:
                                 WHERE schemaname = 'public' AND tablename LIKE '{find_trigger}';""")
                     tables = cur.fetchall()
 
+                    if not tables:
+                        print(f"  No tables found matching: {find_trigger}")
+                        return
+                
                     for table in tables:
                         cur.execute(f"DROP TABLE {table[0]};")
                         print(f" Dropping Table {table[0]}")
@@ -209,13 +343,32 @@ class ExperimentRunner:
                     print(f"Error cleaning tables: {e}")
                     conn.rollback()
 
-    def __generate_name(self, experiment: ExperimentSettings, trialNum: int) -> str:
+    def save_results(self) -> str:
+        '''Uses pandas.to_csv to write results to CSV'''
+        if not self.results:
+            return 
+        
+        out_file = f'{time.strftime("d%d_m%m_y%Y_%H:%M:%S")}_results_{self.master_seed}'
+        experiment_folder_path = f'data/results/{out_file}'
+        os.makedirs(experiment_folder_path, exist_ok=True)        
+        
+        df = pd.DataFrame(self.results)
+        df.to_csv(f'{experiment_folder_path}/{out_file}', index=True)
+
+        return f'{experiment_folder_path}/{out_file}'
+
+    def __generate_name(self, experiment: ExperimentSettings, generalName: bool = False) -> str:
         '''
             name format: t_experiment.name_{r | s}_{tX}_{master.seed}_{trial.seed}
+
+            if generalName param is set, then trial number will be emit from result
         '''
         dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
 
-        return f"t_{experiment.name}_{dtype}_t{trialNum}_s{self.master_seed}_ts{self.trial_seed}"
+        if generalName:
+            return f"t_{experiment.name}_{dtype}_s{self.master_seed}"
+
+        return f"t_{experiment.name}_{dtype}_t{experiment.curr_trial}_s{self.master_seed}_ts{self.trial_seed}"
 
 def run_all():
     ### parse args and config
@@ -225,7 +378,8 @@ def run_all():
         master_seed = generate_seed(args.seed)
     else:
         master_seed = generate_seed()
-    
+    print("The unique seed is ", master_seed)
+
     try:
         db_config = load_config(args.dbconfig)    
     except Exception as e:
@@ -242,14 +396,37 @@ def run_all():
     # run experiments in experiment config.yaml, or based on flag input
     if args.quick:
         experiments = create_quick_experiment(args)
-    else:
+    elif args.experiments_file is not None:
         experiments = load_experiments_from_file(args.experiments_file)
+    elif args.code:
+        print("     **Need to implement this better, but write code below this print statement in main.py run_all()**")
+
+        # ADD TESTS HERE
+        # SAMPLE CODE
+        # trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
+        #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, save_ddl=True, mode="all",
+        #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
+        # runner.run_experiment(trial1)
+        # sample_sizes = [100, 1000, 5000, 10000, 25000, 50000]
+        # for s in sample_sizes:
+        #     trial = ExperimentSettings(name=f"test_{s}", data_type=DataType.RANGE, dataset_size=s, uncertain_ratio=0.1, mult_size_range=(1,5),
+        #                             interval_size_range=(1, 100), save_csv=False, save_ddl=True, mode="all",
+        #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
+        #     runner.run_experiment(trial)
+        
+        # runner.clean_tables(db_config)
+        return 
 
     # Only run specific mode of ExperimentRunner
-    for name, experiment in experiments.items():
-        # experiment.name = runner.__generate_name(experiment)
+    for _, experiment in experiments.items():
         runner.run_experiment(experiment)
+    
+    results_path = runner.save_results()
+    print(f"Results stored in: {results_path}")
 
+    # clean db after using
+    if args.clean_after:
+        runner.clean_tables(db_config, args.clean_after)
 
 def generate_seed(in_seed=None):
     '''
