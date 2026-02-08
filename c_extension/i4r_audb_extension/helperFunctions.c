@@ -80,7 +80,7 @@ bool validRangeStrict(Int4Range a){
 }
 
 // lift a scalar int into a Int4Range
-Int4Range lift_scalar(int x){
+Int4Range lift_scalar_local(int x){
   Int4Range rv;
   rv.lower = x;
   rv.upper = x+1;
@@ -452,7 +452,6 @@ Int4RangeSet filterOutNulls(Int4RangeSet vals) {
 
 
 // testing agg
-
 Int4RangeSet
 interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
     Int4RangeSet result;

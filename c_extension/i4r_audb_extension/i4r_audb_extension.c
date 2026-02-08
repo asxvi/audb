@@ -65,7 +65,8 @@ PG_FUNCTION_INFO_V1(agg_count_transfunc);
 
 // avg
 // uses agg_sum_set_transfunc as transition function
-PG_FUNCTION_INFO_V1(agg_avg_set_finalfunc);
+PG_FUNCTION_INFO_V1(agg_avg_range_transfunc);
+PG_FUNCTION_INFO_V1(agg_avg_range_finalfunc);
 
 // easy change for future implementation. currently only affects lift funciton
 #define PRIMARY_DATA_TYPE "int4range"
@@ -486,7 +487,7 @@ lift_scalar(PG_FUNCTION_ARGS)
     unlifted = PG_GETARG_INT32(0);
     
     Int4Range result;
-    result = lift_scalar(unlifted);
+    result = lift_scalar_local(unlifted);
     
     RangeBound lb, ub;
     lb = make_range_bound(result.lower, true, true);
@@ -1269,12 +1270,22 @@ combine_set_mult_sum(PG_FUNCTION_ARGS)
     typcacheSet = lookup_type_cache(set_input->elemtype, TYPECACHE_RANGE_INFO);
     typcacheMult = lookup_type_cache(mult_input->rangetypid, TYPECACHE_RANGE_INFO);
 
+    // empty mult return NULL
+    if RangeIsEmpty(mult_input){
+        PG_RETURN_NULL();
+    }
+
     // hardcoded //FIXME
     neutral_element = 0;
 
     // deserialize, operate on, serialize, return
     set1 = deserialize_ArrayType(set_input, typcacheSet);
     mult = deserialize_RangeType(mult_input, typcacheMult);
+
+    // mult LB 0 return NULL
+    if (mult.lower == 0){
+        PG_RETURN_NULL();
+    }
 
     result = set_mult_combine_helper(set1, mult, neutral_element);
     output = serialize_ArrayType(result, typcacheSet);
@@ -1317,22 +1328,24 @@ agg_sum_transfunc(PG_FUNCTION_ARGS)
     PG_RETURN_ARRAYTYPE_P(result);
 }
 
-// agg over empty == 0,0
-/* arbitrary trigger size. doesnt use for now 
-    first parameter is the state
-    second parameter is the current colA (I4RSet)
-    third parameter is the multiplicity
+/*
+ * Transition function for range set sum aggregate
+ * Args:
+ *   0: int4range[] - state (accumulated sum so far)
+ *   1: int4range[] - current row value
+ *   2: integer - resize trigger (optional)
+ *   3: integer - size limit (optional)
  */
 Datum
 agg_sum_set_transfunc(PG_FUNCTION_ARGS)
 {
-    Int4RangeSet state_i4r, input_i4r, n_state_i4r, n_input_i4r, result_i4r;
     ArrayType *state, *input, *result;
     TypeCacheEntry *typcache;
     int resizeTrigger, sizeLimit, nelems;
-    
-    resizeTrigger = 5;
-    sizeLimit = 3; 
+
+    // default values
+    const int DEFAULT_TRIGGER = 5;
+    const int DEFAULT_SIZE = 3;
 
     // first call: use the first input as initial state, or non null
     if (PG_ARGISNULL(0)){
@@ -1347,19 +1360,34 @@ agg_sum_set_transfunc(PG_FUNCTION_ARGS)
     if(PG_ARGISNULL(1)) {
         PG_RETURN_ARRAYTYPE_P(PG_GETARG_ARRAYTYPE_P(0));
     }
+
+    // fetch resize params or use defaults
+    resizeTrigger = (PG_NARGS() >= 3 && !PG_ARGISNULL(2)) ? PG_GETARG_INT32(2) : DEFAULT_TRIGGER;
+    sizeLimit = (PG_NARGS() >= 4 && !PG_ARGISNULL(3)) ? PG_GETARG_INT32(3) : DEFAULT_SIZE;
     
     // get arguments, call helper to get result, check to normalize after
     state = PG_GETARG_ARRAYTYPE_P(0);
     input = PG_GETARG_ARRAYTYPE_P(1);
+    typcache = lookup_type_cache(ARR_ELEMTYPE(state), TYPECACHE_RANGE_INFO);
 
+    // sum of prev state and current
     result = arithmetic_set_helper(state, input, range_set_add_internal);
 
     // check to normalize //FIXME should be reduce size down to sizeLimit
     nelems = ArrayGetNItems(ARR_NDIM(result), ARR_DIMS(result));
-    if (nelems <= resizeTrigger) {
+    if (nelems >= resizeTrigger) {
+        Int4RangeSet result_i4r, reduced_i4r;
         ArrayType *normResult;
-        normResult = normalizeRange(result);
+
+        // deserialize, operate, serialize
+        result_i4r = deserialize_ArrayType(result, typcache);
+        reduced_i4r = reduceSize(result_i4r, sizeLimit);
+        normResult = serialize_ArrayType(reduced_i4r, typcache);
         
+        pfree(result);
+        pfree(result_i4r.ranges);
+        pfree(reduced_i4r.ranges);
+
         PG_RETURN_ARRAYTYPE_P(normResult);
     }
 
@@ -1791,21 +1819,6 @@ agg_max_set_transfunc(PG_FUNCTION_ARGS)
 
     typcache = lookup_type_cache(state->elemtype, TYPECACHE_RANGE_INFO);
 
-    // if (input_i4r.count > 0 && 
-    //     input_i4r.ranges[0].lower == INT_MIN && 
-    //     input_i4r.ranges[0].upper == INT_MIN + 2) {
-    //     elog(NOTICE, "Skipping MAX sentinel in input");
-    //     PG_RETURN_ARRAYTYPE_P(state);
-    // }
-
-    // // Replace state if it's the MAX sentinel
-    // if (state_i4r.count > 0 && 
-    //     state_i4r.ranges[0].lower == INT_MIN && 
-    //     state_i4r.ranges[0].upper == INT_MIN + 2) {
-    //     elog(NOTICE, "Replacing MAX sentinel in state");
-    //     PG_RETURN_ARRAYTYPE_P(input);
-    // }
-
     state_i4r = deserialize_ArrayType(state, typcache);
     input_i4r = deserialize_ArrayType(input, typcache);
 
@@ -1817,7 +1830,6 @@ agg_max_set_transfunc(PG_FUNCTION_ARGS)
     
     PG_RETURN_ARRAYTYPE_P(result);
 }
-
 
 // Simply just normalizes the result. Compressing any ranges if possible
 Datum 
@@ -1837,6 +1849,9 @@ agg_min_max_set_finalfunc(PG_FUNCTION_ARGS)
     PG_RETURN_ARRAYTYPE_P(output);
 }
 
+/*
+    Only necessary for multiplicty. Takes in mult as param and counts the total number of possible ranges
+*/
 Datum
 agg_count_transfunc(PG_FUNCTION_ARGS)
 {
@@ -1869,26 +1884,26 @@ agg_count_transfunc(PG_FUNCTION_ARGS)
 
 // // need to add in resize logic that is easily modifiable. macro perhaps
 // Datum
-// agg_avg_set_finalfunc(PG_FUNCTION_ARGS)
+// agg_avg_range_transfunc(PG_FUNCTION_ARGS)
 // {
-//     ArrayType *state, *input, *result;
-//     TypeCacheEntry *typcache;
+//     // ArrayType *state, *input, *result;
+//     // TypeCacheEntry *typcache;
     
-//     // no values in aggregated accum 
-//     if (PG_ARGISNULL(0)) {
-//         PG_RETURN_NULL();
-//     }
+//     // // no values in aggregated accum 
+//     // if (PG_ARGISNULL(0)) {
+//     //     PG_RETURN_NULL();
+//     // }
 
-//     final = PG_GETARG_ARRAYTYPE_P(0);
-//     nelems = ArrayGetNItems(ARR_NDIM(final), ARR_DIMS(final));
+//     // final = PG_GETARG_ARRAYTYPE_P(0);
+//     // nelems = ArrayGetNItems(ARR_NDIM(final), ARR_DIMS(final));
     
-//     // get arguments, call helper to get result, check to normalize after
-//     state = PG_GETARG_RANGE_P(0);
-//     input = PG_GETARG_RANGE_P(1);
+//     // // get arguments, call helper to get result, check to normalize after
+//     // state = PG_GETARG_RANGE_P(0);
+//     // input = PG_GETARG_RANGE_P(1);
 
-//     result = arithmetic_range_helper(state, input, range_add_internal);
+//     // result = arithmetic_range_helper(state, input, range_add_internal);
 
-//     PG_RETURN_ARRAYTYPE_P(result);
+//     // PG_RETURN_ARRAYTYPE_P(result);
 // }
 
 

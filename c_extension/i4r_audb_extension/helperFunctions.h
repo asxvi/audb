@@ -22,26 +22,30 @@ typedef struct{
     bool containsNull;
 } Int4RangeSet;
 
-// **DELETE ME**
+// **DELETE ME** will break certain outdated code
 // [Inlcusive LB, Inclusive UB]
 typedef struct{
     int lower;  //inclusive
     int upper;  //inclusive
 } Multiplicity;
 
-// sum aggregate state data type
-typedef struct {
-    Int4RangeSet accumulated;        // potential duplicates
-    Int4Range mult;               // closed interval
-    bool has_null;              // only true if every row contains (0,0) || mult = [0,n]
-    int triggerSize;
-} IntervalAggState;
+// // sum aggregate state data type
+// typedef struct {
+//     Int4RangeSet accumulated;        // potential duplicates
+//     Int4Range mult;               // closed interval
+//     bool has_null;              // only true if every row contains (0,0) || mult = [0,n]
+//     int triggerSize;
+// } IntervalAggState;
+// typedef struct {
+//     Int4Range accumulated;
+//     Int4Range mult;
+//     // bool has_null;
+// } RangeRowType;
 
 typedef struct {
-    Int4Range accumulated;
-    Int4Range mult;
-    // bool has_null;
-} RangeRowType;
+    Int4Range sum;
+    Int4Range count;
+} avg_stateType;
 
 // add extra utilites for working with defined type
 void printRange(Int4Range a);
@@ -63,7 +67,7 @@ Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult);
 bool overlap(Int4Range a, Int4Range b);
 bool contains(Int4Range a, Int4Range b);
 int range_distance(Int4Range a, Int4Range b);
-Int4Range lift_scalar(int x);
+Int4Range lift_scalar_local(int x);
 Int4RangeSet lift_range(Int4Range a);
 Int4RangeSet sort(Int4RangeSet vals);
 Int4RangeSet normalize(Int4RangeSet vals);
