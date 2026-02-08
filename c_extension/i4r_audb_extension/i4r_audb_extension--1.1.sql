@@ -175,22 +175,43 @@ RETURNS int4range[]
 AS 'MODULE_PATHNAME', 'combine_set_mult_sum'
 LANGUAGE c;
 
-CREATE FUNCTION agg_sum_set_transfunc(int4range[], int4range[], integer, integer) 
-RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'agg_sum_set_transfunc'
+-- CREATE FUNCTION agg_sum_set_transfunc(int4range[], int4range[], integer, integer) 
+-- RETURNS int4range[]
+-- AS 'MODULE_PATHNAME', 'agg_sum_set_transfunc'
+-- LANGUAGE c;
+
+-- CREATE FUNCTION agg_sum_set_finalfunc(int4range[]) 
+-- RETURNS int4range[]
+-- AS 'MODULE_PATHNAME', 'agg_sum_set_finalfunc'
+-- LANGUAGE c;
+
+-- create aggregate sum (int4range[], resizeTrigger integer, sizeLimit integer) 
+-- (
+--     stype = int4range[],
+--     sfunc = agg_sum_set_transfunc,
+--     finalfunc = agg_sum_set_finalfunc
+-- );
+
+
+CREATE FUNCTION agg_sum_set_transfunc2(internal, int4range[], integer, integer) 
+RETURNS internal
+AS 'MODULE_PATHNAME', 'agg_sum_set_transfunc2'
 LANGUAGE c;
 
-CREATE FUNCTION agg_sum_set_finalfunc(int4range[]) 
+CREATE FUNCTION agg_sum_set_finalfunc2(internal) 
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'agg_sum_set_finalfunc'
+AS 'MODULE_PATHNAME', 'agg_sum_set_finalfunc2'
 LANGUAGE c;
 
-create aggregate sum (int4range[], resizeTrigger integer, sizeLimit integer) 
+create aggregate sum2 (int4range[], resizeTrigger integer, sizeLimit integer) 
 (
-    stype = int4range[],
-    sfunc = agg_sum_set_transfunc,
-    finalfunc = agg_sum_set_finalfunc
+    stype = internal,
+    sfunc = agg_sum_set_transfunc2,
+    finalfunc = agg_sum_set_finalfunc2
 );
+
+
+
 
 ---------- MIN/ MAX -----------
 -- not sure if this is more functions than need be

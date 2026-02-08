@@ -43,6 +43,13 @@ typedef struct{
 // } RangeRowType;
 
 typedef struct {
+    Int4RangeSet ranges;
+    int resizeTrigger;
+    int sizeLimit;
+} SumAggState;
+
+
+typedef struct {
     Int4Range sum;
     Int4Range count;
 } avg_stateType;

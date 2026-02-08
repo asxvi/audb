@@ -46,8 +46,12 @@ PG_FUNCTION_INFO_V1(set_reduce_size);
 PG_FUNCTION_INFO_V1(combine_range_mult_sum);
 PG_FUNCTION_INFO_V1(agg_sum_transfunc);
 PG_FUNCTION_INFO_V1(combine_set_mult_sum);
+
 PG_FUNCTION_INFO_V1(agg_sum_set_transfunc);
 PG_FUNCTION_INFO_V1(agg_sum_set_finalfunc);
+
+PG_FUNCTION_INFO_V1(agg_sum_set_transfunc2);
+PG_FUNCTION_INFO_V1(agg_sum_set_finalfunc2);
 
 // min/max
 PG_FUNCTION_INFO_V1(combine_range_mult_min);
@@ -1360,15 +1364,23 @@ agg_sum_set_transfunc(PG_FUNCTION_ARGS)
     if(PG_ARGISNULL(1)) {
         PG_RETURN_ARRAYTYPE_P(PG_GETARG_ARRAYTYPE_P(0));
     }
-
-    // fetch resize params or use defaults
-    resizeTrigger = (PG_NARGS() >= 3 && !PG_ARGISNULL(2)) ? PG_GETARG_INT32(2) : DEFAULT_TRIGGER;
-    sizeLimit = (PG_NARGS() >= 4 && !PG_ARGISNULL(3)) ? PG_GETARG_INT32(3) : DEFAULT_SIZE;
     
     // get arguments, call helper to get result, check to normalize after
     state = PG_GETARG_ARRAYTYPE_P(0);
     input = PG_GETARG_ARRAYTYPE_P(1);
     typcache = lookup_type_cache(ARR_ELEMTYPE(state), TYPECACHE_RANGE_INFO);
+
+    // check input or state are empty
+    if (ArrayGetNItems(ARR_NDIM(input), ARR_DIMS(input)) == 0) {
+        PG_RETURN_ARRAYTYPE_P(state);
+    }
+    if (ArrayGetNItems(ARR_NDIM(state), ARR_DIMS(state)) == 0) {
+        PG_RETURN_ARRAYTYPE_P(input);
+    }
+
+    // fetch resize params or use defaults
+    resizeTrigger = (PG_NARGS() >= 3 && !PG_ARGISNULL(2)) ? PG_GETARG_INT32(2) : DEFAULT_TRIGGER;
+    sizeLimit = (PG_NARGS() >= 4 && !PG_ARGISNULL(3)) ? PG_GETARG_INT32(3) : DEFAULT_SIZE;
 
     // sum of prev state and current
     result = arithmetic_set_helper(state, input, range_set_add_internal);
@@ -1417,9 +1429,65 @@ agg_sum_set_finalfunc(PG_FUNCTION_ARGS)
         result = normalizeRange(final);
         PG_RETURN_ARRAYTYPE_P(result);    
     }
-    
+
     PG_RETURN_ARRAYTYPE_P(final);
 }
+
+// // final func return accumulated result as a native postgres type
+// /*
+//  * Transition function for range set sum aggregate
+//  * Args:
+//  *   0: int4range[] - state (accumulated sum so far)
+//  *   1: integer - resize trigger (optional)
+//  *   2: integer - size limit (optional)
+//  */
+// Datum
+// agg_sum_set_finalfunc(PG_FUNCTION_ARGS)
+// {
+//     ArrayType *final;
+//     TypeCacheEntry *typcache;
+//     int resizeTrigger, sizeLimit, nelems;
+
+//     // default values
+//     const int DEFAULT_TRIGGER = 500;
+//     const int DEFAULT_SIZE = 100;
+
+//     // no values in aggregated accum 
+//     if (PG_ARGISNULL(0)) {
+//         PG_RETURN_NULL();
+//     }
+
+//     final = PG_GETARG_ARRAYTYPE_P(0);
+//     nelems = ArrayGetNItems(ARR_NDIM(final), ARR_DIMS(final));
+
+//     // fetch resize params or use defaults
+//     resizeTrigger = (PG_NARGS() >= 2 && !PG_ARGISNULL(1)) ? PG_GETARG_INT32(1) : DEFAULT_TRIGGER;
+//     sizeLimit = (PG_NARGS() >= 3 && !PG_ARGISNULL(2)) ? PG_GETARG_INT32(2) : DEFAULT_SIZE;
+//     typcache = lookup_type_cache(ARR_ELEMTYPE(final), TYPECACHE_RANGE_INFO);
+
+//     // check to reduce size//normalize
+//     if (nelems >= resizeTrigger) {
+//         // ArrayType *result;
+//         // result = normalizeRange(final);
+//         // PG_RETURN_ARRAYTYPE_P(result);    
+
+//         Int4RangeSet result_i4r, reduced_i4r;
+//         ArrayType *normResult;
+
+//         // deserialize, operate, serialize
+//         result_i4r = deserialize_ArrayType(final, typcache);
+//         reduced_i4r = reduceSize(result_i4r, sizeLimit);
+//         normResult = serialize_ArrayType(reduced_i4r, typcache);
+        
+//         pfree(result_i4r.ranges);
+//         pfree(reduced_i4r.ranges);
+
+//         PG_RETURN_ARRAYTYPE_P(normResult);
+//     }
+
+//     PG_RETURN_ARRAYTYPE_P(final);
+// }
+
 
 /*
 State Transition function for max aggregate
@@ -1933,3 +2001,74 @@ agg_count_transfunc(PG_FUNCTION_ARGS)
     
 //     PG_RETURN_ARRAYTYPE_P(final);
 // }
+
+
+
+// maybe internal state doesnt have to translate back and from datum types?
+Datum
+agg_sum_set_transfunc2(PG_FUNCTION_ARGS)
+{
+    SumAggState *state;
+    ArrayType* currSet;
+    TypeCacheEntry *typcache; 
+
+    // first call, state is NULL
+    if (PG_ARGISNULL(0)){
+        
+        if (PG_ARGISNULL(1)) {
+            PG_RETURN_NULL(); // nothing to accumulate
+        }
+
+        currSet = PG_GETARG_ARRAYTYPE_P(1);
+        typcache = lookup_type_cache(ARR_ELEMTYPE(currSet), TYPECACHE_RANGE_INFO);
+
+        // what do i initialize the I4Rset to be initially? cannot call deserialize funciton bc that requires typcache
+        state = (SumAggState *) palloc0(sizeof(SumAggState));
+        state->ranges = deserialize_ArrayType(currSet, typcache);
+        state->resizeTrigger = PG_GETARG_INT32(2);
+        state->sizeLimit = PG_GETARG_INT32(3);
+        
+        PG_RETURN_POINTER(state);
+    }
+
+    // otherwise we merge results into existing state
+    state  = (SumAggState *) PG_GETARG_POINTER(0);
+
+    if(!PG_ARGISNULL(1)){
+        currSet = PG_GETARG_ARRAYTYPE_P(1);
+        typcache = lookup_type_cache(ARR_ELEMTYPE(currSet), TYPECACHE_RANGE_INFO);
+        
+        Int4RangeSet inputSet = deserialize_ArrayType(currSet, typcache);
+        state->ranges = range_set_add_internal(state->ranges, inputSet);
+        
+        if (state->ranges.count > state->resizeTrigger){
+            state->ranges = reduceSize(state->ranges, state->sizeLimit);
+        }
+    }
+
+    PG_RETURN_POINTER(state);
+}
+
+// hardcoded for i4r. //FIXME
+Datum
+agg_sum_set_finalfunc2(PG_FUNCTION_ARGS)
+{
+    SumAggState *state;
+    ArrayType *result;
+    TypeCacheEntry *typcache;
+
+    if(PG_ARGISNULL(0)){
+        PG_RETURN_NULL();
+    }
+
+    state = (SumAggState*) PG_GETARG_POINTER(0);
+    typcache = lookup_type_cache(INT4RANGEOID, TYPECACHE_RANGE_INFO);
+
+    if(state->ranges.count > state->resizeTrigger) {
+        state->ranges = reduceSize(state->ranges, state->sizeLimit);
+    }
+
+    result = serialize_ArrayType(state->ranges, typcache);
+
+    PG_RETURN_ARRAYTYPE_P(result);
+}
