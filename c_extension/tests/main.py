@@ -147,6 +147,8 @@ class ExperimentRunner:
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
                     if experiment.data_type == DataType.RANGE:
+                        
+                        # EXPLAIN (ANALYZE TIMING OFF) ...
                         # MIN
                         start = time.perf_counter()
                         cur.execute(f"SELECT MIN(combine_range_mult_min(val, mult)) from {table}")

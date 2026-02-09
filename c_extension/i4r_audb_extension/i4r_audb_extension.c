@@ -1274,7 +1274,11 @@ combine_set_mult_sum(PG_FUNCTION_ARGS)
     typcacheSet = lookup_type_cache(set_input->elemtype, TYPECACHE_RANGE_INFO);
     typcacheMult = lookup_type_cache(mult_input->rangetypid, TYPECACHE_RANGE_INFO);
 
-    // empty mult return NULL
+    // check for empty array
+    if (ArrayGetNItems(ARR_NDIM(set_input), ARR_DIMS(set_input)) == 0) {
+        PG_RETURN_NULL();
+    }
+    // check for empty mult
     if RangeIsEmpty(mult_input){
         PG_RETURN_NULL();
     }
@@ -1286,13 +1290,20 @@ combine_set_mult_sum(PG_FUNCTION_ARGS)
     set1 = deserialize_ArrayType(set_input, typcacheSet);
     mult = deserialize_RangeType(mult_input, typcacheMult);
 
-    // mult LB 0 return NULL
+    // check for mult LB = 0
     if (mult.lower == 0){
+        pfree(set1.ranges);
         PG_RETURN_NULL();
     }
 
     result = set_mult_combine_helper(set1, mult, neutral_element);
     output = serialize_ArrayType(result, typcacheSet);
+    
+    // clean
+    pfree(set1.ranges);
+    if (result.ranges != set1.ranges) {
+        pfree(result.ranges);
+    }
 
     PG_RETURN_ARRAYTYPE_P(output);
 }
@@ -2004,71 +2015,201 @@ agg_count_transfunc(PG_FUNCTION_ARGS)
 
 
 
-// maybe internal state doesnt have to translate back and from datum types?
+// // maybe internal state doesnt have to translate back and from datum types?
+// Datum
+// agg_sum_set_transfunc2(PG_FUNCTION_ARGS)
+// {
+//     SumAggState *state;
+//     ArrayType* currSet;
+//     TypeCacheEntry *typcache; 
+
+//     // first call, state is NULL
+//     if (PG_ARGISNULL(0)){
+        
+//         if (PG_ARGISNULL(1)) {
+//             PG_RETURN_NULL(); // nothing to accumulate
+//         }
+
+//         currSet = PG_GETARG_ARRAYTYPE_P(1);
+//         typcache = lookup_type_cache(ARR_ELEMTYPE(currSet), TYPECACHE_RANGE_INFO);
+
+//         // what do i initialize the I4Rset to be initially? cannot call deserialize funciton bc that requires typcache
+//         state = (SumAggState *) palloc0(sizeof(SumAggState));
+//         state->ranges = deserialize_ArrayType(currSet, typcache);
+//         state->resizeTrigger = PG_GETARG_INT32(2);
+//         state->sizeLimit = PG_GETARG_INT32(3);
+        
+//         PG_RETURN_POINTER(state);
+//     }
+
+//     // otherwise we merge results into existing state
+//     state  = (SumAggState *) PG_GETARG_POINTER(0);
+
+//     if(!PG_ARGISNULL(1)){
+//         currSet = PG_GETARG_ARRAYTYPE_P(1);
+//         typcache = lookup_type_cache(ARR_ELEMTYPE(currSet), TYPECACHE_RANGE_INFO);
+        
+//         Int4RangeSet inputSet = deserialize_ArrayType(currSet, typcache);
+//         state->ranges = range_set_add_internal(state->ranges, inputSet);
+        
+//         if (state->ranges.count > state->resizeTrigger){
+//             state->ranges = reduceSize(state->ranges, state->sizeLimit);
+//         }
+//     }
+
+//     PG_RETURN_POINTER(state);
+// }
+
+// // hardcoded for i4r. //FIXME
+// Datum
+// agg_sum_set_finalfunc2(PG_FUNCTION_ARGS)
+// {
+//     SumAggState *state;
+//     ArrayType *result;
+//     TypeCacheEntry *typcache;
+
+//     if(PG_ARGISNULL(0)){
+//         PG_RETURN_NULL();
+//     }
+
+//     state = (SumAggState*) PG_GETARG_POINTER(0);
+//     typcache = lookup_type_cache(INT4RANGEOID, TYPECACHE_RANGE_INFO);
+
+//     if(state->ranges.count > state->resizeTrigger) {
+//         state->ranges = reduceSize(state->ranges, state->sizeLimit);
+//     }
+
+//     result = serialize_ArrayType(state->ranges, typcache);
+
+//     PG_RETURN_ARRAYTYPE_P(result);
+// }
+
 Datum
 agg_sum_set_transfunc2(PG_FUNCTION_ARGS)
 {
+    MemoryContext aggcontext;
+    MemoryContext oldcontext;
     SumAggState *state;
-    ArrayType* currSet;
-    TypeCacheEntry *typcache; 
+    ArrayType *currSet;
+    TypeCacheEntry *typcache;
+    Int4RangeSet inputSet;
+    Int4RangeSet combined;
+    Int4RangeSet reduced;
+    
+    // const int32 DEFAULT_TRIGGER = 5;
+    // const int32 DEFAULT_SIZE = 3;
+    
+    if (!AggCheckCallContext(fcinfo, &aggcontext))
+        elog(ERROR, "agg_sum_set_transfunc2 called in non-aggregate context");
+    
+    /* First call, state is NULL */
+    if (PG_ARGISNULL(0)) {
 
-    // first call, state is NULL
-    if (PG_ARGISNULL(0)){
-        
+        // check for NULL input param, or empty
         if (PG_ARGISNULL(1)) {
-            PG_RETURN_NULL(); // nothing to accumulate
+            PG_RETURN_NULL(); /* nothing to accumulate */
         }
-
+        
         currSet = PG_GETARG_ARRAYTYPE_P(1);
         typcache = lookup_type_cache(ARR_ELEMTYPE(currSet), TYPECACHE_RANGE_INFO);
+        
+        if (ArrayGetNItems(ARR_NDIM(currSet), ARR_DIMS(currSet)) == 0) {
+            PG_RETURN_NULL(); /* First value is empty, wait for non-empty */
+        }
 
-        // what do i initialize the I4Rset to be initially? cannot call deserialize funciton bc that requires typcache
+        /* Switch to aggregate memory context for persistent allocations */
+        oldcontext = MemoryContextSwitchTo(aggcontext);
+        
+        /* Initialize state */
         state = (SumAggState *) palloc0(sizeof(SumAggState));
         state->ranges = deserialize_ArrayType(currSet, typcache);
+        
+        /* Get resize parameters or use defaults */
         state->resizeTrigger = PG_GETARG_INT32(2);
         state->sizeLimit = PG_GETARG_INT32(3);
         
+        MemoryContextSwitchTo(oldcontext);
+        
         PG_RETURN_POINTER(state);
     }
+    
+    /* Otherwise we merge results into existing state */
+    state = (SumAggState *) PG_GETARG_POINTER(0);
 
-    // otherwise we merge results into existing state
-    state  = (SumAggState *) PG_GETARG_POINTER(0);
-
-    if(!PG_ARGISNULL(1)){
+    if (!PG_ARGISNULL(1)) {
         currSet = PG_GETARG_ARRAYTYPE_P(1);
         typcache = lookup_type_cache(ARR_ELEMTYPE(currSet), TYPECACHE_RANGE_INFO);
-        
-        Int4RangeSet inputSet = deserialize_ArrayType(currSet, typcache);
-        state->ranges = range_set_add_internal(state->ranges, inputSet);
-        
-        if (state->ranges.count > state->resizeTrigger){
-            state->ranges = reduceSize(state->ranges, state->sizeLimit);
-        }
-    }
 
+        // empty check
+        if (ArrayGetNItems(ARR_NDIM(currSet), ARR_DIMS(currSet)) == 0) {
+            PG_RETURN_POINTER(state);
+        }
+        
+        /* Deserialize input (in current context - will be freed) */
+        inputSet = deserialize_ArrayType(currSet, typcache);
+        
+        /* Switch to aggregate context for persistent data */
+        oldcontext = MemoryContextSwitchTo(aggcontext);
+        
+        /* Add to accumulated state */
+        combined = range_set_add_internal(state->ranges, inputSet);
+        
+        /* Free old state ranges */
+        if (state->ranges.ranges != NULL) {
+            pfree(state->ranges.ranges);
+        }
+        
+        /* Check if we need to reduce size */
+        if (combined.count >= state->resizeTrigger) {
+            reduced = reduceSize(combined, state->sizeLimit);
+            pfree(combined.ranges);
+            state->ranges = reduced;
+        }
+        else {
+            state->ranges = combined;
+        }
+        
+        MemoryContextSwitchTo(oldcontext);
+        
+        /* Free input set (allocated in previous context) */
+        pfree(inputSet.ranges);
+    }
+    
     PG_RETURN_POINTER(state);
 }
 
-// hardcoded for i4r. //FIXME
 Datum
 agg_sum_set_finalfunc2(PG_FUNCTION_ARGS)
 {
     SumAggState *state;
     ArrayType *result;
     TypeCacheEntry *typcache;
-
-    if(PG_ARGISNULL(0)){
+    Int4RangeSet reduced;
+    Oid elemTypeOID;
+    
+    if (PG_ARGISNULL(0)) {
         PG_RETURN_NULL();
     }
-
+    
     state = (SumAggState*) PG_GETARG_POINTER(0);
-    typcache = lookup_type_cache(INT4RANGEOID, TYPECACHE_RANGE_INFO);
-
-    if(state->ranges.count > state->resizeTrigger) {
-        state->ranges = reduceSize(state->ranges, state->sizeLimit);
+    
+    /* Handle empty state */
+    if (state->ranges.count == 0) {
+        elemTypeOID = TypenameGetTypid("int4range");
+        PG_RETURN_ARRAYTYPE_P(construct_empty_array(elemTypeOID));
     }
-
+    
+    elemTypeOID = TypenameGetTypid("int4range");
+    typcache = lookup_type_cache(elemTypeOID, TYPECACHE_RANGE_INFO);
+    
+    // reduce final time
+    if (state->ranges.count >= state->resizeTrigger) {
+        reduced = reduceSize(state->ranges, state->sizeLimit);
+        result = serialize_ArrayType(reduced, typcache);
+        pfree(reduced.ranges);
+        PG_RETURN_ARRAYTYPE_P(result);
+    }
+    
     result = serialize_ArrayType(state->ranges, typcache);
-
     PG_RETURN_ARRAYTYPE_P(result);
 }
