@@ -193,21 +193,21 @@ LANGUAGE c;
 -- );
 
 
-CREATE FUNCTION agg_sum_set_transfunc2(internal, int4range[], integer, integer) 
+CREATE FUNCTION agg_sum_set_transfunc(internal, int4range[], integer, integer) 
 RETURNS internal
-AS 'MODULE_PATHNAME', 'agg_sum_set_transfunc2'
+AS 'MODULE_PATHNAME', 'agg_sum_set_transfunc'
 LANGUAGE c;
 
-CREATE FUNCTION agg_sum_set_finalfunc2(internal) 
+CREATE FUNCTION agg_sum_set_finalfunc(internal) 
 RETURNS int4range[]
-AS 'MODULE_PATHNAME', 'agg_sum_set_finalfunc2'
+AS 'MODULE_PATHNAME', 'agg_sum_set_finalfunc'
 LANGUAGE c;
 
-create aggregate sum2 (int4range[], resizeTrigger integer, sizeLimit integer) 
+create aggregate sum (int4range[], resizeTrigger integer, sizeLimit integer) 
 (
     stype = internal,
-    sfunc = agg_sum_set_transfunc2,
-    finalfunc = agg_sum_set_finalfunc2
+    sfunc = agg_sum_set_transfunc,
+    finalfunc = agg_sum_set_finalfunc
 );
 
 

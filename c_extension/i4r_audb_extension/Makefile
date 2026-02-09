@@ -6,8 +6,9 @@ DATA = i4r_audb_extension--1.1.sql
 OBJS = 	\
 	arithmetic.o \
 	helperFunctions.o \
-	i4r_audb_extension.o \
-	logicalOperators.o
+	serialization.o	\
+	logicalOperators.o	\
+	i4r_audb_extension.o
 
 # using postgres@16 for local testing
 # PG_CONFIG = /usr/local/pgsql16/bin/pg_config

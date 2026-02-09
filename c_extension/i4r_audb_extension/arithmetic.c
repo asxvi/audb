@@ -6,19 +6,6 @@
 #define malloc palloc
 #define free pfree
 
-/*
-summary:
-
-// mult == repeated addition?
-// add: null survives if in both a and b
-    // null + null = null
-    // null + 3 = entire domain
-// mult: null survives if in either a and b 
-    // null * null = null
-    // ex: null * 3 = entire domain
-*/
-
-
 Int4Range range_add_internal(Int4Range a, Int4Range b){
     Int4Range rv;
 
