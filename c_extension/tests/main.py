@@ -70,11 +70,26 @@ class ExperimentRunner:
         self.master_seed = seed
         self.trial_seed = None
 
+    DATA_TYPE_CONFIG = {
+        DataType.RANGE: {
+            "combine_sum": "combine_range_mult_sum",
+            "combine_min": "combine_range_mult_min",
+            "combine_max": "combine_range_mult_max",
+        },
+        DataType.SET: {
+            "combine_sum": "combine_set_mult_sum",
+            "combine_min": "combine_set_mult_min",
+            "combine_max": "combine_set_mult_max",
+        },
+    }
+
     def run_experiment(self, experiment :ExperimentSettings) -> list:
         '''an experiement has N trials. gen data for each trial, run queries//benchmark results, and append to results'''    
         # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
         experiment_results = []
-        for trial in range(experiment.num_trials):    
+        cold_results = []
+        
+        for trial in range(experiment.num_trials):
             # create a trial seed dependent on the master seed, and specific trial number
             self.trial_seed = (self.master_seed + experiment.curr_trial + 1) % (2**32)
             np.random.seed(self.trial_seed)
@@ -86,19 +101,40 @@ class ExperimentRunner:
 
             # save in ddl compatible format. Insert into DB regardless... need to run tests
             if experiment.save_ddl:
-                print("ddl")
                 self.insert_data_file(experiment, file_data_format)
             
             self.insert_data_db(experiment, db_data_format)
 
             # run queries and benchmark
             trial_results = self.run_queries(experiment)
-            experiment_results.append(trial_results)
+            if (trial == 0):
+                cold_results.append(trial_results)
+            else:
+                experiment_results.append(trial_results)
 
         aggregated_results = self.__calc_aggregate_results(experiment, experiment_results)
+        cold_aggregate_results = self.__calc_aggregate_results(experiment, cold_results)
+        
+        print(cold_aggregate_results)
         self.results.append(aggregated_results)
 
         return experiment_results
+
+    def run_aggregate(self, cur, table, agg_name, combine_func, *agg_params):
+        '''General aggregate runner with no WHERE clause'''
+        params_sql = ",".join(str(param) for param in agg_params)
+        sql = f"""EXPLAIN (analyze, format json)
+            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
+            FROM {table};"""
+        
+        cur.execute(sql)
+        results = cur.fetchone()[0]
+        plan_root = results[0]
+        plan = plan_root["Plan"]
+        agg_time = plan["Actual Total Time"]
+        print(agg_time)
+        return agg_time
+        
 
     def generate_data(self, experiment :ExperimentSettings):
         '''
@@ -141,56 +177,69 @@ class ExperimentRunner:
             'sum_result' : None,
         }
         table = experiment.experiment_id
+        config = self.DATA_TYPE_CONFIG[experiment.data_type]
+
         try:
             with self.connect_db() as conn:
                 with conn.cursor() as cur:
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
-                    if experiment.data_type == DataType.RANGE:
-                        
-                        # EXPLAIN (ANALYZE TIMING OFF) ...
-                        # MIN
-                        start = time.perf_counter()
-                        cur.execute(f"SELECT MIN(combine_range_mult_min(val, mult)) from {table}")
-                        results['min_time'] = time.perf_counter() - start
-                        result = cur.fetchone()[0]
-                        results['min_result'] = str(result) if result else None
+                   
+                    results['sum_time'] = self.run_aggregate(cur, table, 'SUM2', config['combine_sum'], 10, 10)
 
-                        # MAX
-                        start = time.perf_counter()
-                        cur.execute(f"SELECT MAX(combine_range_mult_max(val, mult)) from {table}")
-                        results["max_time"] = time.perf_counter() - start
-                        result = cur.fetchone()[0]
-                        results['max_result'] = str(result) if result else None
+                    results['min_time'] = self.run_aggregate(cur, table, 'MIN', config['combine_min'])
+                    results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
 
-                        # SUM
-                        start = time.perf_counter()
-                        cur.execute(f"SELECT SUM(combine_range_mult_sum(val, mult)) from {table}")
-                        results["sum_time"] = time.perf_counter() - start
-                        result = cur.fetchone()[0]
-                        results['sum_result'] = str(result) if result else None
+                    print(results)
+                   
+                    # if experiment.data_type == DataType.RANGE:
+                    #     self.run_sum(experiment, cur, 10, 10)
 
-                    elif experiment.data_type == DataType.SET:
-                        # MIN
-                        start = time.perf_counter()
-                        cur.execute(f"SELECT MIN(combine_set_mult_min(val, mult)) from {table}")
-                        results['min_time'] = time.perf_counter() - start
-                        result = cur.fetchone()[0]
-                        results['min_result'] = str(result) if result else None
+                    # #     # EXPLAIN (ANALYZE TIMING OFF) ...
+                    # #     # MIN
+                    # #     start = time.perf_counter()
+                    # #     cur.execute(f"SELECT MIN(combine_range_mult_min(val, mult)) from {table}")
+                    # #     results['min_time'] = time.perf_counter() - start
+                    # #     result = cur.fetchone()[0]
+                    # #     results['min_result'] = str(result) if result else None
 
-                        # MAX
-                        start = time.perf_counter()
-                        cur.execute(f"SELECT MAX(combine_set_mult_max(val, mult)) from {table}")
-                        results["max_time"] = time.perf_counter() - start
-                        result = cur.fetchone()[0]
-                        results['max_result'] = str(result) if result else None
+                    # #     # MAX
+                    # #     start = time.perf_counter()
+                    # #     cur.execute(f"SELECT MAX(combine_range_mult_max(val, mult)) from {table}")
+                    # #     results["max_time"] = time.perf_counter() - start
+                    # #     result = cur.fetchone()[0]
+                    # #     results['max_result'] = str(result) if result else None
 
-                        # SUM
-                        start = time.perf_counter()
-                        cur.execute(f"SELECT SUM(combine_set_mult_sum(val, mult)) from {table}")
-                        results["sum_time"] = time.perf_counter() - start
-                        result = cur.fetchone()[0]
-                        results['sum_result'] = str(result) if result else None
+                    # #     # SUM2
+                    # #     start = time.perf_counter()
+                    # #     cur.execute(f"SELECT SUM2(combine_range_mult_sum(val, mult)) from {table}")
+                    # #     results["sum_time"] = time.perf_counter() - start
+                    # #     result = cur.fetchone()[0]
+                    # #     results['sum_result'] = str(result) if result else None
+
+                    # elif experiment.data_type == DataType.SET:
+                    #     self.run_sum(experiment, cur, 10, 10)
+                    # #     # MIN
+                    # #     start = time.perf_counter()
+                    # #     cur.execute(f"SELECT MIN(combine_set_mult_min(val, mult)) from {table}")
+                    # #     results['min_time'] = time.perf_counter() - start
+                    # #     result = cur.fetchone()[0]
+                    # #     results['min_result'] = str(result) if result else None
+
+                    # #     # MAX
+                    # #     start = time.perf_counter()
+                    # #     cur.execute(f"SELECT MAX(combine_set_mult_max(val, mult)) from {table}")
+                    # #     results["max_time"] = time.perf_counter() - start
+                    # #     result = cur.fetchone()[0]
+                    # #     results['max_result'] = str(result) if result else None
+
+                    # # #     # SUM2
+                    # #     start = time.perf_counter()
+                    # #     cur.execute(f"SELECT SUM2(combine_set_mult_sum(val, mult), 10, 10) from {table}")
+                    # #     results["sum_time"] = time.perf_counter() - start
+                    # #     result = cur.fetchone()[0]
+                    # #     results['sum_result'] = str(result) if result else None
+
         
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")

@@ -1,3 +1,4 @@
+
 experiments:
   # - name: r_small_100
   #   data_type: RANGE
@@ -43,83 +44,83 @@ experiments:
   #   save_csv: false
   #   mode: all
 
-  - name: s_small_100
-    data_type: SET
-    dataset_size: 100
-    uncertain_ratio: 0.5
-    mult_size_range: [1, 5]
-    interval_size_range: [1, 50]
-    num_intervals: 2
-    gap_size_range: [5, 10]
-    num_trials: 3
-    insert_to_db: true
-    save_csv: false
-    mode: all
+  # - name: s_small_100
+  #   data_type: SET
+  #   dataset_size: 100
+  #   uncertain_ratio: 0.5
+  #   mult_size_range: [1, 5]
+  #   interval_size_range: [1, 50]
+  #   num_intervals: 2
+  #   gap_size_range: [5, 10]
+  #   num_trials: 3
+  #   insert_to_db: true
+  #   save_csv: false
+  #   mode: all
 
-  - name: s_medium_1000
-    data_type: SET
-    dataset_size: 1000
-    uncertain_ratio: 0.0
-    mult_size_range: [1, 5]
-    interval_size_range: [1, 50]
-    num_intervals: 2
-    gap_size_range: [0, 15]
-    num_trials: 3
-    insert_to_db: true
-    save_csv: false
-    mode: all
+  # - name: s_medium_1000
+  #   data_type: SET
+  #   dataset_size: 1000
+  #   uncertain_ratio: 0.0
+  #   mult_size_range: [1, 5]
+  #   interval_size_range: [1, 50]
+  #   num_intervals: 2
+  #   gap_size_range: [0, 15]
+  #   num_trials: 3
+  #   insert_to_db: true
+  #   save_csv: false
+  #   mode: all
 
-  - name: s_large_10000
-    data_type: SET
-    dataset_size: 10000
-    uncertain_ratio: 0.0
-    mult_size_range: [1, 5]
-    interval_size_range: [1, 50]
-    num_intervals: 2
-    gap_size_range: [0, 15]
-    num_trials: 3
-    insert_to_db: true
-    save_csv: false
-    mode: all
+  # - name: s_large_10000
+  #   data_type: SET
+  #   dataset_size: 10000
+  #   uncertain_ratio: 0.0
+  #   mult_size_range: [1, 5]
+  #   interval_size_range: [1, 50]
+  #   num_intervals: 2
+  #   gap_size_range: [0, 15]
+  #   num_trials: 3
+  #   insert_to_db: true
+  #   save_csv: false
+  #   mode: all
 
-  - name: s_xl_25000
-    data_type: SET
-    dataset_size: 25000
-    uncertain_ratio: 0.0
-    mult_size_range: [1, 5]
-    interval_size_range: [1, 50]
-    num_intervals: 2
-    gap_size_range: [0, 15]
-    num_trials: 3
-    insert_to_db: true
-    save_csv: false
-    mode: all
+  # - name: s_xl_25000
+  #   data_type: SET
+  #   dataset_size: 25000
+  #   uncertain_ratio: 0.0
+  #   mult_size_range: [1, 5]
+  #   interval_size_range: [1, 50]
+  #   num_intervals: 2
+  #   gap_size_range: [0, 15]
+  #   num_trials: 3
+  #   insert_to_db: true
+  #   save_csv: false
+  #   mode: all
 
-  - name: s_xxl_50000
-    data_type: SET
-    dataset_size: 50000
-    uncertain_ratio: 0.0
-    mult_size_range: [1, 5]
-    interval_size_range: [1, 50]
-    num_intervals: 2
-    gap_size_range: [0, 15]
-    num_trials: 3
-    insert_to_db: true
-    save_csv: false
-    mode: all
+  # - name: s_xxl_50000
+  #   data_type: SET
+  #   dataset_size: 50000
+  #   uncertain_ratio: 0.0
+  #   mult_size_range: [1, 5]
+  #   interval_size_range: [1, 50]
+  #   num_intervals: 2
+  #   gap_size_range: [0, 15]
+  #   num_trials: 3
+  #   insert_to_db: true
+  #   save_csv: false
+  #   mode: all
 
-  - name: s_xxxl_100000
-    data_type: SET
-    dataset_size: 100000
-    uncertain_ratio: 0.0
-    mult_size_range: [1, 5]
-    interval_size_range: [1, 50]
-    num_intervals: 2
-    gap_size_range: [0, 15]
-    num_trials: 3
-    insert_to_db: true
-    save_csv: false
-    mode: all
+  # - name: s_xxxl_100000
+  #   data_type: SET
+  #   dataset_size: 100000
+  #   uncertain_ratio: 0.0
+  #   mult_size_range: [1, 5]
+  #   interval_size_range: [1, 50]
+  #   num_intervals: 2
+  #   gap_size_range: [0, 15]
+  #   num_trials: 3
+  #   insert_to_db: true
+  #   save_csv: false
+  #   mode: all
 
   - name: s_4xl_150000
     data_type: SET
@@ -129,7 +130,7 @@ experiments:
     num_intervals: 2
     num_intervals_range: [1, 4]
     gap_size_range: [0, 15]
-    num_trials: 3
+    num_trials: 5
     insert_to_db: true
     save_csv: false
     mode: all
