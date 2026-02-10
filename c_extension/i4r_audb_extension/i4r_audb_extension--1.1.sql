@@ -159,39 +159,21 @@ RETURNS int4range
 AS 'MODULE_PATHNAME', 'combine_range_mult_sum'
 LANGUAGE c;
 
-CREATE FUNCTION agg_sum_transfunc(int4range, int4range) 
+CREATE FUNCTION agg_sum_range_transfunc(int4range, int4range) 
 RETURNS int4range
-AS 'MODULE_PATHNAME', 'agg_sum_transfunc'
+AS 'MODULE_PATHNAME', 'agg_sum_range_transfunc'
 LANGUAGE c;
 
 create aggregate sum (int4range)
 (
     stype = int4range,
-    sfunc = agg_sum_transfunc
+    sfunc = agg_sum_range_transfunc
 );
 
 CREATE FUNCTION combine_set_mult_sum(int4range[], int4range) 
 RETURNS int4range[]
 AS 'MODULE_PATHNAME', 'combine_set_mult_sum'
 LANGUAGE c;
-
--- CREATE FUNCTION agg_sum_set_transfunc(int4range[], int4range[], integer, integer) 
--- RETURNS int4range[]
--- AS 'MODULE_PATHNAME', 'agg_sum_set_transfunc'
--- LANGUAGE c;
-
--- CREATE FUNCTION agg_sum_set_finalfunc(int4range[]) 
--- RETURNS int4range[]
--- AS 'MODULE_PATHNAME', 'agg_sum_set_finalfunc'
--- LANGUAGE c;
-
--- create aggregate sum (int4range[], resizeTrigger integer, sizeLimit integer) 
--- (
---     stype = int4range[],
---     sfunc = agg_sum_set_transfunc,
---     finalfunc = agg_sum_set_finalfunc
--- );
-
 
 CREATE FUNCTION agg_sum_set_transfunc(internal, int4range[], integer, integer) 
 RETURNS internal
@@ -226,25 +208,25 @@ RETURNS int4range
 AS 'MODULE_PATHNAME', 'combine_range_mult_max'
 LANGUAGE c;
 
-CREATE FUNCTION agg_min_transfunc(int4range, int4range) 
+CREATE FUNCTION agg_min_range_transfunc(int4range, int4range) 
 RETURNS int4range
-AS 'MODULE_PATHNAME', 'agg_min_transfunc'
+AS 'MODULE_PATHNAME', 'agg_min_range_transfunc'
 LANGUAGE c;
 
-CREATE FUNCTION agg_max_transfunc(int4range, int4range) 
+CREATE FUNCTION agg_max_range_transfunc(int4range, int4range) 
 RETURNS int4range
-AS 'MODULE_PATHNAME', 'agg_max_transfunc'
+AS 'MODULE_PATHNAME', 'agg_max_range_transfunc'
 LANGUAGE c;
 
 create aggregate min (int4range)
 (
     stype = int4range,
-    sfunc = agg_min_transfunc
+    sfunc = agg_min_range_transfunc
 );
 create aggregate max (int4range)
 (
     stype = int4range,
-    sfunc = agg_max_transfunc
+    sfunc = agg_max_range_transfunc
 );
 
 CREATE FUNCTION combine_set_mult_min(int4range[], int4range) 
@@ -299,9 +281,19 @@ create aggregate count (int4range)
 
 
 --------- AVERAGE ----------
--- create aggregate avg (int4range)
--- (
---     stype = internal,   -- avg_stateType
---     sfunc = agg_avg_set_finalfunc,
---     finalfunc = agg_sum_set_finalfunc
--- );
+CREATE FUNCTION agg_avg_range_transfunc(internal, data int4range, mult int4range) 
+RETURNS internal
+AS 'MODULE_PATHNAME', 'agg_avg_range_transfunc'
+LANGUAGE c;
+
+CREATE FUNCTION agg_avg_range_finalfunc() 
+RETURNS int4range
+AS 'MODULE_PATHNAME', 'agg_avg_range_finalfunc'
+LANGUAGE c;
+
+create aggregate avg (data int4range, mult int4range)
+(
+    stype = internal,   -- rAvgAggState
+    sfunc = agg_avg_range_transfunc,
+    finalfunc = agg_avg_range_finalfunc
+);

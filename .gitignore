@@ -5,6 +5,7 @@
 # Test suite files to ignore
 database.ini
 tests/data/
+c_extension/tests/data/
 
 # https://github.com/github/gitignore/blob/main/C.gitignore
 

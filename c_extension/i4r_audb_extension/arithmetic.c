@@ -319,6 +319,7 @@ Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult) {
     Int4Range rv;
     int minLB;
     int maxUB;
+    size_t j;
     
     // convert mult to I4R... make exlusive upper
     multSet.count = 1;
@@ -330,7 +331,6 @@ Int4Range floatIntervalSetMult(Int4RangeSet a, Multiplicity mult) {
     minLB = mult.lower;
     maxUB = mult.upper+1;
     
-    size_t j;
     for (j=0; j < a.count; j++){
         int r1;
         int r2;

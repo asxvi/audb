@@ -122,14 +122,17 @@ Int4Range max_range(Int4Range range1, Int4Range range2) {
   Room for optimization avoiding non overlapping comparisons
 */
 Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b){
+  Int4RangeSet rv;
+  Int4RangeSet result;
+  int aptr;
+  int bptr;
+  
   // empty sets
   // if (a.count > 0 && a.ranges[0].isNull) return normalize(b);
   // if (b.count > 0 && b.ranges[0].isNull) return normalize(a);
   if (a.count == 0) return b;
   if (b.count == 0) return a;
   
-  Int4RangeSet rv, result;
-  int aptr, bptr;
   
   rv.ranges = malloc(sizeof(Int4Range) * (a.count + b.count));
   rv.containsNull = false;
@@ -159,14 +162,16 @@ Int4RangeSet min_rangeSet(Int4RangeSet a, Int4RangeSet b){
   Room for optimization avoiding non overlapping comparisons
 */
 Int4RangeSet max_rangeSet(Int4RangeSet a, Int4RangeSet b){
+  Int4RangeSet rv;
+  Int4RangeSet result;
+  int aptr;
+  int bptr;
+  
   // empty sets
   // if (a.count > 0 && a.ranges[0].isNull) return normalize(b);
   // if (b.count > 0 && b.ranges[0].isNull) return normalize(a);
   if (a.count == 0) return b;
   if (b.count == 0) return a;
-  
-  Int4RangeSet rv, result;
-  int aptr, bptr;
   
   rv.ranges = malloc(sizeof(Int4Range) * (a.count + b.count));
   rv.containsNull = false;
@@ -209,7 +214,10 @@ static int q_sort_compare_ranges(const void* range1, const void* range2){
 // returns sorted array with NULL appended if necessary.
 Int4RangeSet sort(Int4RangeSet vals){
   Int4RangeSet sorted;
-  
+  size_t nonNullCount;
+  size_t i;
+  size_t idx;
+
   if (vals.count == 0){
     sorted.count = 0;
     sorted.ranges = NULL;
@@ -218,9 +226,6 @@ Int4RangeSet sort(Int4RangeSet vals){
   }
 
   // filter out nulls
-  size_t nonNullCount;
-  size_t i;
-  
   nonNullCount = 0;
   for (i = 0; i < vals.count; i++) {
     if (!vals.ranges[i].isNull) nonNullCount++;
@@ -230,7 +235,6 @@ Int4RangeSet sort(Int4RangeSet vals){
   sorted.ranges = malloc(sizeof(Int4Range) * sorted.count);
   sorted.containsNull = vals.containsNull;
 
-  size_t idx;
   idx = 0;
   for (i = 0; i < vals.count; i++) {
     if (!vals.ranges[i].isNull) {
@@ -260,6 +264,7 @@ Int4RangeSet normalize(Int4RangeSet vals){
   Int4RangeSet sorted;
   Int4Range prev;
   size_t i;
+  bool hadNull;
 
   if (vals.count == 0){
     normalized.count = 0;
@@ -270,7 +275,7 @@ Int4RangeSet normalize(Int4RangeSet vals){
   
   sorted = sort(vals);
   
-  bool hadNull = sorted.containsNull;
+  hadNull = sorted.containsNull;
   // remove null is present
   if (hadNull) {
     sorted = filterOutNulls(sorted);
@@ -417,14 +422,15 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
 // removes any NULLs in the set. returns a set that with containsNULL = false.
 // set no longer knows it contains nulls; this must be tracked when called.
 Int4RangeSet filterOutNulls(Int4RangeSet vals) {
-  if (!vals.containsNull) {
-    return vals;
-  }
-  
   Int4RangeSet filteredVals;
   size_t nonNullCount;
   size_t i;
+  int idx;
   
+  if (!vals.containsNull) {
+    return vals;
+  }
+
   nonNullCount = 0;
   for (i = 0; i < vals.count; i++) {
     if (!vals.ranges[i].isNull) nonNullCount++;
@@ -435,7 +441,6 @@ Int4RangeSet filterOutNulls(Int4RangeSet vals) {
   filteredVals.containsNull = false;
   // filteredVals.containsNull = vals.containsNull;
 
-  int idx;
   idx = 0;
   for (i = 0; i < vals.count; i++) {
     if (!vals.ranges[i].isNull) {
@@ -455,8 +460,14 @@ Int4RangeSet filterOutNulls(Int4RangeSet vals) {
 Int4RangeSet
 interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
     Int4RangeSet result;
-    // bool leftNull, rightNull;
     int total_result_ranges;
+    // bool leftNull, rightNull;
+    int i;
+    int j;
+    int idx;
+    Int4RangeSet multSet;
+    Int4RangeSet tempResult;
+    Int4RangeSet normOutput;
 
     total_result_ranges = set1.count * (mult.upper - mult.lower);
     
@@ -468,7 +479,6 @@ interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
     // leftNull = set1.containsNull;
     // rightNull = mult.lower == 0;
     
-    int i, idx;
     idx = 0;
     // traverse thru every set/mult combination and union result
     for (i = mult.lower; i < mult.upper; i++) {
@@ -477,8 +487,6 @@ interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
             continue;
         }
 
-        Int4RangeSet multSet;
-
         multSet.containsNull = false;
         multSet.count = 1;
         multSet.ranges = palloc(sizeof(Int4Range));
@@ -486,12 +494,10 @@ interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
         multSet.ranges[0].upper = i+2;      // account for exclusive UB representation 
         multSet.ranges[0].isNull = false;
 
-        Int4RangeSet tempResult;
         tempResult = range_set_multiply_internal(set1, multSet);
         pfree(multSet.ranges);
 
         // union in new results
-        int j;
         for (j = 0; i < tempResult.count; j++) {
             result.ranges[idx] = tempResult.ranges[j];
             idx++;
@@ -502,10 +508,132 @@ interval_agg_combine_set_mult(Int4RangeSet set1, Int4Range mult) {
     }
     result.count = idx;
 
-    Int4RangeSet normOutput;
     normOutput = normalize(result);
 
     pfree(result.ranges);
     
     return normOutput;
 }
+
+
+
+
+
+// ArrayType*
+// normalizeRange(ArrayType *input1) {
+//     Oid elemTypeOID;
+//     TypeCacheEntry *typcache;
+
+//     elemTypeOID = input1->elemtype;
+//     typcache = lookup_type_cache(elemTypeOID, TYPECACHE_RANGE_INFO);
+    
+//     // deconstruct array, create our representation of I4R, call function and get 'normalized' result
+//     Datum *elems1;
+//     bool *nulls1;
+//     int n1;
+//     deconstruct_array(input1, elemTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign, &elems1, &nulls1, &n1);
+
+//     // Our representation of I4R. Should be freed after normalizing/reducing to potentially smaller range
+//     Int4RangeSet set1;
+//     set1.containsNull = false;
+//     set1.ranges = palloc(sizeof(Int4Range) * n1);
+    
+//     int currIdx = 0;
+//     int i;
+//     for(i=0; i < n1; i++){
+        
+//         // the RangeType at this index is NULL
+//         // only insert a NULL entry ONCE into the currIdx
+//         if (nulls1[i] && !set1.containsNull) {
+//             set1.ranges[currIdx].lower = 0;
+//             set1.ranges[currIdx].upper = 0; // maybe remove?
+
+//             set1.ranges[currIdx].isNull = true;
+//             set1.containsNull = true;
+//             currIdx++;
+//         }
+//         // otherwise Extract RangeType elements
+//         else {
+//             RangeType *curr;
+//             RangeBound l1, u1;
+//             bool isEmpty1;
+            
+//             curr = DatumGetRangeTypeP(elems1[i]);
+//             range_deserialize(typcache, curr, &l1, &u1, &isEmpty1);
+
+//             // if the RangeType is not empty, append to 
+//             if (!isEmpty1) {
+//                 set1.ranges[currIdx].lower = DatumGetInt32(l1.val);
+//                 set1.ranges[currIdx].upper = DatumGetInt32(u1.val);
+//                 set1.ranges[currIdx].isNull = false;
+//                 currIdx++;
+//             }
+//         }
+//     }
+//     set1.count = currIdx;
+    
+//     Int4Range *temp;
+//     // return empty array if there is no result
+//     if (set1.count == 0) {
+//         pfree(set1.ranges);
+//         return construct_empty_array(elemTypeOID);
+//     }
+//     // change size of working set after removing over allocated arr
+//     else {
+//         temp = repalloc(set1.ranges, sizeof(Int4Range) * set1.count);
+//         if (temp != NULL) set1.ranges = temp;
+//     }
+
+//     // Remove all possible overlap.
+//     Int4RangeSet rv;
+//     rv = normalize(set1);
+
+//     Datum *datums;
+//     bool  *nulls;
+//     datums = palloc(sizeof(Datum) * rv.count);
+//     nulls  = palloc(sizeof(bool) * rv.count);
+    
+//     // convert self defined type into valid Postgres Type
+//     for(i=0; i<rv.count; i++){
+//         // trigger NULL index properly
+//         if (rv.ranges[i].isNull) {
+//             nulls[i] = true;
+//             datums[i] = (Datum) 0;
+//             continue;
+//         }
+        
+//         nulls[i] = false;
+        
+//         RangeBound lowerRv, upperRv;
+//         lowerRv.val = Int32GetDatum(rv.ranges[i].lower);
+//         lowerRv.inclusive = true;
+//         lowerRv.infinite = false;
+//         lowerRv.lower = true;
+
+//         upperRv.val = Int32GetDatum(rv.ranges[i].upper);
+//         upperRv.inclusive = false;
+//         upperRv.infinite = false;
+//         upperRv.lower = false;
+
+//         RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
+//         datums[i] = RangeTypePGetDatum(r);
+//     }
+
+//     // Convert array of Datums into an ArrayType
+//     int ndim;
+//     int dims[1];
+//     int lbs[1];
+    
+//     ndim = 1;
+//     dims[0] = rv.count;
+//     lbs[0] = 1;
+
+//     ArrayType *resultsArrOut = construct_md_array(datums, nulls, ndim, dims, lbs, elemTypeOID, typcache->typlen, typcache->typbyval, typcache->typalign);
+    
+//     pfree(elems1);
+//     pfree(nulls1);
+//     pfree(set1.ranges);
+//     pfree(rv.ranges);
+
+//     return resultsArrOut;
+// }

@@ -92,13 +92,16 @@ deserialize_ArrayType(ArrayType *arr, TypeCacheEntry *typcache)
     int16 typlen;
     bool typbyval;
     char typalign;
+    Datum *elems;
+    bool *nulls;
+    int count;
+    int currIdx;
+    int i;
+
     rangeTypeOID = typcache->type_id;
     get_typlenbyvalalign(rangeTypeOID, &typlen, &typbyval, &typalign);
     
     // deconstruct array
-    Datum *elems;
-    bool *nulls;
-    int count;
     deconstruct_array(arr, rangeTypeOID, typlen, typbyval, typalign, &elems, &nulls, &count);
 
     // create an empty I4RSet if Array is empty
@@ -116,8 +119,6 @@ deserialize_ArrayType(ArrayType *arr, TypeCacheEntry *typcache)
     set.ranges = palloc(sizeof(Int4Range) * count);
 
     // go through every RangeType in array, and deserialize it
-    int currIdx;
-    int i;
     currIdx = 0;
     for (i = 0; i < count; i++) {
         
@@ -167,6 +168,11 @@ ArrayType*
 serialize_ArrayType(Int4RangeSet set, TypeCacheEntry *typcache)
 {
     ArrayType *result;
+    RangeBound lowerRv, upperRv;
+    RangeType *r;
+    int ndim;
+    int dims[1];
+    int lbs[1];
 
     // must handle datums and nulls independently. get errors when calling range functions (make_range, range_deserialize) on nulls
     Datum *datums;
@@ -185,18 +191,14 @@ serialize_ArrayType(Int4RangeSet set, TypeCacheEntry *typcache)
         
         nulls[i] = false;
             
-        RangeBound lowerRv, upperRv;     
+        
         lowerRv = make_range_bound(set.ranges[i].lower, true, true);
         upperRv = make_range_bound(set.ranges[i].upper, false, false);
         
-        RangeType *r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
+        r = make_range(typcache, &lowerRv, &upperRv, false, NULL);
         datums[i] = RangeTypePGetDatum(r);
     }
-
-    int ndim;
-    int dims[1];
-    int lbs[1];
-    
+    // 1D array of size set.count
     ndim = 1;
     dims[0] = set.count;
     lbs[0] = 1;

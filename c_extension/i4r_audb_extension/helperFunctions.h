@@ -52,7 +52,12 @@ typedef struct {
 typedef struct {
     Int4Range sum;
     Int4Range count;
-} avg_stateType;
+} rAvgAggState;
+
+typedef struct {
+    Int4RangeSet sum;
+    Int4Range count;
+} sAvgAggState;
 
 // add extra utilites for working with defined type
 void printRange(Int4Range a);
