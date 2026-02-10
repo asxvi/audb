@@ -185,7 +185,7 @@ class ExperimentRunner:
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
                    
-                    results['sum_time'] = self.run_aggregate(cur, table, 'SUM2', config['combine_sum'], 10, 10)
+                    results['sum_time'] = self.run_aggregate(cur, table, 'SUM', config['combine_sum'], 10, 10)
 
                     results['min_time'] = self.run_aggregate(cur, table, 'MIN', config['combine_min'])
                     results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
