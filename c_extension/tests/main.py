@@ -1,4 +1,3 @@
-# naming q_n1000_i2
 import csv
 import random
 import time
@@ -29,8 +28,6 @@ class ExperimentSettings:
     interval_size_range: tuple = (1, 100)
     mult_size_range: tuple = (1,5)      # required 
     
-
-
     # use these value if not None, otherwise use tuple if not None, both none = error
     num_intervals: int = None       
     gap_size: int = None
@@ -42,6 +39,10 @@ class ExperimentSettings:
     save_ddl:bool = False           # store ddl code to make tables 
     save_csv: bool = False          # store csv with statistics and results of test
     # insert_to_db: bool = False      # this is actually stupid, but currently code relies on this
+
+    # start_int_range()
+    # 
+    reduce_trigger_size: tuple = None       #test this. need to figure out how to encode different techniques.
 
     def asdict(self):
         dt = 'range' if self.data_type == DataType.RANGE else 'set'
@@ -121,13 +122,12 @@ class ExperimentRunner:
 
     def run_aggregate(self, cur, table, agg_name, combine_func, *agg_params):
         '''General aggregate runner with no WHERE clause'''
+
         params_sql = ",".join(str(param) for param in agg_params)
         sql = f"""EXPLAIN (analyze, format json)
             SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
             FROM {table};"""
         
-        
-
         cur.execute(sql)
         results = cur.fetchone()[0]
         plan_root = results[0]
@@ -184,13 +184,10 @@ class ExperimentRunner:
                 with conn.cursor() as cur:
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
-                   
-                    results['sum_time'] = self.run_aggregate(cur, table, 'SUM', config['combine_sum'], 10, 10)
-
+                    results['sum_time'] = self.run_aggregate(cur, table, 'SUM', config['combine_sum'], experiment.reduce_trigger_size[0], experiment.reduce_trigger_size[1])
                     results['min_time'] = self.run_aggregate(cur, table, 'MIN', config['combine_min'])
                     results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
 
-        
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
             exit(1)
@@ -257,12 +254,10 @@ class ExperimentRunner:
         elif experiment.num_intervals_range is not None:
             num_intervals = np.random.randint(*experiment.num_intervals_range)
         else:
-            raise ValueError()
+            raise ValueError("Either num_intervals or num_intervals_range must be specified")
         
         rset = []
-        
-        # FIXME account for gapsize
-
+        # FIXME account for gapsize. need to acocunt for (interval size range / (number interval * gap size))
         for i in range(num_intervals):    
             # uncertain ratio. maybe should account for half nulls, half mult 0
             if np.random.random() < experiment.uncertain_ratio * 0.5:  
@@ -272,6 +267,10 @@ class ExperimentRunner:
             lb = np.random.randint(*experiment.interval_size_range)
             ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
             
+            # if i < num_intervals - 1 and experiment.gap_size is not None or experiment.gap_size_range is not None:
+            #     gap = experiment.gap_size if experiment.gap_size else np.random.randint(**experiment.gap_size_range)
+                
+
             rset.append(RangeType(lb,ub,False))
         
         return RangeSetType(rset, cu=False)
@@ -292,10 +291,18 @@ class ExperimentRunner:
 
         aggregated = {
             'uid' : self.__generate_name(experiment, True),
+            'master_seed': self.master_seed,
             'data_type' : 'range' if experiment.data_type == DataType.RANGE else 'set',
-            'dataset_size' : experiment.dataset_size,
             'num_trials': experiment.num_trials,
-            'master_seed' : self.master_seed,
+            'dataset_size' : experiment.dataset_size,
+            'uncertain_ratio': experiment.uncertain_ratio,
+            'interval_size_range':experiment.interval_size_range,
+            'mult_size_range': experiment.mult_size_range,
+            'num_intervals': experiment.num_intervals,
+            'gap_size': experiment.gap_size,
+            'num_intervals_range': experiment.num_intervals_range,
+            'gap_size_range': experiment.gap_size_range,
+            'reduce_trigger_size': experiment.reduce_trigger_size,
 
             # MIN stats
             'min_time_mean': np.mean(min_times) if min_times else None,
@@ -323,7 +330,6 @@ class ExperimentRunner:
 
     def clean_tables(self, config, find_trigger="t_%"):
         print(f"Cleaning/ Dropping all Tables starting with '{find_trigger}'")
-        dbname = config['database']
 
         with self.connect_db() as conn:
             with conn.cursor() as cur:
@@ -402,7 +408,8 @@ def run_all():
         experiments = load_experiments_from_file(args.experiments_file)
     elif args.code:
         print("     **Need to implement this better, but write code below this print statement in main.py run_all()**")
-
+        
+        '''
         # ADD TESTS HERE
         # SAMPLE CODE
         # trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
@@ -417,6 +424,8 @@ def run_all():
         #     runner.run_experiment(trial)
         
         # runner.clean_tables(db_config)
+        # '''
+
         return 
 
     # Only run specific mode of ExperimentRunner
@@ -445,8 +454,12 @@ def generate_seed(in_seed=None):
     return seed
 
 
-if __name__ == '__main__':    
+if __name__ == '__main__':
+    start = time.perf_counter()
     run_all()
+    end = time.perf_counter()
+
+    print(f"Tests took {end-start:.3f} s")
 
 # python3 main.py --quick -dt r -nt 5 -sz 2 -ur .0 -ca        
 # python3 main.py -xf tests_config.yaml -cb   

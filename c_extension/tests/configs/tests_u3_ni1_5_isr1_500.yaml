@@ -7,7 +7,7 @@ experiments:
     interval_size_range: [1, 500]
     num_intervals_range: [1,5]
     gap_size_range: [5, 100]
-    num_trials: 3
+    num_trials: 5
     insert_to_db: true
     save_csv: false
     mode: all
@@ -20,7 +20,7 @@ experiments:
     interval_size_range: [1, 500]
     num_intervals_range: [1,5]
     gap_size_range: [5, 100]
-    num_trials: 3
+    num_trials: 5
     insert_to_db: true
     save_csv: false
     mode: all
@@ -33,7 +33,7 @@ experiments:
     interval_size_range: [1, 500]
     num_intervals_range: [1,5]
     gap_size_range: [5, 100]
-    num_trials: 3
+    num_trials: 5
     insert_to_db: true
     save_csv: false
     mode: all
@@ -47,7 +47,7 @@ experiments:
     interval_size_range: [1, 500]
     num_intervals_range: [1,5]
     gap_size_range: [5, 100]
-    num_trials: 3
+    num_trials: 5
     insert_to_db: true
     save_csv: false
     mode: all
@@ -60,7 +60,7 @@ experiments:
     interval_size_range: [1, 500]
     num_intervals_range: [1,5]
     gap_size_range: [5, 100]
-    num_trials: 3
+    num_trials: 5
     insert_to_db: true
     save_csv: false
     mode: all

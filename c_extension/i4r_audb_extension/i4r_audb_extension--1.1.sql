@@ -192,9 +192,6 @@ create aggregate sum (int4range[], resizeTrigger integer, sizeLimit integer)
     finalfunc = agg_sum_set_finalfunc
 );
 
-
-
-
 ---------- MIN/ MAX -----------
 -- not sure if this is more functions than need be
 
@@ -286,7 +283,7 @@ RETURNS internal
 AS 'MODULE_PATHNAME', 'agg_avg_range_transfunc'
 LANGUAGE c;
 
-CREATE FUNCTION agg_avg_range_finalfunc() 
+CREATE FUNCTION agg_avg_range_finalfunc(internal) 
 RETURNS int4range
 AS 'MODULE_PATHNAME', 'agg_avg_range_finalfunc'
 LANGUAGE c;

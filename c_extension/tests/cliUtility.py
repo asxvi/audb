@@ -130,6 +130,14 @@ def parse_args():
         nargs=2,
         help='Bounds for possible interval size. Ex: -isr a b (Default=(1,100))'
     )
+    quick_group.add_argument(
+        '-rts', '--reduce-trigger-size',
+        required=False,
+        default=(10,10),
+        type=positive_int,
+        nargs=2,
+        help='Parameters for reduction helper used in sum etc'
+    )
     
     # output options
     quick_group.add_argument(
@@ -229,7 +237,8 @@ def create_quick_experiment(args: argparse.Namespace) -> dict:
         save_csv=args.save_csv,
         save_ddl= args.save_ddl,
         # insert_to_db=args.insert_to_db,
-        mode=args.mode
+        mode=args.mode,
+        reduce_trigger_size=args.reduce_trigger_size,
     )
 
     return {name: experiment}
@@ -272,6 +281,7 @@ def load_experiments_from_file(filename: str) -> dict:
             save_csv=exp_config.get('save_csv', None),
             mode=exp_config.get('mode', None),
             # insert_to_db=exp_config.get('insert_to_db', False),
+            reduce_trigger_size=exp_config.get('reduce_trigger_size', (10, 10)),
         )
 
     return experiments
