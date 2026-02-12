@@ -3,8 +3,11 @@
     Contains methods for operating arithmetic, logical, and general helper methods
 """
 
+from __future__ import annotations
 from enum import Enum
 import itertools
+import numpy as np
+from dataclasses import dataclass
 
 '''
     local represention of postres RangeType. helper methods include arithmetic,
@@ -283,7 +286,6 @@ class RangeSetType:
         
         return RangeSetType(rset, cu=False)
 
-# not sure if this is needed anymore, cant we just do type() as a param to class ExperimentSettings
 class DataType(Enum):
     RANGE = RangeType
     SET = RangeSetType

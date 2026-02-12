@@ -3,6 +3,7 @@
     Contains all code regarding db config file parsing.
 """
 
+from __future__ import annotations
 import time
 import argparse
 import yaml
@@ -10,7 +11,7 @@ from configparser import ConfigParser
 import os
 
 from DataTypes import DataType
-from main import ExperimentRunner, ExperimentSettings
+from main import ExperimentSettings
 
 def find(name, path):
     for root, dirs, files in os.walk(path):
@@ -47,7 +48,7 @@ def parse_args():
 
     exp_group = parser.add_mutually_exclusive_group(required=True)
     exp_group.add_argument(
-        '-xf', '--experiments-file',
+        '-xf', '--yaml-experiments-file',
         type=str,
         help="YAML file with defined experiments"
     )
@@ -57,9 +58,9 @@ def parse_args():
         help="Quick run experiment fully defined with CLI flags"
     )
     exp_group.add_argument(
-        '--code',
-        action='store_true',
-        help="Use inline code to run experiment. Good for range based testing."
+        '-py', '--code',
+        type=str,
+        help=".py file with defined experiments"
     )
 
     quick_group = parser.add_argument_group("Quick experiment options (must use --quick)")
@@ -148,14 +149,6 @@ def parse_args():
         help='Directory for output files (default: data/)'
     )
 
-    # quick_group.add_argument(
-    #     '-ddl', '--save_ddl',
-    #     required=False,
-    #     type=str,
-    #     default='data',
-    #     help='Directory for DDL code (default: data/)'
-    # )
-
     quick_group.add_argument(
         '-ddl', '--save_ddl',
         required=False,
@@ -238,7 +231,7 @@ def create_quick_experiment(args: argparse.Namespace) -> dict:
         save_ddl= args.save_ddl,
         # insert_to_db=args.insert_to_db,
         mode=args.mode,
-        reduce_trigger_size=args.reduce_trigger_size,
+        reduce_triggerSz_sizeLim=args.reduce_triggerSz_sizeLim,
     )
 
     return {name: experiment}
@@ -281,7 +274,7 @@ def load_experiments_from_file(filename: str) -> dict:
             save_csv=exp_config.get('save_csv', None),
             mode=exp_config.get('mode', None),
             # insert_to_db=exp_config.get('insert_to_db', False),
-            reduce_trigger_size=exp_config.get('reduce_trigger_size', (10, 10)),
+            reduce_triggerSz_sizeLim=exp_config.get('reduce_triggerSz_sizeLim', (10, 10)),
         )
 
     return experiments

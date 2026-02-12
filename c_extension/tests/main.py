@@ -1,9 +1,8 @@
-import csv
+from numerize import numerize
 import random
 import time
 import os
-import psycopg2
-import psycopg2.extras
+import psycopg2, psycopg2.extras
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
@@ -41,8 +40,7 @@ class ExperimentSettings:
     # insert_to_db: bool = False      # this is actually stupid, but currently code relies on this
 
     # start_int_range()
-    # 
-    reduce_trigger_size: tuple = None       #test this. need to figure out how to encode different techniques.
+    reduce_triggerSz_sizeLim: tuple = (10,5)       #test this. need to figure out how to encode different techniques.
 
     def asdict(self):
         dt = 'range' if self.data_type == DataType.RANGE else 'set'
@@ -61,8 +59,7 @@ class ExperimentSettings:
             'num_intervals_range': self.num_intervals_range,
             'gap_size_range': self.gap_size_range
         }
-
-
+    
 class ExperimentRunner:
     '''
         ExperimentRunner runs entire or parts of a test (gen_data, insert_db) by taking an ExperimentSettings
@@ -184,7 +181,7 @@ class ExperimentRunner:
                 with conn.cursor() as cur:
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
-                    results['sum_time'] = self.run_aggregate(cur, table, 'SUM', config['combine_sum'], experiment.reduce_trigger_size[0], experiment.reduce_trigger_size[1])
+                    results['sum_time'] = self.run_aggregate(cur, table, 'SUM', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
                     results['min_time'] = self.run_aggregate(cur, table, 'MIN', config['combine_min'])
                     results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
 
@@ -302,7 +299,7 @@ class ExperimentRunner:
             'gap_size': experiment.gap_size,
             'num_intervals_range': experiment.num_intervals_range,
             'gap_size_range': experiment.gap_size_range,
-            'reduce_trigger_size': experiment.reduce_trigger_size,
+            'reduce_triggerSz_sizeLim': experiment.reduce_triggerSz_sizeLim,
 
             # MIN stats
             'min_time_mean': np.mean(min_times) if min_times else None,
@@ -377,6 +374,12 @@ class ExperimentRunner:
             return f"t_{experiment.name}_{dtype}_s{self.master_seed}"
 
         return f"t_{experiment.name}_{dtype}_t{experiment.curr_trial}_s{self.master_seed}_ts{self.trial_seed}"
+    
+    # def format_datasize(size):
+    #     if size >= 1_000_000: 
+    #         return numerize.numerize(size, 2)
+    #     return numerize.numerize(size, 0)
+
 
 def run_all():
     ### parse args and config
@@ -404,33 +407,21 @@ def run_all():
     # run experiments in experiment config.yaml, or based on flag input
     if args.quick:
         experiments = create_quick_experiment(args)
-    elif args.experiments_file is not None:
-        experiments = load_experiments_from_file(args.experiments_file)
+    elif args.yaml_experiments_file is not None:
+        experiments = load_experiments_from_file(args.yaml_experiments_file)
     elif args.code:
-        print("     **Need to implement this better, but write code below this print statement in main.py run_all()**")
+        # expect a file with ExperimentSetting Classes with defined experiments
         
-        '''
-        # ADD TESTS HERE
-        # SAMPLE CODE
-        # trial1 = ExperimentSettings(name="test1", data_type=DataType.RANGE, dataset_size=10, uncertain_ratio=0.1, mult_size_range=(1,5),
-        #                             interval_size_range=(1, 100), num_intervals=2, num_intervals_range=(1,3), save_csv=False, save_ddl=True, mode="all",
-        #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
-        # runner.run_experiment(trial1)
-        # sample_sizes = [100, 1000, 5000, 10000, 25000, 50000]
-        # for s in sample_sizes:
-        #     trial = ExperimentSettings(name=f"test_{s}", data_type=DataType.RANGE, dataset_size=s, uncertain_ratio=0.1, mult_size_range=(1,5),
-        #                             interval_size_range=(1, 100), save_csv=False, save_ddl=True, mode="all",
-        #                             num_trials=2, gap_size_range=(0,5), gap_size=None)
-        #     runner.run_experiment(trial)
-        
-        # runner.clean_tables(db_config)
-        # '''
-
-        return 
+        namespace = {'runner': runner, 'db_config': db_config,}
+        exec(open(args.code).read(), namespace)
+        experiments = namespace.get('experiments', {})
 
     # Only run specific mode of ExperimentRunner
     for _, experiment in experiments.items():
-        runner.run_experiment(experiment)
+
+        print(experiment)
+
+        # runner.run_experiment(experiment)
     
     results_path = runner.save_results()
     print(f"Results stored in: {results_path}")
