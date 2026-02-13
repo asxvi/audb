@@ -48,7 +48,7 @@ class ExperimentSettings:
     
     mode: str = None                # what modes of test suite to execute
     save_ddl:bool = False           # store ddl code to make tables 
-    save_csv: bool = False          # store csv with statistics and results of test
+    save_csv: bool = True          # store csv with statistics and results of test
     reduce_triggerSz_sizeLim: tuple = (10,5)       #test this. need to figure out how to encode different techniques.
     # start_int_range()
 
@@ -84,7 +84,7 @@ class ExperimentSettings:
     
 class ExperimentRunner:
     '''
-        ExperimentRunner runs entire or parts of a test (gen_data, insert_db) by taking an ExperimentSettings
+        ExperimentRunner runs entire or parts of a test (gen_data, insert_db)
     '''
     def __init__(self, db_config, seed):
         self.db_config = db_config
@@ -93,6 +93,7 @@ class ExperimentRunner:
         self.trial_seed = None
         self.resultFilepath: str = None
         self.name = None
+        self.groupName = None
 
     DATA_TYPE_CONFIG = {
         DataType.RANGE: {
@@ -111,7 +112,6 @@ class ExperimentRunner:
         '''an experiement has N trials. gen data for each trial, run queries//benchmark results, and append to results'''    
         # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
         experiment_results = []
-        cold_results = []
         
         for trial in range(experiment.num_trials):
             # create a trial seed dependent on the master seed, and specific trial number
@@ -119,22 +119,19 @@ class ExperimentRunner:
             self.trial_seed = (self.master_seed + experiment.curr_trial) % (2**32)
             np.random.seed(self.trial_seed)
             experiment.experiment_id = self.__generate_name(experiment)
-            # print(experiment.experiment_id)
             
             # get randomly generated data for curr seed
             db_data_format, file_data_format = self.generate_data(experiment)
 
-            # save in ddl compatible format. Insert into DB regardless... need to run tests
+            # save in ddl compatible format. Insert into DB regardless... need to run tests.
+            # DOES NOT WORK properly
             if experiment.save_ddl:
-                self.insert_data_file(experiment, file_data_format)
+                self.__save_ddl_file(experiment, file_data_format)
             
             self.insert_data_db(experiment, db_data_format)
 
             # run queries and benchmark
             trial_results = self.run_queries(experiment)
-            # if (experiment.curr_trial == 1):
-                # cold_results.append(trial_results)
-            # else:
             experiment_results.append(trial_results)
 
         aggregated_results = self.__calc_aggregate_results(experiment, experiment_results)
@@ -232,32 +229,6 @@ class ExperimentRunner:
                 sql = f"INSERT INTO {table_name} (val, mult) VALUES %s"
                 psycopg2.extras.execute_values(cur, sql, data, template)
                 conn.commit()
-
-    def insert_data_file(self, experiment: ExperimentSettings, data):
-        ''' Write data to SQL file for later loading '''
-
-        experiment_folder_path = f'data/{experiment.name + "_s" + str(self.master_seed)}'
-        table_name = experiment.experiment_id
-        os.makedirs(experiment_folder_path, exist_ok=True)        
-        filepath = f"{experiment_folder_path}/{table_name}.sql"
-            
-        with open(filepath, 'w') as file:
-            if experiment.data_type == DataType.RANGE:
-                file.write(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range, mult int4range);\n\n")
-            elif experiment.data_type == DataType.SET:
-                file.write(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range[], mult int4range);\n\n")
-            
-            batch_size = 100
-            for i in range(0, len(data), batch_size):
-                batch = data[i: i + batch_size]
-                file.write(f"INSERT INTO {table_name} (val, mult) VALUES \n")
-
-                values = []
-                for val, mult in batch:                    
-                    values.append(f"    ({val}, {mult})")
-
-                file.write(',\n'.join(values))
-                file.write(';\n\n')
         
     def __generate_range(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
@@ -350,8 +321,9 @@ class ExperimentRunner:
         return psycopg2.connect(**self.db_config)
 
     def clean_tables(self, find_trigger="t_%"):
-        print(f"Cleaning/ Dropping all Tables starting with '{find_trigger}'")
-
+        '''drop all tables with wildcard match: find_trigger'''
+        
+        print(f"\nCleaning/ Dropping all Tables starting with '{find_trigger}'")
         with self.connect_db() as conn:
             with conn.cursor() as cur:
                 try:
@@ -366,20 +338,17 @@ class ExperimentRunner:
                 
                     for table in tables:
                         cur.execute(f"DROP TABLE {table[0]};")
-                        print(f" Dropping Table {table[0]}")
+                        print(f"  Dropping Table {table[0]}")
 
                 except Exception as e:
-                    print(f"Error cleaning tables: {e}")
+                    print(f"    Error cleaning tables: {e}")
                     conn.rollback()
 
-    
-    def save_csv_results(self, group_name: str, experiment_name: str) -> str:
-        '''Save experiment results to CSV'''
-        if not self.results:
-            return 
-        
+    def set_file_path(self, group_name: str, experiment_name:str) -> None:
+        '''creates experiments root folder'''
+
         timestamp = time.strftime("d%d_m%m_y%Y")
-        out_file = f'{timestamp}_{experiment_name}_{self.master_seed}'
+        out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
         
         # prepend group in output path
         if group_name:
@@ -388,24 +357,56 @@ class ExperimentRunner:
             experiment_folder_path = f'data/results/{out_file}'
         
         self.resultFilepath = experiment_folder_path
-        os.makedirs(experiment_folder_path, exist_ok=True)   
+
+    def save_results(self, experiment: ExperimentSettings):
+        '''handles all experiment file outputs. (DDL, CSV results, Plots)
+        **Does not handle DDL, DDL is handeled in run_experiment after generating data'''
+
+        outputs = {}
+
+        if self.results and experiment.save_csv:
+            csv_path = self.__generate_csv_results(experiment.name)
+            outputs['csv'] = csv_path
+            print(f"  CSV saved: {csv_path}")
+
+            if csv_path and experiment.independent_variable:
+                plot_path = self.__generate_stats_results(experiment.name, experiment.independent_variable)
+                outputs['plot'] = plot_path
+                print(f"  Plot saved: {plot_path}")
         
-        df = pd.DataFrame(self.results)
+        return outputs
+
+    def __generate_csv_results(self, experiment_name: str) -> str:
+        '''save experiment results to CSV'''
+        if not self.results:
+            return 
+
+        experiment_folder_path = self.resultFilepath
+        timestamp = time.strftime("d%d_m%m_y%Y")
+        out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
         csv_path = f'{experiment_folder_path}/{out_file}.csv'  
+
+        os.makedirs(experiment_folder_path, exist_ok=True)           
+        df = pd.DataFrame(self.results)
         df.to_csv(csv_path, index=True)
         
-        print(experiment_folder_path)
-        print(f'{experiment_folder_path}/{out_file}')
-        
-        return f'{experiment_folder_path}/{out_file}'
+        return csv_path
     
-    def generate_stats(self, csv_path, variable: str):
-        df = pd.read_csv(csv_path+".csv")
+    def __generate_stats_results(self, experiment_name: str, indep_variable: str):
+        '''save experiment plot results. Use CSV data created right before this call'''
+        
+        experiment_folder_path = self.resultFilepath
+        timestamp = time.strftime("d%d_m%m_y%Y")
+        out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
+        csv_path = f'{experiment_folder_path}/{out_file}.csv'  
+        jpg_path = f'{experiment_folder_path}/{out_file}.jpg'  
+
+        df = pd.read_csv(csv_path)
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(14, 5))
         
         # get the variable of the experiment #FIXME add in multi variable version & diff plots perhaps
         try:
-            n = df[variable]
+            n = df[indep_variable]
         except Exception as e:
             return f"error trying to get x-axis:  {e}"
             
@@ -416,34 +417,67 @@ class ExperimentRunner:
         # MIN
         ax1.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple')
         ax1.set_title("Mean Time of MIN", fontsize=14, fontweight='bold')
-        ax1.set_xlabel(f'{variable}', fontsize=12)
+        ax1.set_xlabel(f'{indep_variable}', fontsize=12)
         ax1.set_ylabel('Time (ms)', fontsize=12)
         ax1.grid(True, alpha=0.3)
 
         # MAX
         ax2.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange')
         ax2.set_title("Mean Time of MAX", fontsize=14, fontweight='bold')
-        ax2.set_xlabel(f'{variable}', fontsize=12)
+        ax2.set_xlabel(f'{indep_variable}', fontsize=12)
         ax2.set_ylabel('Time (ms)', fontsize=12)
         ax2.grid(True, alpha=0.3)
 
         # SUM
         ax3.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green')
         ax3.set_title("Mean Time of SUM", fontsize=14, fontweight='bold')
-        ax3.set_xlabel(f'{variable}', fontsize=12)
+        ax3.set_xlabel(f'{indep_variable}', fontsize=12)
         ax3.set_ylabel('Time (ms)', fontsize=12)
         ax3.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(f'{csv_path}.jpg')
-        return f'{self.resultFilepath}.jpg'
+        plt.savefig(jpg_path)
+        
+        return f'{jpg_path}'
 
+    def __save_ddl_file(self, experiment: ExperimentSettings, data):
+        ''' write data to DDL file for later loading 
+            #NOTE broken. Need way to store final group and apppend all DDL to proper directory
+        '''
+        raise DeprecationWarning("Broken. Will fix if ever actually used. NOTE- Need way to store final group and append all DDL to proper directory. Currently it stores in group dirctory, but not the specific Experiment within this group.")
 
+        experiment_folder_path = f'data/results/{self.groupName}/ddl'
+        timestamp = time.strftime("d%d_m%m_y%Y")
+        out_file = f'{timestamp}_{experiment.name}_sd{self.master_seed}'
+        ddl_path = f'{experiment_folder_path}/{out_file}.sql'    
+
+        os.makedirs(experiment_folder_path, exist_ok=True)           
+
+        table_name = experiment.experiment_id
+            
+        with open(ddl_path, 'w') as file:
+            if experiment.data_type == DataType.RANGE:
+                file.write(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range, mult int4range);\n\n")
+            elif experiment.data_type == DataType.SET:
+                file.write(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range[], mult int4range);\n\n")
+            
+            batch_size = 250
+            for i in range(0, len(data), batch_size):
+                batch = data[i: i + batch_size]
+                file.write(f"INSERT INTO {table_name} (val, mult) VALUES \n")
+
+                values = []
+                for val, mult in batch:                    
+                    values.append(f"    ({val}, {mult})")
+
+                file.write(',\n'.join(values))
+                file.write(';\n\n')
+
+        print(f"  DDL saved: {ddl_path}")
 
     def __generate_name(self, experiment: ExperimentSettings, generalName: bool = False) -> str:
         '''
             name format: t_experiment.name_{r | s}_{tX}_{master.seed}_{trial.seed}
-
             if generalName param is set, then trial number will be emit from result
         '''
         dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
@@ -456,7 +490,7 @@ class ExperimentRunner:
         return f"t_{experiment.name}_t{experiment.curr_trial}_ms{self.master_seed}_ts{seed_uid}"
     
 def run_all():
-    ### parse args and config
+    ### Parse args and config
     args = parse_args()
 
     if args.seed:
@@ -471,44 +505,39 @@ def run_all():
         print(f"Error loading config: {e}")
         exit(1)
 
-    ### start test engine with specific configuration
+    ### Start engine
     runner = ExperimentRunner(db_config, master_seed)
 
-    # clean db before using
+    ### Clean before
     if args.clean_before:
         runner.clean_tables(args.clean_before)
 
-    # run experiments in experiment config.yaml, or based on flag input
+    ### Load data: 3 branches of execution. Quick run, YAML file, python script.
     if args.quick:
         experiments = create_quick_experiment(args)
     elif args.yaml_experiments_file is not None:
         experiments = load_experiments_from_file(args.yaml_experiments_file)
     elif args.code:
-        # expect a file with ExperimentSetting Classes with defined experiments
         namespace = {'runner': runner, 'db_config': db_config,}
         exec(open(args.code).read(), namespace)
         experiments = namespace.get('experiments', {})
 
-    # go thru experiments: and run every sub-suite within each ExperimentGroup
+    ### Run every experiment and save results
     for group_name, ExpGroup in experiments.items(): 
-        iv = ExpGroup.independent_variable
-
         print(f"running experiment group:  {group_name}")
 
         # clear results buffer for each indep test group
         runner.results = []
         runner.name = ExpGroup.name
+        runner.groupName = group_name
 
         for exp_name, experiment in ExpGroup.experiments.items():
+            runner.set_file_path(group_name, exp_name)
             runner.run_experiment(experiment)
         
-        results_path = runner.save_csv_results(group_name, exp_name)
-        # csv_results_path = runner.save_results(group_name)
-        print(f"    csv stored in: {results_path}")
-        jpg_results_path = runner.generate_stats(results_path, iv)
-        print(f"    jpg stored in: {jpg_results_path}")
+        results_paths = runner.save_results(experiment)
 
-    # clean db after using
+    ### Clean after
     if args.clean_after:
         runner.clean_tables(args.clean_after)
 
@@ -553,8 +582,6 @@ def format_name(experiment: ExperimentSettings):
 
     rv =  f"{dtype}{sz}{unc}{ni_nir}{gs_gsr}{red_sz}{iv}"
     return rv
-
-
 
 if __name__ == '__main__':
     start = time.perf_counter()

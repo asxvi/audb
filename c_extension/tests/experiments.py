@@ -53,6 +53,21 @@ for i in range(100, 1000, 100):
 experiments['dataset_size1'] = dataset_size_group1
 
 
+
+dataset_size_group1 = ExperimentGroup('dataset_size_experiments1', 'dataset_size', None)
+for i in range(10000, 15000, 1000):
+    experiment = replace(
+            template,
+            dataset_size = i, 
+            independent_variable = 'dataset_size',
+        )
+    experiment.name = format_name(experiment)       # name after setting members
+    
+    dataset_size_group1.experiments[experiment.name] = experiment
+
+experiments['dataset_size2'] = dataset_size_group1
+
+
 dataset_size_group2 = ExperimentGroup('dataset_size_experiments2', 'dataset_size', None)
 for i in range(100, 1000, 100):
     experiment = replace(
