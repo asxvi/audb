@@ -370,7 +370,7 @@ class ExperimentRunner:
             print(f"  CSV saved: {csv_path}")
 
             if csv_path and experiment.independent_variable:
-                plot_path = self.__generate_stats_results(experiment.name, experiment.independent_variable)
+                plot_path = self.__generate_stats_results(csv_path, experiment.name, experiment.independent_variable)
                 outputs['plot'] = plot_path
                 print(f"  Plot saved: {plot_path}")
         
@@ -382,8 +382,12 @@ class ExperimentRunner:
             return 
 
         experiment_folder_path = self.resultFilepath
+        
+        # longer, more descriptive name, or shorter, easier name
         timestamp = time.strftime("d%d_m%m_y%Y")
-        out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
+        # out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
+        out_file = f'results_sd{self.master_seed}'
+
         csv_path = f'{experiment_folder_path}/{out_file}.csv'  
 
         os.makedirs(experiment_folder_path, exist_ok=True)           
@@ -392,14 +396,14 @@ class ExperimentRunner:
         
         return csv_path
     
-    def __generate_stats_results(self, experiment_name: str, indep_variable: str):
+    def __generate_stats_results(self, csv_path:str, experiment_name: str, indep_variable: str):
         '''save experiment plot results. Use CSV data created right before this call'''
         
         experiment_folder_path = self.resultFilepath
-        timestamp = time.strftime("d%d_m%m_y%Y")
-        out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
-        csv_path = f'{experiment_folder_path}/{out_file}.csv'  
-        jpg_path = f'{experiment_folder_path}/{out_file}.jpg'  
+        agg_out_file = f'aggregate_results_sd{self.master_seed}'
+        combined_results_file = f'combined_agg_results_sd{self.master_seed}'
+        agg_results_path =  f'{experiment_folder_path}/{agg_out_file}.jpg'
+        combined_results_file = f'{experiment_folder_path}/{combined_results_file}.jpg'
 
         df = pd.read_csv(csv_path)
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(14, 5))
@@ -417,28 +421,44 @@ class ExperimentRunner:
         # MIN
         ax1.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple')
         ax1.set_title("Mean Time of MIN", fontsize=14, fontweight='bold')
-        ax1.set_xlabel(f'{indep_variable}', fontsize=12)
+        ax1.set_xlabel(f'iv: {indep_variable}', fontsize=12)
         ax1.set_ylabel('Time (ms)', fontsize=12)
         ax1.grid(True, alpha=0.3)
 
         # MAX
         ax2.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange')
         ax2.set_title("Mean Time of MAX", fontsize=14, fontweight='bold')
-        ax2.set_xlabel(f'{indep_variable}', fontsize=12)
+        ax2.set_xlabel(f'iv: {indep_variable}', fontsize=12)
         ax2.set_ylabel('Time (ms)', fontsize=12)
         ax2.grid(True, alpha=0.3)
 
         # SUM
         ax3.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green')
         ax3.set_title("Mean Time of SUM", fontsize=14, fontweight='bold')
-        ax3.set_xlabel(f'{indep_variable}', fontsize=12)
+        ax3.set_xlabel(f'iv: {indep_variable}', fontsize=12)
         ax3.set_ylabel('Time (ms)', fontsize=12)
         ax3.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(jpg_path)
-        
-        return f'{jpg_path}'
+        plt.savefig(agg_results_path)
+
+        fig, ax = plt.subplots(figsize=(12, 5))
+
+        ax.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple', label='MIN')
+        ax.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange', label='MAX')
+        ax.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green', label='SUM')
+
+        ax.set_title(f"Query Performance vs {indep_variable})", fontsize=14, fontweight='bold')
+        ax.set_xlabel(f'iv: {indep_variable}', fontsize=12)
+        ax.set_ylabel('Time (ms)', fontsize=12)
+        ax.legend(fontsize=11)
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+
+        plt.tight_layout()
+        plt.savefig(combined_results_file)
+
+        return combined_results_file
 
     def __save_ddl_file(self, experiment: ExperimentSettings, data):
         ''' write data to DDL file for later loading 
