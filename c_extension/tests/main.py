@@ -12,6 +12,17 @@ from cliUtility import *
 from DataTypes import *
 
 @dataclass
+class ExperimentGroup:
+    '''Container class that stores groups of single IV experiments (Dicts of ExperimentSettings)'''
+    name: str
+    independent_variable: str
+    experiments: dict = None
+    
+    def __post_init__(self):
+        if self.experiments is None:
+            self.experiments = {}
+
+@dataclass
 class ExperimentSettings:
     '''
         Class contains the modifiable settings of a test
@@ -27,7 +38,8 @@ class ExperimentSettings:
     uncertain_ratio: float = 0.00       # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
     interval_size_range: tuple = (1, 100)
     mult_size_range: tuple = (1,5)      # required 
-    
+    independent_variable: str = None
+
     # use these value if not None, otherwise use tuple if not None, both none = error
     num_intervals: int = None       
     gap_size: int = None
@@ -84,7 +96,7 @@ class ExperimentRunner:
         },
     }
 
-    def run_experiment(self, experiment :ExperimentSettings) -> list:
+    def run_experiment(self, experiment: ExperimentSettings) -> list:
         '''an experiement has N trials. gen data for each trial, run queries//benchmark results, and append to results'''    
         # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
         experiment_results = []
@@ -387,13 +399,19 @@ class ExperimentRunner:
                     print(f"Error cleaning tables: {e}")
                     conn.rollback()
 
-    def save_results(self) -> str:
+    def save_results(self, group_name: str = None) -> str:
         '''Uses pandas.to_csv to write results to CSV'''
         if not self.results:
             return 
         
         out_file = f'{time.strftime("d%d_m%m_y%Y_%H:%M:%S")}_results_{self.master_seed}'
-        experiment_folder_path = f'data/results/{out_file}'
+
+        # prepend group in output path
+        if group_name:
+            experiment_folder_path = f'data/results/{group_name}/{out_file}'
+        else:
+            experiment_folder_path = f'data/results/{out_file}'
+        
         self.resultFilepath = experiment_folder_path
         os.makedirs(experiment_folder_path, exist_ok=True)   
         
@@ -451,20 +469,26 @@ def run_all():
         experiments = load_experiments_from_file(args.yaml_experiments_file)
     elif args.code:
         # expect a file with ExperimentSetting Classes with defined experiments
-        
         namespace = {'runner': runner, 'db_config': db_config,}
         exec(open(args.code).read(), namespace)
         experiments = namespace.get('experiments', {})
 
-    # Only run specific mode of ExperimentRunner
-    for _, experiment in experiments.items():
-        print(experiment)
-        runner.run_experiment(experiment)
-    
-    results_path = runner.save_results()
-    runner.generate_stats(results_path, 'dataset_size')
+    # go thru experiments: and run every sub-suite within each ExperimentGroup
+    for group_name, ExpGroup in experiments.items(): 
+        iv = ExpGroup.independent_variable
 
-    print(f"Results stored in: {results_path}")
+        print(f"running experiment group:  {group_name}")
+
+        # clear results buffer for each indep test group
+        runner.results = []
+
+        for exp_name, experiment in ExpGroup.experiments.items():
+            runner.run_experiment(experiment)
+        
+        csv_results_path = runner.save_results(group_name)
+        print(f"    csv stored in: {csv_results_path}")
+        jpg_results_path = runner.generate_stats(csv_results_path, iv)
+        print(f"    jpg stored in: {jpg_results_path}")
 
     # clean db after using
     if args.clean_after:
@@ -483,6 +507,19 @@ def generate_seed(in_seed=None):
     np.random.seed(seed)
     
     return seed
+
+def format_datasize(size):
+        if size >= 1_000_000: 
+            return str.replace(numerize.numerize(size, 2), '.', '_')
+        return numerize.numerize(size, 0)
+
+def format_name(experiment: ExperimentSettings):
+    dtype = 's' if experiment.data_type == DataType.SET else 'r'
+    sz = format_datasize(experiment.dataset_size)
+    unc = str.replace(str(experiment.uncertain_ratio), '.', '_')
+
+    return f"{dtype}_n{sz}_unc{unc}"
+
 
 
 if __name__ == '__main__':
