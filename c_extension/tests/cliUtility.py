@@ -11,7 +11,7 @@ from configparser import ConfigParser
 import os
 
 from DataTypes import DataType
-from main import ExperimentSettings
+from main import ExperimentSettings, ExperimentGroup
 
 def find(name, path):
     for root, dirs, files in os.walk(path):
@@ -237,44 +237,72 @@ def create_quick_experiment(args: argparse.Namespace) -> dict:
     return {name: experiment}
 
 def load_experiments_from_file(filename: str) -> dict:
-    '''
-        Opens specified config file, looks for 'experiments' target, returns a dict(name: ExperimentSettings)
-    '''
+    """
+    load experiments from YAML file
+    returns: dict of {group_name: ExperimentGroup}
+    
+    Expected YAML structure:
+
+    experiment_groups:
+      - group_name: dataset_size_study
+        independent_variable: dataset_size
+        experiments:
+          - name: small
+            data_type: SET
+            dataset_size: 1000
+            ...
+          - name: medium
+            data_type: SET
+            dataset_size: 10000
+            ...
+    """
     filepath = find(filename, '.')
     with open(filepath, 'r') as file:
         config = yaml.safe_load(file)
 
     experiments = {}    
 
-    for exp_config in config['experiments']:
-        name = exp_config['name']
-        if exp_config['data_type'] == 'RANGE':
-            datatype = DataType.RANGE 
-        elif exp_config['data_type'] == 'SET':
-            datatype = DataType.SET 
-        else:
-            raise Exception(f'Invalid DataType in {filepath}. View DataTypes.py.')
+    for group_config in config.get('experiment_groups', []):
+
+        group_name = group_config['group_name']
+        independent_variable = group_config.get('independent_variable', 'dataset_size')
+
+        ExpGroup = ExperimentGroup(group_name, independent_variable, None)
+
+        for exp_config in group_config.get('experiments', []):
+            name = exp_config.get('name', 'unnamed')
         
-        experiments[name] = ExperimentSettings(
-            name=name, 
-            data_type=datatype,
-            num_trials=exp_config.get('num_trials', 1),
-            dataset_size=exp_config.get('dataset_size', 100),
-            uncertain_ratio=exp_config.get('uncertain_ratio', 0.0),
+            if exp_config['data_type'] == 'RANGE':
+                datatype = DataType.RANGE 
+            elif exp_config['data_type'] == 'SET':
+                datatype = DataType.SET 
+            else:
+                raise Exception(f'Invalid DataType in {filepath}. View DataTypes.py.')
 
-            num_intervals=exp_config.get('num_intervals', None),
-            gap_size=exp_config.get('gap_size', None),
+            experiment = ExperimentSettings(
+                name=name, 
+                data_type=datatype,
+                num_trials=exp_config.get('num_trials', 1),
+                dataset_size=exp_config.get('dataset_size', 100),
+                uncertain_ratio=exp_config.get('uncertain_ratio', 0.0),
+
+                num_intervals=exp_config.get('num_intervals', None),
+                gap_size=exp_config.get('gap_size', None),
+                
+                mult_size_range=tuple(exp_config.get('mult_size_range', None)),
+                interval_size_range=tuple(exp_config.get('interval_size_range', (1,100))),
+                num_intervals_range=tuple(exp_config['num_intervals_range']) if 'num_intervals_range' in exp_config else None,
+                gap_size_range=tuple(exp_config['gap_size_range']) if 'gap_size_range' in exp_config else None,
+
+                save_ddl=exp_config.get('save_ddl', False),
+                save_csv=exp_config.get('save_csv', False),
+                mode=exp_config.get('mode', 'all'),
+                                reduce_triggerSz_sizeLim=tuple(exp_config.get('reduce_triggerSz_sizeLim', (10, 10))),
+                independent_variable=independent_variable,
+            )
+
+            ExpGroup.experiments[experiment.name] = experiment
             
-            num_intervals_range=tuple(exp_config['num_intervals_range']) if 'num_intervals_range' in exp_config else None,
-            gap_size_range=tuple(exp_config['gap_size_range']) if 'gap_size_range' in exp_config else None,
-            mult_size_range=tuple(exp_config.get('mult_size_range', None)),
-            interval_size_range=tuple(exp_config.get('interval_size_range', (1,100))),
-
-            save_ddl=exp_config.get('save_ddl', None),
-            save_csv=exp_config.get('save_csv', None),
-            mode=exp_config.get('mode', None),
-            # insert_to_db=exp_config.get('insert_to_db', False),
-            reduce_triggerSz_sizeLim=exp_config.get('reduce_triggerSz_sizeLim', (10, 10)),
-        )
+        experiments[group_name] = ExpGroup
 
     return experiments

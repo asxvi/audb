@@ -4,23 +4,10 @@ from numerize import numerize
 from dataclasses import replace
 from main import format_datasize, format_name, ExperimentGroup
 
-
-
 '''
-experiments is a dict of {str: dict}. ALlows for many unrelated experiments to run from 1 file
-Naming convention is "independentVariable member": {experiments of type ExperimentSettings}
+experiments is a dict of {str: ExperimentGroup}. ALlows for many unrelated experiments to run from 1 file
+Naming convention is "GroupName/ID": {ExperimentGroup of related experiments}
 persists in namespace of caller program
-
-Structure: {
-    "experiment_group_name": {
-        "independent_variable": "variable_name",  # specify the x-axis variable
-        "experiments": {
-            "exp1_name": ExperimentSettings(...),
-            "exp2_name": ExperimentSettings(...),
-        }
-    }
-}
-
 '''
 experiments = dict()
 
@@ -39,18 +26,31 @@ template = ExperimentSettings(
         name= "temp",)
 
 
-dataset_size_group = ExperimentGroup('dataset_size_experiments', 'dataset_size', None)
+# uncert_ratio_group = ExperimentGroup('uncertain_ratio_experiments', 'uncertain_ratio', None)
+# for i in range(0.0, 0.9, 0.05):
+#     experiment = replace(
+#             template,
+#             uncertain_ratio = i, 
+#             independent_variable = 'uncertain_ratio',
+#         )
+#     experiment.name = format_name(experiment)
+
+#     uncert_ratio_group.experiments[experiment.name] = experiment
+
+# experiments['dataset_size'] = uncert_ratio_group
+
+dataset_size_group1 = ExperimentGroup('dataset_size_experiments1', 'dataset_size', None)
 for i in range(100, 1000, 100):
     experiment = replace(
             template,
             dataset_size = i, 
             independent_variable = 'dataset_size',
         )
-    experiment.name = format_name(experiment) + f'__{i}'
+    experiment.name = format_name(experiment)       # name after setting members
     
-    dataset_size_group.experiments[experiment.name] = experiment
+    dataset_size_group1.experiments[experiment.name] = experiment
 
-experiments['dataset_size'] = dataset_size_group
+experiments['dataset_size1'] = dataset_size_group1
 
 
 dataset_size_group2 = ExperimentGroup('dataset_size_experiments2', 'dataset_size', None)
@@ -65,24 +65,3 @@ for i in range(100, 1000, 100):
     dataset_size_group2.experiments[experiment.name] = experiment
 
 experiments['dataset_size2'] = dataset_size_group2
-
-# for i in range(0, 1000, 100):
-#     experiment = replace(
-#             template,
-#             dataset_size = i, 
-#             independent_variable = 'dataset_size',
-#         )
-#     experiment.name = format_name(experiment) + f'__{i}'
-
-#     dataset_size_experiments[experiment.name] = experiment
-# experiments['dataset_size'] = dataset_size_experiments
-
-# reduce_triggerSz_sizeLim_experiments = {}
-# for i in range(1, 50):
-#     experiment = replace(
-#             template,
-#             reduce_triggerSz_sizeLim = (i, max(1, i//2)),
-#         )
-#     name = format_name(template) + f'{i}'
-#     reduce_triggerSz_sizeLim_experiments[experiment.name] = experiment
-# experiments['reduce_triggerSz_sizeLim'] = dataset_size_experiments

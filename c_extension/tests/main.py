@@ -52,7 +52,17 @@ class ExperimentSettings:
     reduce_triggerSz_sizeLim: tuple = (10,5)       #test this. need to figure out how to encode different techniques.
     # start_int_range()
 
-    # filepath: str = None
+    iv_map = {
+        "dataset_size": "n",
+        "uncertain_ratio": "unc",
+        "interval_size_range": "isr",
+        "mult_size_range": "msr",
+        "num_intervals": "ni_nir",
+        "num_intervals_range": "ni_nir",
+        "gap_size": "gs_gsr",
+        "gap_size_range": "gs_gsr",
+        "reduce_triggerSz_sizeLim": "red_sz"
+    }
 
     def asdict(self):
         dt = 'range' if self.data_type == DataType.RANGE else 'set'
@@ -82,6 +92,7 @@ class ExperimentRunner:
         self.master_seed = seed
         self.trial_seed = None
         self.resultFilepath: str = None
+        self.name = None
 
     DATA_TYPE_CONFIG = {
         DataType.RANGE: {
@@ -108,6 +119,7 @@ class ExperimentRunner:
             self.trial_seed = (self.master_seed + experiment.curr_trial) % (2**32)
             np.random.seed(self.trial_seed)
             experiment.experiment_id = self.__generate_name(experiment)
+            # print(experiment.experiment_id)
             
             # get randomly generated data for curr seed
             db_data_format, file_data_format = self.generate_data(experiment)
@@ -202,45 +214,6 @@ class ExperimentRunner:
         plan = plan_root["Plan"]
         agg_time = plan["Actual Total Time"]
         return agg_time
-
-    def generate_stats(self, csv_path, variable: str):
-        df = pd.read_csv(csv_path+".csv")
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(14, 5))
-        
-        # get the variable of the experiment #FIXME add in multi variable version & diff plots perhaps
-        try:
-            n = df[variable]
-        except Exception as e:
-            return f"error trying to get x-axis:  {e}"
-            
-        min_mean_time = df['min_time_mean']
-        max_mean_time = df['max_time_mean']
-        sum_mean_time = df['sum_time_mean']
-
-        # MIN
-        ax1.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple')
-        ax1.set_title("Mean Time of MIN", fontsize=14, fontweight='bold')
-        ax1.set_xlabel(f'{variable}', fontsize=12)
-        ax1.set_ylabel('Time (ms)', fontsize=12)
-        ax1.grid(True, alpha=0.3)
-
-        # MAX
-        ax2.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange')
-        ax2.set_title("Mean Time of MAX", fontsize=14, fontweight='bold')
-        ax2.set_xlabel(f'{variable}', fontsize=12)
-        ax2.set_ylabel('Time (ms)', fontsize=12)
-        ax2.grid(True, alpha=0.3)
-
-        # SUM
-        ax3.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green')
-        ax3.set_title("Mean Time of SUM", fontsize=14, fontweight='bold')
-        ax3.set_xlabel(f'{variable}', fontsize=12)
-        ax3.set_ylabel('Time (ms)', fontsize=12)
-        ax3.grid(True, alpha=0.3)
-
-        plt.tight_layout()
-        plt.savefig(f'{csv_path}.jpg')
-        return f'{self.resultFilepath}.jpg'
 
     def insert_data_db(self, experiment: ExperimentSettings, data):
         '''Insert data into database specified in config file'''
@@ -399,13 +372,15 @@ class ExperimentRunner:
                     print(f"Error cleaning tables: {e}")
                     conn.rollback()
 
-    def save_results(self, group_name: str = None) -> str:
-        '''Uses pandas.to_csv to write results to CSV'''
+    
+    def save_csv_results(self, group_name: str, experiment_name: str) -> str:
+        '''Save experiment results to CSV'''
         if not self.results:
             return 
         
-        out_file = f'{time.strftime("d%d_m%m_y%Y_%H:%M:%S")}_results_{self.master_seed}'
-
+        timestamp = time.strftime("d%d_m%m_y%Y")
+        out_file = f'{timestamp}_{experiment_name}_{self.master_seed}'
+        
         # prepend group in output path
         if group_name:
             experiment_folder_path = f'data/results/{group_name}/{out_file}'
@@ -416,9 +391,54 @@ class ExperimentRunner:
         os.makedirs(experiment_folder_path, exist_ok=True)   
         
         df = pd.DataFrame(self.results)
-        df.to_csv(f'{experiment_folder_path}/{out_file}.csv', index=True)
-
+        csv_path = f'{experiment_folder_path}/{out_file}.csv'  
+        df.to_csv(csv_path, index=True)
+        
+        print(experiment_folder_path)
+        print(f'{experiment_folder_path}/{out_file}')
+        
         return f'{experiment_folder_path}/{out_file}'
+    
+    def generate_stats(self, csv_path, variable: str):
+        df = pd.read_csv(csv_path+".csv")
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(14, 5))
+        
+        # get the variable of the experiment #FIXME add in multi variable version & diff plots perhaps
+        try:
+            n = df[variable]
+        except Exception as e:
+            return f"error trying to get x-axis:  {e}"
+            
+        min_mean_time = df['min_time_mean']
+        max_mean_time = df['max_time_mean']
+        sum_mean_time = df['sum_time_mean']
+
+        # MIN
+        ax1.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple')
+        ax1.set_title("Mean Time of MIN", fontsize=14, fontweight='bold')
+        ax1.set_xlabel(f'{variable}', fontsize=12)
+        ax1.set_ylabel('Time (ms)', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+
+        # MAX
+        ax2.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange')
+        ax2.set_title("Mean Time of MAX", fontsize=14, fontweight='bold')
+        ax2.set_xlabel(f'{variable}', fontsize=12)
+        ax2.set_ylabel('Time (ms)', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+
+        # SUM
+        ax3.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green')
+        ax3.set_title("Mean Time of SUM", fontsize=14, fontweight='bold')
+        ax3.set_xlabel(f'{variable}', fontsize=12)
+        ax3.set_ylabel('Time (ms)', fontsize=12)
+        ax3.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(f'{csv_path}.jpg')
+        return f'{self.resultFilepath}.jpg'
+
+
 
     def __generate_name(self, experiment: ExperimentSettings, generalName: bool = False) -> str:
         '''
@@ -429,16 +449,12 @@ class ExperimentRunner:
         dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
 
         if generalName:
-            return f"t_{experiment.name}_{dtype}_s{self.master_seed}"
+            return f"t_{experiment.name}_s{self.master_seed}"
 
-        return f"t_{experiment.name}_{dtype}_t{experiment.curr_trial}_s{self.master_seed}_ts{self.trial_seed}"
+        seed_uid = str(self.trial_seed)[-5:]
+
+        return f"t_{experiment.name}_t{experiment.curr_trial}_ms{self.master_seed}_ts{seed_uid}"
     
-    # def format_datasize(size):
-    #     if size >= 1_000_000: 
-    #         return numerize.numerize(size, 2)
-    #     return numerize.numerize(size, 0)
-
-
 def run_all():
     ### parse args and config
     args = parse_args()
@@ -481,13 +497,15 @@ def run_all():
 
         # clear results buffer for each indep test group
         runner.results = []
+        runner.name = ExpGroup.name
 
         for exp_name, experiment in ExpGroup.experiments.items():
             runner.run_experiment(experiment)
         
-        csv_results_path = runner.save_results(group_name)
-        print(f"    csv stored in: {csv_results_path}")
-        jpg_results_path = runner.generate_stats(csv_results_path, iv)
+        results_path = runner.save_csv_results(group_name, exp_name)
+        # csv_results_path = runner.save_results(group_name)
+        print(f"    csv stored in: {results_path}")
+        jpg_results_path = runner.generate_stats(results_path, iv)
         print(f"    jpg stored in: {jpg_results_path}")
 
     # clean db after using
@@ -515,10 +533,26 @@ def format_datasize(size):
 
 def format_name(experiment: ExperimentSettings):
     dtype = 's' if experiment.data_type == DataType.SET else 'r'
-    sz = format_datasize(experiment.dataset_size)
-    unc = str.replace(str(experiment.uncertain_ratio), '.', '_')
+    sz = f"_n{format_datasize(experiment.dataset_size)}"
+    unc = f"_unc{str.replace(str(experiment.uncertain_ratio), '.', '')}"
+    # msr = f"{experiment.mult_size_range[0]}_{experiment.mult_size_range[1]}"
+    iv = f"__iv_{experiment.iv_map[experiment.independent_variable]}"
+    red_sz = f"_redSz{experiment.reduce_triggerSz_sizeLim[0]}_{experiment.reduce_triggerSz_sizeLim[1]}"
+    ni_nir = ""
+    gs_gsr = ""
 
-    return f"{dtype}_n{sz}_unc{unc}"
+    if experiment.num_intervals:
+        ni_nir = f'_ni{experiment.num_intervals}'
+    elif experiment.num_intervals_range:
+        ni_nir = f'_nir{experiment.num_intervals_range[0]}_{experiment.num_intervals_range[1]}'
+
+    if experiment.gap_size:
+        gs_gsr = f'_gs{experiment.gap_size}'
+    elif experiment.gap_size_range:
+        gs_gsr = f'_gsr{experiment.gap_size_range[0]}_{experiment.gap_size_range[1]}'
+
+    rv =  f"{dtype}{sz}{unc}{ni_nir}{gs_gsr}{red_sz}{iv}"
+    return rv
 
 
 
