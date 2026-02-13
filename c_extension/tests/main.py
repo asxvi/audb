@@ -6,6 +6,7 @@ import psycopg2, psycopg2.extras
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
+import matplotlib.pyplot as plt
 
 from cliUtility import *
 from DataTypes import *
@@ -30,17 +31,16 @@ class ExperimentSettings:
     # use these value if not None, otherwise use tuple if not None, both none = error
     num_intervals: int = None       
     gap_size: int = None
-    # use if scalars are None and tuples are not None, both none = error
     num_intervals_range: tuple = None
     gap_size_range: tuple = None    
-
+    
     mode: str = None                # what modes of test suite to execute
     save_ddl:bool = False           # store ddl code to make tables 
     save_csv: bool = False          # store csv with statistics and results of test
-    # insert_to_db: bool = False      # this is actually stupid, but currently code relies on this
-
-    # start_int_range()
     reduce_triggerSz_sizeLim: tuple = (10,5)       #test this. need to figure out how to encode different techniques.
+    # start_int_range()
+
+    # filepath: str = None
 
     def asdict(self):
         dt = 'range' if self.data_type == DataType.RANGE else 'set'
@@ -69,6 +69,7 @@ class ExperimentRunner:
         self.results = []
         self.master_seed = seed
         self.trial_seed = None
+        self.resultFilepath: str = None
 
     DATA_TYPE_CONFIG = {
         DataType.RANGE: {
@@ -116,23 +117,7 @@ class ExperimentRunner:
         self.results.append(aggregated_results)
 
         return experiment_results
-
-    def run_aggregate(self, cur, table, agg_name, combine_func, *agg_params):
-        '''General aggregate runner with no WHERE clause'''
-
-        params_sql = ",".join(str(param) for param in agg_params)
-        sql = f"""EXPLAIN (analyze, format json)
-            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
-            FROM {table};"""
         
-        cur.execute(sql)
-        results = cur.fetchone()[0]
-        plan_root = results[0]
-        plan = plan_root["Plan"]
-        agg_time = plan["Actual Total Time"]
-        return agg_time
-        
-
     def generate_data(self, experiment :ExperimentSettings):
         '''
             Generates pseudorandom data based on user specified experiment settings. 
@@ -190,7 +175,61 @@ class ExperimentRunner:
             exit(1)
         
         return results
-                    
+
+    def run_aggregate(self, cur, table, agg_name, combine_func, *agg_params):
+        '''General aggregate runner with no WHERE clause'''
+
+        params_sql = ",".join(str(param) for param in agg_params)
+        sql = f"""EXPLAIN (analyze, format json)
+            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
+            FROM {table};"""
+        
+        cur.execute(sql)
+        results = cur.fetchone()[0]
+        plan_root = results[0]
+        plan = plan_root["Plan"]
+        agg_time = plan["Actual Total Time"]
+        return agg_time
+
+    def generate_stats(self, csv_path, variable: str):
+        df = pd.read_csv(csv_path+".csv")
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(14, 5))
+        
+        # get the variable of the experiment #FIXME add in multi variable version & diff plots perhaps
+        try:
+            n = df[variable]
+        except Exception as e:
+            return f"error trying to get x-axis:  {e}"
+            
+        min_mean_time = df['min_time_mean']
+        max_mean_time = df['max_time_mean']
+        sum_mean_time = df['sum_time_mean']
+
+        # MIN
+        ax1.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple')
+        ax1.set_title("Mean Time of MIN", fontsize=14, fontweight='bold')
+        ax1.set_xlabel(f'{variable}', fontsize=12)
+        ax1.set_ylabel('Time (ms)', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+
+        # MAX
+        ax2.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange')
+        ax2.set_title("Mean Time of MAX", fontsize=14, fontweight='bold')
+        ax2.set_xlabel(f'{variable}', fontsize=12)
+        ax2.set_ylabel('Time (ms)', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+
+        # SUM
+        ax3.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green')
+        ax3.set_title("Mean Time of SUM", fontsize=14, fontweight='bold')
+        ax3.set_xlabel(f'{variable}', fontsize=12)
+        ax3.set_ylabel('Time (ms)', fontsize=12)
+        ax3.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(f'{csv_path}.jpg')
+        return f'{self.resultFilepath}.jpg'
+
     def insert_data_db(self, experiment: ExperimentSettings, data):
         '''Insert data into database specified in config file'''
         with self.connect_db() as conn:
@@ -325,7 +364,7 @@ class ExperimentRunner:
     def connect_db(self):
         return psycopg2.connect(**self.db_config)
 
-    def clean_tables(self, config, find_trigger="t_%"):
+    def clean_tables(self, find_trigger="t_%"):
         print(f"Cleaning/ Dropping all Tables starting with '{find_trigger}'")
 
         with self.connect_db() as conn:
@@ -355,7 +394,8 @@ class ExperimentRunner:
         
         out_file = f'{time.strftime("d%d_m%m_y%Y_%H:%M:%S")}_results_{self.master_seed}'
         experiment_folder_path = f'data/results/{out_file}'
-        os.makedirs(experiment_folder_path, exist_ok=True)        
+        self.resultFilepath = experiment_folder_path
+        os.makedirs(experiment_folder_path, exist_ok=True)   
         
         df = pd.DataFrame(self.results)
         df.to_csv(f'{experiment_folder_path}/{out_file}.csv', index=True)
@@ -402,7 +442,7 @@ def run_all():
 
     # clean db before using
     if args.clean_before:
-        runner.clean_tables(db_config, args.clean_before)
+        runner.clean_tables(args.clean_before)
 
     # run experiments in experiment config.yaml, or based on flag input
     if args.quick:
@@ -418,17 +458,17 @@ def run_all():
 
     # Only run specific mode of ExperimentRunner
     for _, experiment in experiments.items():
-
         print(experiment)
-
-        # runner.run_experiment(experiment)
+        runner.run_experiment(experiment)
     
     results_path = runner.save_results()
+    runner.generate_stats(results_path, 'dataset_size')
+
     print(f"Results stored in: {results_path}")
 
     # clean db after using
     if args.clean_after:
-        runner.clean_tables(db_config, args.clean_after)
+        runner.clean_tables(args.clean_after)
 
 def generate_seed(in_seed=None):
     '''

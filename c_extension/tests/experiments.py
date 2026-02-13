@@ -44,17 +44,25 @@ template = ExperimentSettings(
         interval_size_range=(1, 500), 
         num_intervals=4, 
         mode="all",
-        num_trials=5, 
+        num_trials=3, 
         gap_size_range=(0,5), 
-        gap_size=None,
+        gap_size=10,
         name= "temp", 
     )
 
-for i in range(1, 50):
+for i in range(0, 100000, 10000):
     experiment = replace(
         template,
-        name = format_name(template) + f'{i}',
-        reduce_triggerSz_sizeLim = (i, max(1, i//2)),
+        # reduce_triggerSz_sizeLim = (i, max(1, i//2)),
+        dataset_size = i, 
+        name = format_name(experiment) + f'__{i}',
     )
-    
     experiments[experiment.name] = experiment
+
+# for i in range(1, 50):
+#     experiment = replace(
+#         template,
+#         name = format_name(template) + f'{i}',
+#         reduce_triggerSz_sizeLim = (i, max(1, i//2)),
+#     )
+    
