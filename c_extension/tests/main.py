@@ -7,9 +7,11 @@ import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from cliUtility import *
 from DataTypes import *
+from StatisticsPlotter import StatisticsPlotter
 
 @dataclass
 class ExperimentGroup:
@@ -97,6 +99,8 @@ class ExperimentRunner:
         self.name = None
         self.groupName = None
 
+        self.plotter = StatisticsPlotter()
+
     DATA_TYPE_CONFIG = {
         DataType.RANGE: {
             "combine_sum": "combine_range_mult_sum",
@@ -180,6 +184,8 @@ class ExperimentRunner:
             'max_result' : None,
             'sum_time' : None,
             'sum_result' : None,
+
+            'sumtest_time': None,
         }
         table = experiment.experiment_id
         config = self.DATA_TYPE_CONFIG[experiment.data_type]
@@ -193,6 +199,9 @@ class ExperimentRunner:
                     results['min_time'] = self.run_aggregate(cur, table, 'MIN', config['combine_min'])
                     results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
 
+                    #
+                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
+                    #
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
             exit(1)
@@ -308,8 +317,6 @@ class ExperimentRunner:
                 interval_end = start + interval_width
             else:
                 raise ValueError("Either interval_width or interval_width_range must be specified")
-                max_end = experiment.interval_size_range[1]
-                interval_end = np.random(start+1, min(max_end + 1, start + 100))
 
             rset.append(RangeType(start, interval_end, False))
 
@@ -323,11 +330,11 @@ class ExperimentRunner:
                     gap = 0  
                 
                 start = interval_end + gap
+                # next next start exceeds bounds, we can't add more intervals
+                if start >= experiment.interval_size_range[1]:
+                    break
 
         return RangeSetType(rset, cu=False)
-
-
-
 
     def __generate_mult(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
@@ -395,7 +402,7 @@ class ExperimentRunner:
                     tables = cur.fetchall()
 
                     if not tables:
-                        print(f"  No tables found matching: {find_trigger}")
+                        print(f"  No tables found matching: {find_trigger}\n")
                         return
                 
                     for table in tables:
@@ -425,18 +432,22 @@ class ExperimentRunner:
         **Does not handle DDL, DDL is handeled in run_experiment after generating data'''
 
         outputs = {}
-
+        
         if self.results and experiment.save_csv:
             csv_path = self.__generate_csv_results(experiment.name)
             outputs['csv'] = csv_path
             print(f"  CSV saved: {csv_path}")
 
-            if csv_path and experiment.independent_variable:
-                plot_path = self.__generate_stats_results(csv_path, experiment.name, experiment.independent_variable)
-                outputs['plot'] = plot_path
-                print(f"  Plot saved: {plot_path}")
+            self.generate_plots(csv_path, experiment.independent_variable)
+
+
+        #     if csv_path and experiment.independent_variable:
+        #         plot_path = self.__generate_stats_results(csv_path, experiment.name, experiment.independent_variable)
+        #         heat_path = self.generate_reduction_heatmap(csv_path)
+        #         outputs['plot'] = plot_path
+        #         print(f"  Plot saved: {plot_path}")
         
-        return outputs
+        # return outputs
 
     def __generate_csv_results(self, experiment_name: str) -> str:
         '''save experiment results to CSV'''
@@ -458,6 +469,10 @@ class ExperimentRunner:
         
         return csv_path
     
+    def generate_plots(self, csv_path: str, indep_variable: str) -> None:
+        self.plotter.plot_all(csv_path, indep_variable)
+
+
     def __generate_stats_results(self, csv_path:str, experiment_name: str, indep_variable: str):
         '''save experiment plot results. Use CSV data created right before this call'''
         
@@ -465,7 +480,7 @@ class ExperimentRunner:
         agg_out_file = f'aggregate_results_sd{self.master_seed}'
         combined_results_file = f'combined_agg_results_sd{self.master_seed}'
         agg_results_path =  f'{experiment_folder_path}/{agg_out_file}.jpg'
-        combined_results_file = f'{experiment_folder_path}/{combined_results_file}.jpg'
+        combined_results_path = f'{experiment_folder_path}/{combined_results_file}.jpg'
 
         df = pd.read_csv(csv_path)
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(14, 5))
@@ -484,6 +499,8 @@ class ExperimentRunner:
         ax1.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple')
         ax1.set_title("Mean Time of MIN", fontsize=14, fontweight='bold')
         ax1.set_xlabel(f'iv: {indep_variable}', fontsize=12)
+        ax1.set_xticks(range(len(n)))
+        ax1.set_xticklabels(n, rotation=45, ha='right')
         ax1.set_ylabel('Time (ms)', fontsize=12)
         ax1.grid(True, alpha=0.3)
 
@@ -491,6 +508,8 @@ class ExperimentRunner:
         ax2.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange')
         ax2.set_title("Mean Time of MAX", fontsize=14, fontweight='bold')
         ax2.set_xlabel(f'iv: {indep_variable}', fontsize=12)
+        ax2.set_xticks(range(len(n)))
+        ax2.set_xticklabels(n, rotation=45, ha='right')
         ax2.set_ylabel('Time (ms)', fontsize=12)
         ax2.grid(True, alpha=0.3)
 
@@ -498,6 +517,8 @@ class ExperimentRunner:
         ax3.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green')
         ax3.set_title("Mean Time of SUM", fontsize=14, fontweight='bold')
         ax3.set_xlabel(f'iv: {indep_variable}', fontsize=12)
+        ax3.set_xticks(range(len(n)))
+        ax3.set_xticklabels(n, rotation=45, ha='right')
         ax3.set_ylabel('Time (ms)', fontsize=12)
         ax3.grid(True, alpha=0.3)
 
@@ -512,15 +533,62 @@ class ExperimentRunner:
 
         ax.set_title(f"Query Performance vs {indep_variable})", fontsize=14, fontweight='bold')
         ax.set_xlabel(f'iv: {indep_variable}', fontsize=12)
+        ax.set_xticks(range(len(n)))
+        ax.set_xticklabels(n, rotation=45, ha='right')
         ax.set_ylabel('Time (ms)', fontsize=12)
         ax.legend(fontsize=11)
         ax.grid(True, alpha=0.3)
         plt.tight_layout()
 
         plt.tight_layout()
-        plt.savefig(combined_results_file)
+        plt.savefig(combined_results_path)
 
-        return combined_results_file
+        return combined_results_path
+
+    def generate_reduction_heatmap(self, csv_path):
+        """Generate heatmap for reduction parameter tuning"""
+        df = pd.read_csv(csv_path)
+        # Parse tuple column
+        parsed = df['reduce_triggerSz_sizeLim'].apply(
+            lambda x: eval(x) if isinstance(x, str) else x
+        )
+        df['trigger_sz'] = parsed.apply(lambda x: x[0])
+        df['reduce_to_sz'] = parsed.apply(lambda x: x[1])
+        
+        # Create pivot tables for each metric
+        sum_pivot = df.pivot_table(values='sum_time_mean', 
+                                    index='reduce_to_sz', 
+                                    columns='trigger_sz')   
+        
+        # Create figure with 3 heatmaps
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+        
+
+
+        # SUM heatmap
+        sns.heatmap(sum_pivot, annot=True, fmt='.1f', cmap='RdYlGn_r', 
+                    ax=ax3, cbar_kws={'label': 'Time (ms)'})
+        ax3.set_title('SUM Time Heatmap', fontsize=14, fontweight='bold')
+        ax3.set_xlabel('Trigger Size', fontsize=12)
+        ax3.set_ylabel('Reduce To Size', fontsize=12)
+        
+        plt.tight_layout()
+        plt.savefig(f'{csv_path}_heatmap.jpg', dpi=300, bbox_inches='tight')
+        
+        # Also print optimal values
+        min_idx = df['sum_time_mean'].idxmin()
+        best = df.iloc[min_idx]
+        print(f"\n{'='*50}")
+        print(f"OPTIMAL REDUCTION PARAMETERS:")
+        print(f"  Trigger Size: {best['trigger_sz']}")
+        print(f"  Reduce To Size: {best['reduce_to_sz']}")
+        print(f"  Ratio: {best['reduce_to_sz']/best['trigger_sz']:.2f}")
+        print(f"  SUM Time: {best['sum_time_mean']:.2f} ms")
+        print(f"{'='*50}\n")
+        
+        return f'{csv_path}_heatmap.jpg'
+
+
 
     def __save_ddl_file(self, experiment: ExperimentSettings, data):
         ''' write data to DDL file for later loading 
@@ -643,6 +711,8 @@ def format_datasize(size):
         return numerize.numerize(size, 0)
 
 def format_name(experiment: ExperimentSettings):
+    '''format name using experiment elements'''
+
     dtype = 's' if experiment.data_type == DataType.SET else 'r'
     sz = f"_n{format_datasize(experiment.dataset_size)}"
     unc = f"_unc{str.replace(str(experiment.uncertain_ratio), '.', '')}"

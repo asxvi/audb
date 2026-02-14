@@ -294,3 +294,41 @@ create aggregate avg (data int4range, mult int4range)
     sfunc = agg_avg_range_transfunc,
     finalfunc = agg_avg_range_finalfunc
 );
+
+
+
+    
+-- Int4RangeSet ranges;
+-- int resizeTrigger;
+-- int sizeLimit;
+-- long reduceCalls;               //how many times reduceSize() fired
+-- long maxIntervalCount;          //peak number of intervals seen
+-- long totalIntervalCount;        //sum of counts across all agg
+-- long combineCalls;              //number of times merged new input
+
+CREATE TYPE sum_set_metrics AS (
+    result int4range[],
+    resizeTrigger bigint,
+    sizeLimit bigint,
+    reduceCalls bigint,
+    maxIntervalCount bigint,
+    totalIntervalCount bigint, 
+    combineCalls bigint
+);
+
+CREATE FUNCTION agg_sum_set_transfuncTest(internal, int4range[], integer, integer) 
+RETURNS internal
+AS 'MODULE_PATHNAME', 'agg_sum_set_transfuncTest'
+LANGUAGE c;
+
+CREATE FUNCTION agg_sum_set_finalfuncTest(internal) 
+RETURNS sum_set_metrics
+AS 'MODULE_PATHNAME', 'agg_sum_set_finalfuncTest'
+LANGUAGE c;
+
+create aggregate sumTest (int4range[], resizeTrigger integer, sizeLimit integer) 
+(
+    stype = internal,
+    sfunc = agg_sum_set_transfuncTest,
+    finalfunc = agg_sum_set_finalfuncTest
+);

@@ -8,6 +8,8 @@
 #include "catalog/pg_type_d.h"  // pg_type oid macros
 #include "catalog/namespace.h"  // type helpers
 
+#include "funcapi.h"
+
 // local code
 #include "arithmetic.h"         // logic for arithmetic 
 #include "logicalOperators.h"   // logic for logical ops
@@ -48,9 +50,13 @@ PG_FUNCTION_INFO_V1(set_reduce_size);
 //sum
 PG_FUNCTION_INFO_V1(combine_range_mult_sum);
 PG_FUNCTION_INFO_V1(agg_sum_range_transfunc);
+
 PG_FUNCTION_INFO_V1(combine_set_mult_sum);
 PG_FUNCTION_INFO_V1(agg_sum_set_transfunc);
 PG_FUNCTION_INFO_V1(agg_sum_set_finalfunc);
+
+PG_FUNCTION_INFO_V1(agg_sum_set_transfuncTest);
+PG_FUNCTION_INFO_V1(agg_sum_set_finalfuncTest);
 
 // min/max
 PG_FUNCTION_INFO_V1(combine_range_mult_min);
@@ -1500,3 +1506,178 @@ agg_avg_range_finalfunc(PG_FUNCTION_ARGS)
     
 //     PG_RETURN_RANGE_P(result);
 // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+*   transition function for sum(combine_set_mult_sum(data, mult), resizetrigger, sizelimit)
+*   
+* Parameters [4]:
+*   - SumAggStateTest: (internal type)
+*   - ArrayType: current state (result of combine_set_mult_sum(data, mult))
+*   - Integer: resize trigger
+*   - Integer: size limit
+*   
+* Returns [1]:
+*   - Datum (pointer to SumAggState) 
+*/
+Datum
+agg_sum_set_transfuncTest(PG_FUNCTION_ARGS)
+{
+    MemoryContext aggcontext;
+    MemoryContext oldcontext;
+    SumAggStateTest *state;
+    ArrayType *currSet;
+    TypeCacheEntry *typcache;
+    Int4RangeSet inputSet, combined, reduced;
+    
+    if (!AggCheckCallContext(fcinfo, &aggcontext))
+        elog(ERROR, "agg_sum_set_transfunc called in non-aggregate context");
+    
+    // first call, state is NULL
+    if (PG_ARGISNULL(0)) {
+
+        // check for NULL input param, or empty
+        if (PG_ARGISNULL(1)) {
+            PG_RETURN_NULL();
+        }
+        
+        currSet = PG_GETARG_ARRAYTYPE_P(1);
+        typcache = lookup_type_cache(ARR_ELEMTYPE(currSet), TYPECACHE_RANGE_INFO);
+        
+        // empty set, continue on until non empty
+        if (ArrayGetNItems(ARR_NDIM(currSet), ARR_DIMS(currSet)) == 0) {
+            PG_RETURN_NULL();
+        }
+
+        // switch to aggregate memory context for persistent allocations
+        oldcontext = MemoryContextSwitchTo(aggcontext);
+        
+        // internal state init
+        state = (SumAggStateTest *) palloc0(sizeof(SumAggStateTest));
+        state->ranges = deserialize_ArrayType(currSet, typcache);
+        state->resizeTrigger = PG_GETARG_INT32(2);
+        state->sizeLimit = PG_GETARG_INT32(3);
+        
+        state->reduceCalls = 0;
+        state->combineCalls = 1;
+        state->maxIntervalCount = state->ranges.count;
+        state->totalIntervalCount = state->ranges.count;
+        
+        // need to return to callers context
+        MemoryContextSwitchTo(oldcontext);
+        
+        PG_RETURN_POINTER(state);
+    }
+    
+    // otherwise merge into existing state
+    state = (SumAggStateTest *) PG_GETARG_POINTER(0);
+
+    if (!PG_ARGISNULL(1)) {
+        currSet = PG_GETARG_ARRAYTYPE_P(1);
+        typcache = lookup_type_cache(ARR_ELEMTYPE(currSet), TYPECACHE_RANGE_INFO);
+
+        // empty check
+        if (ArrayGetNItems(ARR_NDIM(currSet), ARR_DIMS(currSet)) == 0) {
+            PG_RETURN_POINTER(state);
+        }
+        
+        // deserialize input in current context (freed later)
+        inputSet = deserialize_ArrayType(currSet, typcache);
+        
+        // agg context persists data
+        oldcontext = MemoryContextSwitchTo(aggcontext);
+        combined = range_set_add_internal(state->ranges, inputSet);
+        
+        state->combineCalls++;
+        state->totalIntervalCount += combined.count;
+        if (combined.count > state->maxIntervalCount) {
+            state->maxIntervalCount = combined.count;
+        }
+
+        // free old ranges
+        if (state->ranges.ranges != NULL) {
+            pfree(state->ranges.ranges);
+        }
+        
+        // check reduce size
+        if (combined.count >= state->resizeTrigger) {
+            reduced = reduceSize(combined, state->sizeLimit);
+            pfree(combined.ranges);
+            state->ranges = reduced;
+            state->reduceCalls++;
+        }
+        else {
+            state->ranges = combined;
+        }
+        
+        MemoryContextSwitchTo(oldcontext);
+        
+        // free previous memory context
+        pfree(inputSet.ranges);
+    }
+    
+    PG_RETURN_POINTER(state);
+}
+
+/*
+    Reduce one last time if needed and Convert Internal type to ArrayType Datum.
+*/
+Datum
+agg_sum_set_finalfuncTest(PG_FUNCTION_ARGS)
+{
+    SumAggStateTest *state;
+    Datum values[7];
+    bool nulls[7] = {false,false,false,false,false, false, false};
+    HeapTuple tuple;
+    TupleDesc tupdesc;
+    ArrayType *arr;
+    Oid elemTypeOID;
+    TypeCacheEntry *typcache;
+    
+    if (PG_ARGISNULL(0)) {
+        PG_RETURN_NULL();
+    }
+    
+    state = (SumAggStateTest*) PG_GETARG_POINTER(0);
+    
+    elemTypeOID = TypenameGetTypid("int4range");
+    if (elemTypeOID == InvalidOid)
+        elog(ERROR, "int4range type not found in catalog");
+
+    typcache = lookup_type_cache(elemTypeOID, TYPECACHE_RANGE_INFO);
+
+    arr = serialize_ArrayType(state->ranges, typcache);
+    values[0] = PointerGetDatum(arr);
+    values[1] = Int64GetDatum(state->resizeTrigger);
+    values[2] = Int64GetDatum(state->sizeLimit);
+    values[3] = Int64GetDatum(state->reduceCalls);
+    values[4] = Int64GetDatum(state->maxIntervalCount);
+    values[5] = Int64GetDatum(state->totalIntervalCount);
+    values[6] = Int64GetDatum(state->combineCalls);
+
+    // get the composite tuple descriptor
+    if (get_call_result_type(fcinfo, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+        elog(ERROR, "return type must be composite");
+    BlessTupleDesc(tupdesc);
+
+    tuple = heap_form_tuple(tupdesc, values, nulls);
+    return HeapTupleGetDatum(tuple);
+}

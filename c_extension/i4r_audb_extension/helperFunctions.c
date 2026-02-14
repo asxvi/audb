@@ -375,7 +375,7 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
   // ignore the NULL range at sortedInput.ranges[len-1]
   currNumRanges = sortedInput.count - (sortedInput.containsNull ? 1 : 0);
 
-  while(currNumRanges > numRangesKeep){
+  while(currNumRanges >  numRangesKeep){
     int bestDist;
     int bestIndex;
     int currDist;
