@@ -7,7 +7,6 @@ from __future__ import annotations
 from enum import Enum
 import itertools
 import numpy as np
-from dataclasses import dataclass
 
 '''
     local represention of postres RangeType. helper methods include arithmetic,

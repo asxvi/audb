@@ -1,3 +1,6 @@
+# used for the -xf option. Configure file and make many different files testing specific experiments.
+# Not preffered method. If possible, use -py option and feed in a python file and modify experiments using Code and not repetitive config files
+
 experiment_groups:
   - group_name: dataset_size_sample
     independent_variable: dataset_size

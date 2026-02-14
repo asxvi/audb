@@ -29,28 +29,30 @@ class ExperimentSettings:
         if num_intervals is used, num_intervals_range shouldn't be used
         if gap_size is used, gap_size_range shouldn't be used
     '''
-    name: str                           # required 
-    data_type: DataType                 # always Set or Range
-    curr_trial: int = 0                 # keep track locally 
-    experiment_id: str = None           # unique string name that identifies specific experiment
-    num_trials: int = 1                 # always fixed
-    dataset_size: int = 100             # always fixed
-    uncertain_ratio: float = 0.00       # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
-    interval_size_range: tuple = (1, 100)
-    mult_size_range: tuple = (1,5)      # required 
-    independent_variable: str = None
-
+    name: str                                   # required 
+    data_type: DataType                         # always Set or Range
+    curr_trial: int = 0                         # keep track locally 
+    experiment_id: str = None                   # unique string name that identifies specific experiment
+    num_trials: int = 1                         # always fixed
+    dataset_size: int = 100                     # always fixed
+    uncertain_ratio: float = 0.00               # uncertainty ratio is split 50% in data, 50% in multiplicity columns. Uncert in data == NULL, uncert in mult = [0,N]
+    interval_size_range: tuple = (1, 1000)      # the size of each interval
+    mult_size_range: tuple = (1,5)              # required 
+    independent_variable: str = None            # flag for what var we test. Used internally
+    start_interval_range: tuple = (interval_size_range[0], interval_size_range[1])   
+    reduce_triggerSz_sizeLim: tuple = (10,5)    # test this. need to figure out how to encode different techniques.
+    
     # use these value if not None, otherwise use tuple if not None, both none = error
+    interval_width: int = None
+    interval_width_range: tuple = None
     num_intervals: int = None       
     gap_size: int = None
     num_intervals_range: tuple = None
     gap_size_range: tuple = None    
     
-    mode: str = None                # what modes of test suite to execute
+    mode: str = None                # NOT USED YET what modes of test suite to execute
     save_ddl:bool = False           # store ddl code to make tables 
-    save_csv: bool = True          # store csv with statistics and results of test
-    reduce_triggerSz_sizeLim: tuple = (10,5)       #test this. need to figure out how to encode different techniques.
-    # start_int_range()
+    save_csv: bool = True           # store csv with statistics and results of test
 
     iv_map = {
         "dataset_size": "n",
@@ -239,7 +241,37 @@ class ExperimentRunner:
         ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
         return RangeType(lb, ub)
     
+    # def __generate_set(self, experiment:ExperimentSettings) -> RangeSetType:
+    #     # if experiment.num_intervals is not None then use, otherwise if experiment.num_intervals_range then use. otherwise raise error
+    #     if experiment.num_intervals is not None:
+    #         num_intervals = experiment.num_intervals
+    #     elif experiment.num_intervals_range is not None:
+    #         num_intervals = np.random.randint(*experiment.num_intervals_range)
+    #     else:
+    #         raise ValueError("Either num_intervals or num_intervals_range must be specified")
+        
+    #     rset = []
+    #     # FIXME account for gapsize. need to acocunt for (interval size range / (number interval * gap size))
+    #     for i in range(num_intervals):    
+    #         # uncertain ratio. maybe should account for half nulls, half mult 0
+    #         if np.random.random() < experiment.uncertain_ratio * 0.5:  
+    #             # rset.append(RangeType(0,0,True))
+    #             continue
+            
+    #         lb = np.random.randint(*experiment.interval_size_range)
+    #         ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
+            
+    #         # if i < num_intervals - 1 and experiment.gap_size is not None or experiment.gap_size_range is not None:
+    #         #     gap = experiment.gap_size if experiment.gap_size else np.random.randint(**experiment.gap_size_range)
+                
+
+    #         rset.append(RangeType(lb,ub,False))
+        
+    #     return RangeSetType(rset, cu=False)
+
+
     def __generate_set(self, experiment:ExperimentSettings) -> RangeSetType:
+        
         # if experiment.num_intervals is not None then use, otherwise if experiment.num_intervals_range then use. otherwise raise error
         if experiment.num_intervals is not None:
             num_intervals = experiment.num_intervals
@@ -248,24 +280,54 @@ class ExperimentRunner:
         else:
             raise ValueError("Either num_intervals or num_intervals_range must be specified")
         
+        # entire set is unknown
+        if np.random.random() < experiment.uncertain_ratio * 0.5:  
+            return RangeSetType([], cu=False)
+        
         rset = []
-        # FIXME account for gapsize. need to acocunt for (interval size range / (number interval * gap size))
+
+        # set the first starting point
+        if hasattr(experiment, 'start_interval_range') and experiment.start_interval_range is not None:
+            start = np.random.randint(*experiment.start_interval_range)
+        else:
+            start = experiment.interval_size_range[0]
+
+        # for each interval
         for i in range(num_intervals):    
-            # uncertain ratio. maybe should account for half nulls, half mult 0
             if np.random.random() < experiment.uncertain_ratio * 0.5:  
-                # rset.append(RangeType(0,0,True))
                 continue
             
-            lb = np.random.randint(*experiment.interval_size_range)
-            ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
-            
-            # if i < num_intervals - 1 and experiment.gap_size is not None or experiment.gap_size_range is not None:
-            #     gap = experiment.gap_size if experiment.gap_size else np.random.randint(**experiment.gap_size_range)
-                
+            # get the interval width
+            if hasattr(experiment, 'interval_width') or hasattr(experiment, 'interval_width_range'):
+                if experiment.interval_width is not None:
+                    interval_width = experiment.interval_width
+                elif experiment.interval_width_range is not None:
+                    interval_width = np.random.randint(*experiment.interval_width_range)
+                else:
+                    raise ValueError("Either interval_width or interval_width_range must be specified")
+                interval_end = start + interval_width
+            else:
+                raise ValueError("Either interval_width or interval_width_range must be specified")
+                max_end = experiment.interval_size_range[1]
+                interval_end = np.random(start+1, min(max_end + 1, start + 100))
 
-            rset.append(RangeType(lb,ub,False))
-        
+            rset.append(RangeType(start, interval_end, False))
+
+            # find next gap if not last
+            if i < num_intervals -1:
+                if experiment.gap_size is not None:
+                    gap = experiment.gap_size
+                elif experiment.gap_size_range is not None:
+                    gap = np.random.randint(*experiment.gap_size_range)
+                else:
+                    gap = 0  
+                
+                start = interval_end + gap
+
         return RangeSetType(rset, cu=False)
+
+
+
 
     def __generate_mult(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
