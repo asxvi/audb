@@ -205,8 +205,9 @@ class ExperimentRunner:
                     results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
                     
                     # get additional tests for sumtest
-                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
-                    metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
+                    normalize = True
+                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], normalize)
+                    metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], normalize)
                     
                     if metrics: 
                         results['sum_test_result'] = metrics['result']
@@ -229,8 +230,9 @@ class ExperimentRunner:
         sql = f"""EXPLAIN (analyze, format json)
             SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
             FROM {table};"""
-        
         cur.execute(sql)
+        
+        print(f"DEBUG SQL: {sql}") 
         results = cur.fetchone()[0]
         plan_root = results[0]
         plan = plan_root["Plan"]
@@ -256,7 +258,27 @@ class ExperimentRunner:
         
         return result_value
     
-    def get_sumtest_metrics(self, cur, table, combine_func, trigger_sz, size_lim):
+    def get_aggregate_ground_truth(self, cur, table, agg_name, combine_func, *agg_params):
+        '''get ground truth- minimally reduced, only normalzied.
+            used small ranges with large gaps to get good tests
+        '''
+        
+        params_sql = ",".join(str(param) for param in agg_params)
+        sql = f"""
+            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
+            FROM {table};"""
+        
+        cur.execute(sql)
+        result = cur.fetchone()
+        
+        if result is None:
+            return None
+        
+        result_value = result[0]
+        
+        return result_value
+    
+    def get_sumtest_metrics(self, cur, table, combine_func, trigger_sz, size_lim, normalize: bool):
         '''get SUMTEST metrics from composite type result using field accessors'''
         
         sql = f"""
@@ -269,7 +291,7 @@ class ExperimentRunner:
                 (result).totalIntervalCount,
                 (result).combineCalls
             FROM (
-                SELECT sumTest({combine_func}(val, mult), {trigger_sz}, {size_lim}) as result
+                SELECT sumTest({combine_func}(val, mult), {trigger_sz}, {size_lim}, {normalize}) as result
                 FROM {table}) subq;"""
         
         cur.execute(sql)
