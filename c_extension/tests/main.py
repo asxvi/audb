@@ -99,8 +99,6 @@ class ExperimentRunner:
         self.name = None
         self.groupName = None
 
-        self.plotter = StatisticsPlotter()
-
     DATA_TYPE_CONFIG = {
         DataType.RANGE: {
             "combine_sum": "combine_range_mult_sum",
@@ -179,13 +177,20 @@ class ExperimentRunner:
         results = {
             'row_count' : 0,
             'min_time' : None,
-            'min_result' : None,
             'max_time' : None,
-            'max_result' : None,
             'sum_time' : None,
-            'sum_result' : None,
-
             'sumtest_time': None,
+            # 'min_result' : None,
+            # 'max_result' : None,
+            # 'sum_result' : None,
+
+            'sum_test_result' : None,
+            'reduce_calls' : None,
+            'max_interval_count': None,
+            'total_interval_count': None,
+            'combine_calls': None,
+            'result_size': None
+
         }
         table = experiment.experiment_id
         config = self.DATA_TYPE_CONFIG[experiment.data_type]
@@ -198,10 +203,19 @@ class ExperimentRunner:
                     results['sum_time'] = self.run_aggregate(cur, table, 'SUM', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
                     results['min_time'] = self.run_aggregate(cur, table, 'MIN', config['combine_min'])
                     results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
-
-                    #
+                    
+                    # get additional tests for sumtest
                     results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
-                    #
+                    metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
+                    
+                    if metrics: 
+                        results['sum_test_result'] = metrics['result']
+                        results['reduce_calls'] = metrics['reduce_calls']
+                        results['max_interval_count'] = metrics['max_interval_count']
+                        results['total_interval_count'] = metrics['total_interval_count']
+                        results['combine_calls'] = metrics['combine_calls']
+                        results['result_size'] = metrics['result_size']
+
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
             exit(1)
@@ -221,7 +235,72 @@ class ExperimentRunner:
         plan_root = results[0]
         plan = plan_root["Plan"]
         agg_time = plan["Actual Total Time"]
+        
         return agg_time
+    
+    def get_aggregate_result(self, cur, table, agg_name, combine_func, *agg_params):
+        '''get actual aggregate result value (no timing)'''
+        
+        params_sql = ",".join(str(param) for param in agg_params)
+        sql = f"""
+            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
+            FROM {table};"""
+        
+        cur.execute(sql)
+        result = cur.fetchone()
+        
+        if result is None:
+            return None
+        
+        result_value = result[0]
+        
+        return result_value
+    
+    def get_sumtest_metrics(self, cur, table, combine_func, trigger_sz, size_lim):
+        '''get SUMTEST metrics from composite type result using field accessors'''
+        
+        sql = f"""
+            SELECT 
+                (result).result,
+                (result).resizeTrigger,
+                (result).sizeLimit,
+                (result).reduceCalls,
+                (result).maxIntervalCount,
+                (result).totalIntervalCount,
+                (result).combineCalls
+            FROM (
+                SELECT sumTest({combine_func}(val, mult), {trigger_sz}, {size_lim}) as result
+                FROM {table}) subq;"""
+        
+        cur.execute(sql)
+        result = cur.fetchone()     
+        if result is None:
+            return None
+        
+        result_array = result[0] 
+        resize_trigger = result[1]
+        size_limit = result[2]
+        reduce_calls = result[3]
+        max_interval_count = result[4]
+        total_interval_count = result[5]
+        combine_calls = result[6]
+
+        metrics = {
+            'result': result_array,             # list of NumericRange objects
+            'resize_trigger': resize_trigger,
+            'size_limit': size_limit,
+            'reduce_calls': reduce_calls,
+            'max_interval_count': max_interval_count,
+            'total_interval_count': total_interval_count,
+            'combine_calls': combine_calls,
+            'result_size': len(result_array) if result_array else 0,
+            
+            'avg_intervals_per_combine': total_interval_count / combine_calls if combine_calls > 0 else 0,
+            'reduction_rate': reduce_calls / combine_calls if combine_calls > 0 else 0,
+            'peak_to_final_ratio': max_interval_count / len(result_array) if result_array else 0,
+        }
+    
+        return metrics
 
     def insert_data_db(self, experiment: ExperimentSettings, data):
         '''Insert data into database specified in config file'''
@@ -250,35 +329,6 @@ class ExperimentRunner:
         ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
         return RangeType(lb, ub)
     
-    # def __generate_set(self, experiment:ExperimentSettings) -> RangeSetType:
-    #     # if experiment.num_intervals is not None then use, otherwise if experiment.num_intervals_range then use. otherwise raise error
-    #     if experiment.num_intervals is not None:
-    #         num_intervals = experiment.num_intervals
-    #     elif experiment.num_intervals_range is not None:
-    #         num_intervals = np.random.randint(*experiment.num_intervals_range)
-    #     else:
-    #         raise ValueError("Either num_intervals or num_intervals_range must be specified")
-        
-    #     rset = []
-    #     # FIXME account for gapsize. need to acocunt for (interval size range / (number interval * gap size))
-    #     for i in range(num_intervals):    
-    #         # uncertain ratio. maybe should account for half nulls, half mult 0
-    #         if np.random.random() < experiment.uncertain_ratio * 0.5:  
-    #             # rset.append(RangeType(0,0,True))
-    #             continue
-            
-    #         lb = np.random.randint(*experiment.interval_size_range)
-    #         ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
-            
-    #         # if i < num_intervals - 1 and experiment.gap_size is not None or experiment.gap_size_range is not None:
-    #         #     gap = experiment.gap_size if experiment.gap_size else np.random.randint(**experiment.gap_size_range)
-                
-
-    #         rset.append(RangeType(lb,ub,False))
-        
-    #     return RangeSetType(rset, cu=False)
-
-
     def __generate_set(self, experiment:ExperimentSettings) -> RangeSetType:
         
         # if experiment.num_intervals is not None then use, otherwise if experiment.num_intervals_range then use. otherwise raise error
@@ -346,9 +396,18 @@ class ExperimentRunner:
         return RangeType(lb, ub)
     
     def __calc_aggregate_results(self, experiment: ExperimentSettings, trial_results: dict) -> dict:
+        # remainder agg
         min_times = [r['min_time'] for r in trial_results if r['min_time'] is not None]
         max_times = [r['max_time'] for r in trial_results if r['max_time'] is not None]
         sum_times = [r['sum_time'] for r in trial_results if r['sum_time'] is not None]
+        sumtest_times = [r['sumtest_time'] for r in trial_results if r['sumtest_time'] is not None]
+        # SUMTEST stuff 
+        reduce_calls = [r['reduce_calls'] for r in trial_results if r['reduce_calls'] is not None]
+        max_intervals = [r['max_interval_count'] for r in trial_results if r['max_interval_count'] is not None]
+        total_intervals = [r['total_interval_count'] for r in trial_results if r['total_interval_count'] is not None]
+        combine_calls = [r['combine_calls'] for r in trial_results if r['combine_calls'] is not None]
+        result_sizes = [r['result_size'] for r in trial_results if r['result_size'] is not None]
+
 
         aggregated = {
             'uid' : self.__generate_name(experiment, True),
@@ -361,9 +420,13 @@ class ExperimentRunner:
             'mult_size_range': experiment.mult_size_range,
             'num_intervals': experiment.num_intervals,
             'gap_size': experiment.gap_size,
+            'interval_width': experiment.interval_width,
             'num_intervals_range': experiment.num_intervals_range,
             'gap_size_range': experiment.gap_size_range,
+            'interval_width_range': experiment.interval_width_range,
+
             'reduce_triggerSz_sizeLim': experiment.reduce_triggerSz_sizeLim,
+            'independent_variable': experiment.independent_variable,
 
             # MIN stats
             'min_time_mean': np.mean(min_times) if min_times else None,
@@ -382,6 +445,17 @@ class ExperimentRunner:
             'sum_time_std': np.std(sum_times) if sum_times else None,
             'sum_time_min': np.min(sum_times) if sum_times else None,
             'sum_time_max': np.max(sum_times) if sum_times else None,
+            
+            # SUMTEST stats
+            'sumtest_time_mean': np.mean(sumtest_times) if sumtest_times else None,
+            'sumtest_time_std': np.std(sumtest_times) if sumtest_times else None,
+            'reduce_calls_mean': np.mean(reduce_calls) if reduce_calls else None,
+            'reduce_calls_std': np.std(reduce_calls) if reduce_calls else None,
+            'max_interval_count_mean': np.mean(max_intervals) if max_intervals else None,
+            'max_interval_count_std': np.std(max_intervals) if max_intervals else None,
+            'total_interval_count_mean': np.mean(total_intervals) if total_intervals else None,
+            'combine_calls_mean': np.mean(combine_calls) if combine_calls else None,
+            'result_size_mean': np.mean(result_sizes) if result_sizes else None,
         }
         
         return aggregated
@@ -440,15 +514,6 @@ class ExperimentRunner:
 
             self.generate_plots(csv_path, experiment.independent_variable)
 
-
-        #     if csv_path and experiment.independent_variable:
-        #         plot_path = self.__generate_stats_results(csv_path, experiment.name, experiment.independent_variable)
-        #         heat_path = self.generate_reduction_heatmap(csv_path)
-        #         outputs['plot'] = plot_path
-        #         print(f"  Plot saved: {plot_path}")
-        
-        # return outputs
-
     def __generate_csv_results(self, experiment_name: str) -> str:
         '''save experiment results to CSV'''
         if not self.results:
@@ -462,133 +527,17 @@ class ExperimentRunner:
         out_file = f'results_sd{self.master_seed}'
 
         csv_path = f'{experiment_folder_path}/{out_file}.csv'  
-
         os.makedirs(experiment_folder_path, exist_ok=True)           
+
+        # convert internal results member to csv
         df = pd.DataFrame(self.results)
         df.to_csv(csv_path, index=True)
         
         return csv_path
     
     def generate_plots(self, csv_path: str, indep_variable: str) -> None:
-        self.plotter.plot_all(csv_path, indep_variable)
-
-
-    def __generate_stats_results(self, csv_path:str, experiment_name: str, indep_variable: str):
-        '''save experiment plot results. Use CSV data created right before this call'''
-        
-        experiment_folder_path = self.resultFilepath
-        agg_out_file = f'aggregate_results_sd{self.master_seed}'
-        combined_results_file = f'combined_agg_results_sd{self.master_seed}'
-        agg_results_path =  f'{experiment_folder_path}/{agg_out_file}.jpg'
-        combined_results_path = f'{experiment_folder_path}/{combined_results_file}.jpg'
-
-        df = pd.read_csv(csv_path)
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(14, 5))
-        
-        # get the variable of the experiment #FIXME add in multi variable version & diff plots perhaps
-        try:
-            n = df[indep_variable]
-        except Exception as e:
-            return f"error trying to get x-axis:  {e}"
-            
-        min_mean_time = df['min_time_mean']
-        max_mean_time = df['max_time_mean']
-        sum_mean_time = df['sum_time_mean']
-
-        # MIN
-        ax1.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple')
-        ax1.set_title("Mean Time of MIN", fontsize=14, fontweight='bold')
-        ax1.set_xlabel(f'iv: {indep_variable}', fontsize=12)
-        ax1.set_xticks(range(len(n)))
-        ax1.set_xticklabels(n, rotation=45, ha='right')
-        ax1.set_ylabel('Time (ms)', fontsize=12)
-        ax1.grid(True, alpha=0.3)
-
-        # MAX
-        ax2.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange')
-        ax2.set_title("Mean Time of MAX", fontsize=14, fontweight='bold')
-        ax2.set_xlabel(f'iv: {indep_variable}', fontsize=12)
-        ax2.set_xticks(range(len(n)))
-        ax2.set_xticklabels(n, rotation=45, ha='right')
-        ax2.set_ylabel('Time (ms)', fontsize=12)
-        ax2.grid(True, alpha=0.3)
-
-        # SUM
-        ax3.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green')
-        ax3.set_title("Mean Time of SUM", fontsize=14, fontweight='bold')
-        ax3.set_xlabel(f'iv: {indep_variable}', fontsize=12)
-        ax3.set_xticks(range(len(n)))
-        ax3.set_xticklabels(n, rotation=45, ha='right')
-        ax3.set_ylabel('Time (ms)', fontsize=12)
-        ax3.grid(True, alpha=0.3)
-
-        plt.tight_layout()
-        plt.savefig(agg_results_path)
-
-        fig, ax = plt.subplots(figsize=(12, 5))
-
-        ax.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple', label='MIN')
-        ax.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange', label='MAX')
-        ax.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green', label='SUM')
-
-        ax.set_title(f"Query Performance vs {indep_variable})", fontsize=14, fontweight='bold')
-        ax.set_xlabel(f'iv: {indep_variable}', fontsize=12)
-        ax.set_xticks(range(len(n)))
-        ax.set_xticklabels(n, rotation=45, ha='right')
-        ax.set_ylabel('Time (ms)', fontsize=12)
-        ax.legend(fontsize=11)
-        ax.grid(True, alpha=0.3)
-        plt.tight_layout()
-
-        plt.tight_layout()
-        plt.savefig(combined_results_path)
-
-        return combined_results_path
-
-    def generate_reduction_heatmap(self, csv_path):
-        """Generate heatmap for reduction parameter tuning"""
-        df = pd.read_csv(csv_path)
-        # Parse tuple column
-        parsed = df['reduce_triggerSz_sizeLim'].apply(
-            lambda x: eval(x) if isinstance(x, str) else x
-        )
-        df['trigger_sz'] = parsed.apply(lambda x: x[0])
-        df['reduce_to_sz'] = parsed.apply(lambda x: x[1])
-        
-        # Create pivot tables for each metric
-        sum_pivot = df.pivot_table(values='sum_time_mean', 
-                                    index='reduce_to_sz', 
-                                    columns='trigger_sz')   
-        
-        # Create figure with 3 heatmaps
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
-        
-
-
-        # SUM heatmap
-        sns.heatmap(sum_pivot, annot=True, fmt='.1f', cmap='RdYlGn_r', 
-                    ax=ax3, cbar_kws={'label': 'Time (ms)'})
-        ax3.set_title('SUM Time Heatmap', fontsize=14, fontweight='bold')
-        ax3.set_xlabel('Trigger Size', fontsize=12)
-        ax3.set_ylabel('Reduce To Size', fontsize=12)
-        
-        plt.tight_layout()
-        plt.savefig(f'{csv_path}_heatmap.jpg', dpi=300, bbox_inches='tight')
-        
-        # Also print optimal values
-        min_idx = df['sum_time_mean'].idxmin()
-        best = df.iloc[min_idx]
-        print(f"\n{'='*50}")
-        print(f"OPTIMAL REDUCTION PARAMETERS:")
-        print(f"  Trigger Size: {best['trigger_sz']}")
-        print(f"  Reduce To Size: {best['reduce_to_sz']}")
-        print(f"  Ratio: {best['reduce_to_sz']/best['trigger_sz']:.2f}")
-        print(f"  SUM Time: {best['sum_time_mean']:.2f} ms")
-        print(f"{'='*50}\n")
-        
-        return f'{csv_path}_heatmap.jpg'
-
-
+        plotter = StatisticsPlotter(self.resultFilepath, self.master_seed)
+        plotter.plot_all(csv_path, indep_variable)
 
     def __save_ddl_file(self, experiment: ExperimentSettings, data):
         ''' write data to DDL file for later loading 

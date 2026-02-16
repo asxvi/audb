@@ -8,21 +8,21 @@ from typing import Optional
 class StatisticsPlotter:
     """ handles all statistical analysis and visualization of experiment results"""
 
-    def __init__(self, base_path: str):
-        self.base_path = base_path
+    def __init__(self, resultFilepath: str, seed: str):
+        self.resultFilepath = resultFilepath
+        self.master_seed = seed
     
     def plot_all(self, csv_path: str, indep_variable: str):
         """ calls all plotting functions """
 
-        three_agg_path = self.generate_3_agg_plots(csv_path)
+        three_agg_path = self.generate_3_agg_plots(csv_path, indep_variable)
         comb_agg_path = self.generate_combined_agg_plot(csv_path, indep_variable)
-
-        if indep_variable == '':
-            heat_agg_path = self.generate_reduction_heatmap(csv_path)
+        heat_agg_path = self.generate_reduction_heatmap(csv_path, indep_variable)
         
         print(f"  3 aggs saved: {three_agg_path}")
         print(f"  Combined aggs saved: {comb_agg_path}")
-        print(f"  Heatmap saved: {heat_agg_path}")
+        if heat_agg_path: 
+            print(f"  Heatmap saved: {heat_agg_path}")
 
 
     def generate_3_agg_plots(self, csv_path: str, indep_variable: str):
@@ -116,9 +116,12 @@ class StatisticsPlotter:
 
         return combined_results_path
 
-    def generate_reduction_heatmap(self, csv_path):
+    def generate_reduction_heatmap(self, csv_path: str, indep_variable: str):
         """generate heatmap for reduction parameter tuning"""
         
+        if indep_variable != "reduce_triggerSz_sizeLim":
+            return
+
         df = pd.read_csv(csv_path)
         
         # parse tuple column
@@ -133,7 +136,7 @@ class StatisticsPlotter:
                                     index='reduce_to_sz', 
                                     columns='trigger_sz')   
         
-        fig, (ax) = plt.subplots(1, 3, figsize=(12, 5))
+        fig, (ax) = plt.subplots(1, 1, figsize=(12, 5))
 
         # SUM heatmap
         sns.heatmap(sum_pivot, annot=True, fmt='.1f', cmap='RdYlGn_r', ax=ax, cbar_kws={'label': 'Time (ms)'})
@@ -149,9 +152,9 @@ class StatisticsPlotter:
 
 if __name__ == '__main__':
     csv_path = "/Users/asxvi/Desktop/uic/research/audb/extension/c_extension/tests/data/results/reduction_param_tuning/d14_m02_y2026_s_n1K_unc00_ni7_gsr0_100_redSz50_45__iv_red_sz_sd1579190252/results_sd1579190252.csv"
-    indep_variable = ""
+    
+    df = pd.read_csv(csv_path)
 
-    plotter = StatisticsPlotter()
-    plotter.plot_all(csv_path, )
+    print(df['independent_variable']) 
     
     pass

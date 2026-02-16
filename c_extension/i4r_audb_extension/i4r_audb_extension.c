@@ -1638,7 +1638,7 @@ agg_sum_set_transfuncTest(PG_FUNCTION_ARGS)
 }
 
 /*
-    Reduce one last time if needed and Convert Internal type to ArrayType Datum.
+    returns a composite type 
 */
 Datum
 agg_sum_set_finalfuncTest(PG_FUNCTION_ARGS)
