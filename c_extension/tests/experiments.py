@@ -200,8 +200,6 @@ for trigger_size in range(1, 3, 1):
                 interval_width_range=(25,1000),
                 num_intervals=2
             )
-
-            print(experiment)
             experiment.name = format_name(experiment)
             reduction_tuning.experiments[experiment.name] = experiment
 

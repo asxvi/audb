@@ -189,11 +189,7 @@ class ExperimentRunner:
             'max_interval_count': None,
             'total_interval_count': None,
             'combine_calls': None,
-            'result_size': None,
-
-            'accuracy_size_ratio': None,
-            'accuracy_coverage_ratio': None,
-            'accuracy_jaccard': None,
+            'result_size': None
 
         }
         table = experiment.experiment_id
@@ -210,12 +206,8 @@ class ExperimentRunner:
                     
                     # get additional tests for sumtest
                     normalize = True
-                    int_max = 2147483647
                     results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], normalize)
-                    
                     metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], normalize)
-                    ground_truth_metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], int_max, int_max, normalize)
-                    accuracy_metrics = self.__calculate_accuracy(metrics, ground_truth_metrics)
                     
                     if metrics: 
                         results['sum_test_result'] = metrics['result']
@@ -224,13 +216,7 @@ class ExperimentRunner:
                         results['total_interval_count'] = metrics['total_interval_count']
                         results['combine_calls'] = metrics['combine_calls']
                         results['result_size'] = metrics['result_size']
-                    if accuracy_metrics:
-                        results['accuracy_coverage_ratio'] = accuracy_metrics['cover_accuracy']
-                        results['accuracy_size_ratio'] = accuracy_metrics['size_accuracy']
-                        results['accuracy_jaccard'] = accuracy_metrics['jaccard_index']
-                        
-                print(results)
-                    
+
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
             exit(1)
@@ -256,6 +242,26 @@ class ExperimentRunner:
     
     def get_aggregate_result(self, cur, table, agg_name, combine_func, *agg_params):
         '''get actual aggregate result value (no timing)'''
+        
+        params_sql = ",".join(str(param) for param in agg_params)
+        sql = f"""
+            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
+            FROM {table};"""
+        
+        cur.execute(sql)
+        result = cur.fetchone()
+        
+        if result is None:
+            return None
+        
+        result_value = result[0]
+        
+        return result_value
+    
+    def get_aggregate_ground_truth(self, cur, table, agg_name, combine_func, *agg_params):
+        '''get ground truth- minimally reduced, only normalzied.
+            used small ranges with large gaps to get good tests
+        '''
         
         params_sql = ",".join(str(param) for param in agg_params)
         sql = f"""
@@ -311,85 +317,12 @@ class ExperimentRunner:
             'combine_calls': combine_calls,
             'result_size': len(result_array) if result_array else 0,
             
-            # 'avg_intervals_per_combine': total_interval_count / combine_calls if combine_calls > 0 else 0,
-            # 'reduction_rate': reduce_calls / combine_calls if combine_calls > 0 else 0,
-            # 'peak_to_final_ratio': max_interval_count / len(result_array) if result_array else 0,
+            'avg_intervals_per_combine': total_interval_count / combine_calls if combine_calls > 0 else 0,
+            'reduction_rate': reduce_calls / combine_calls if combine_calls > 0 else 0,
+            'peak_to_final_ratio': max_interval_count / len(result_array) if result_array else 0,
         }
     
         return metrics
-    
-
-    def calculate_accuracy(self, test_results, ground_truth):
-        """calculate the accuracy of ground truth vs test results.
-            in both sets, we compare:
-                1. number of ranges
-                2. the range covered by ranges
-                3. jaccard index |A n B| / |A u B|
-        """
-
-        if not test_results or not ground_truth:
-            return None
-
-        size_accuracy = float(len(test_results['result'])) / len(ground_truth['result']) if ground_truth else 0
-    
-        test_cover = self.__calculate_coverage(test_results['result'])
-        truth_cover = self.__calculate_coverage(ground_truth['result'])
-        cover_accuracy = test_cover / truth_cover if truth_cover > 0 else 0
-
-        jaccard_index = self.__calculate_jaccard_index(test_results['result'], ground_truth['result'])
-
-        print(size_accuracy)   
-        print(cover_accuracy)
-        print(jaccard_index)
-
-        return {'size_accuracy': size_accuracy, 'cover_accuracy': cover_accuracy, 'jaccard_index': jaccard_index}
-        
-   
-    def __calculate_coverage(self, interval_set):
-        cover = 0
-        for interval in interval_set:
-            cover += interval.upper - interval.lower
-        return cover
-    
-    def __calculate_coverage_i4r(self, interval_set: RangeSetType):
-        cover = 0
-        for interval in interval_set.rset:
-            cover += interval.ub - interval.lb
-        return cover
-    
-    def __calculate_jaccard_index(self, ranges_a, ranges_b):
-        '''
-            Jaccard similarity- measures similarity between finite non-empty sample sets 
-            |A n B| / |A u B|
-            
-            https://en.wikipedia.org/wiki/Jaccard_index
-        '''
-
-        if not ranges_a or not ranges_b:
-            return 0.0
-
-        setA = RangeSetType([RangeType(r.lower, r.upper) for r in ranges_a], cu=True)
-        setB = RangeSetType([RangeType(r.lower, r.upper) for r in ranges_b], cu=True)
-        # rng = RangeType(100_000_000, 100_100_101)       #test value to see result
-        # setB.rset.append(rng)
-        # setB.cleanup() 
-                
-        intersection = setA.set_intersection(setB)
-        union = setA.set_union(setB)
-    
-        ic = self.__calculate_coverage_i4r(intersection)
-        uc = self.__calculate_coverage_i4r(union)
-
-        jaccard = ic / uc if uc > 0 else 0.0
-        # print('A    ', setA)
-        # print('B    ', setB)
-        # print('i    ',intersection)
-        # print('u    ', union)
-        # print('ic   ', ic)
-        # print('uc   ', uc)
-        # print('j    ', jaccard)
-
-        return jaccard
 
     def insert_data_db(self, experiment: ExperimentSettings, data):
         '''Insert data into database specified in config file'''
@@ -496,6 +429,7 @@ class ExperimentRunner:
         total_intervals = [r['total_interval_count'] for r in trial_results if r['total_interval_count'] is not None]
         combine_calls = [r['combine_calls'] for r in trial_results if r['combine_calls'] is not None]
         result_sizes = [r['result_size'] for r in trial_results if r['result_size'] is not None]
+
 
         aggregated = {
             'uid' : self.__generate_name(experiment, True),

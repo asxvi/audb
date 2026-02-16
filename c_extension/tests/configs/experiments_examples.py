@@ -1,7 +1,7 @@
 from cliUtility import *
 from DataTypes import *
 from dataclasses import replace
-from main import format_name, ExperimentGroup
+from tests.runner import format_name, ExperimentGroup
 
 '''
 experiments is a dict of {str: ExperimentGroup}. ALlows for many unrelated experiments to run from 1 file

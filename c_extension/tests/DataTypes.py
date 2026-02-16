@@ -284,6 +284,22 @@ class RangeSetType:
             rset.append(RangeType(lb,ub,False))
         
         return RangeSetType(rset, cu=False)
+    
+    def set_union(self, other):
+        combined = self.rset + other.rset
+
+        return RangeSetType(combined, cu=True)
+
+    def set_intersection(self, other):
+        rst = []
+        for p in itertools.product(self.rset, other.rset):
+            ir = p[0].i(p[1])
+            if ir is not None:
+                rst.append(p[0].i(p[1]))
+        rt = RangeSetType(rst)
+        
+        rt.cleanup()
+        return rt
 
 class DataType(Enum):
     RANGE = RangeType
