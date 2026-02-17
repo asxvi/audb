@@ -192,9 +192,14 @@ class ExperimentRunner:
             'combine_calls': None,
             'result_size': None,
 
-            'accuracy_size_ratio': None,
+            # v1
             'accuracy_coverage_ratio': None,
             'accuracy_jaccard': None,
+            
+            # v2
+            'compression_ratio': None,
+            'excess_ratio': None,
+            'false_coverage_fraction': None,
 
         }
         table = experiment.experiment_id
@@ -212,14 +217,14 @@ class ExperimentRunner:
                     # get additional tests for sumtest
                     normalize = True
                     int_max = 2147483647
-                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], normalize)
+                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], False)
                     
                     metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], normalize)
                     ground_truth_metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], int_max, int_max, normalize)
                     accuracy_metrics = self.__calculate_accuracy(metrics, ground_truth_metrics)
                     
-                    if accuracy_metrics:
-                        results['ground_truth_result'] = metrics['result']
+                    if ground_truth_metrics:
+                        results['ground_truth_result'] = ground_truth_metrics['result']
                     if metrics: 
                         results['sum_test_result'] = metrics['result']
                         results['reduce_calls'] = metrics['reduce_calls']
@@ -229,9 +234,11 @@ class ExperimentRunner:
                         results['result_size'] = metrics['result_size']
                     if accuracy_metrics:
                         results['accuracy_coverage_ratio'] = accuracy_metrics['cover_accuracy']
-                        results['accuracy_size_ratio'] = accuracy_metrics['size_accuracy']
                         results['accuracy_jaccard'] = accuracy_metrics['jaccard_index']
-                                            
+                        results['compression_ratio'] = accuracy_metrics['compression_ratio']
+                        results['false_coverage_fraction'] = accuracy_metrics['false_coverage_fraction']
+                        results['excess_ratio'] = accuracy_metrics['excess_ratio']
+
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
             exit(1)
@@ -321,20 +328,29 @@ class ExperimentRunner:
                 1. number of ranges
                 2. the range covered by ranges
                 3. jaccard index |A n B| / |A u B|
+
+                4. excess_ratio: The percent difference actual result vs expected
         """
 
         if not test_results or not ground_truth:
             return None
 
-        size_accuracy = float(len(test_results['result'])) / len(ground_truth['result']) if ground_truth else 0
-    
+        # how many intervals survived relative to ground truth (1.0 == no compression)
+        test_size = len(test_results['result'])
+        truth_size = len(ground_truth['result'])
+        compression_ratio = test_size / truth_size if truth_size > 0 else 0.0
+
+        # excess_truth = percent difference
         test_cover = self.__calculate_coverage(test_results['result'])
         truth_cover = self.__calculate_coverage(ground_truth['result'])
-        cover_accuracy = test_cover / truth_cover if truth_cover > 0 else 0
+        excess_ratio = float(test_cover - truth_cover) / truth_cover if truth_cover > 0 else 0.0
+        # false_coverage_fraction = float(test_cover - truth_cover) / test_cover if test_cover > 0 else 0.0
+        false_coverage_fraction = 0.0
 
+        cover_accuracy = test_cover / truth_cover if truth_cover > 0 else 0
         jaccard_index = self.__calculate_jaccard_index(test_results['result'], ground_truth['result'])
 
-        return {'size_accuracy': size_accuracy, 'cover_accuracy': cover_accuracy, 'jaccard_index': jaccard_index}
+        return {'cover_accuracy': cover_accuracy, 'jaccard_index': jaccard_index, 'compression_ratio': compression_ratio, 'excess_ratio': excess_ratio, 'false_coverage_fraction': false_coverage_fraction}
         
    
     def __calculate_coverage(self, interval_set):
@@ -354,8 +370,7 @@ class ExperimentRunner:
     def __calculate_jaccard_index(self, ranges_a, ranges_b):
         '''
             Jaccard similarity- measures similarity between finite non-empty sample sets 
-            |A n B| / |A u B|
-            
+                |A n B| / |A u B|
             https://en.wikipedia.org/wiki/Jaccard_index
         '''
 
@@ -490,10 +505,15 @@ class ExperimentRunner:
         total_intervals = [r['total_interval_count'] for r in trial_results if r['total_interval_count'] is not None]
         combine_calls = [r['combine_calls'] for r in trial_results if r['combine_calls'] is not None]
         result_sizes = [r['result_size'] for r in trial_results if r['result_size'] is not None]
-        accuracy_coverage_ratio = [r['accuracy_coverage_ratio'] for r in trial_results if r['accuracy_coverage_ratio'] is not None]
-        accuracy_size_ratio = [r['accuracy_size_ratio'] for r in trial_results if r['accuracy_size_ratio'] is not None]
-        accuracy_jaccard = [r['accuracy_jaccard'] for r in trial_results if r['accuracy_jaccard'] is not None]
         
+        # accuracy attempts
+        accuracy_coverage_ratio = [r['accuracy_coverage_ratio'] for r in trial_results if r['accuracy_coverage_ratio'] is not None]
+        accuracy_jaccard = [r['accuracy_jaccard'] for r in trial_results if r['accuracy_jaccard'] is not None]
+                
+        compression_ratio = [r['compression_ratio'] for r in trial_results if r['compression_ratio'] is not None]
+        false_coverage_fraction = [r['false_coverage_fraction'] for r in trial_results if r['false_coverage_fraction'] is not None]
+        excess_ratio = [r['excess_ratio'] for r in trial_results if r['excess_ratio'] is not None]
+
         # actual set results for convenience
         sum_test_result = [r['sum_test_result'] for r in trial_results if r['sum_test_result'] is not None]
         ground_truth_result = [r['ground_truth_result'] for r in trial_results if r['ground_truth_result'] is not None]
@@ -547,10 +567,17 @@ class ExperimentRunner:
             'combine_calls_mean': np.mean(combine_calls) if combine_calls else None,
             'result_size_mean': np.mean(result_sizes) if result_sizes else None,
 
+            # Accuracy Attempts :(
+            # v1
             'accuracy_coverage_ratio': np.mean(accuracy_coverage_ratio) if accuracy_coverage_ratio else None,
-            'accuracy_size_ratio': np.mean(accuracy_size_ratio) if accuracy_size_ratio else None,
             'accuracy_jaccard': np.mean(accuracy_jaccard) if accuracy_jaccard else None,
-
+            
+            # v2
+            'compression_ratio': np.mean(compression_ratio) if compression_ratio else None,
+            'false_coverage_fraction': np.mean(false_coverage_fraction) if false_coverage_fraction else None,
+            'excess_ratio': np.mean(excess_ratio) if excess_ratio else None,
+            
+            # actual I4R's
             'sum_test_result': sum_test_result if sum_test_result else None,
             'ground_truth_result': ground_truth_result if ground_truth_result else None,
         }

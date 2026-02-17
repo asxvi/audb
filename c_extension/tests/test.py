@@ -16,7 +16,7 @@ template = ExperimentSettings(
         reduce_triggerSz_sizeLim=(10, 5),)
 
 def getStuff(self):
-    table = 't_s_n10_unc00_ni2_gsr2500_40000_redsz2_1__iv_red_sz_t1_ms174377'
+    table = 't_s_iv_red_sz_0838b03329_t1'
     config = self.DATA_TYPE_CONFIG[DataType.SET]
 
     results = {
@@ -51,7 +51,7 @@ def getStuff(self):
             ground_truth_metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], int_max, int_max, normalize)
             
             accuracy_metrics = self.calculate_accuracy(metrics, ground_truth_metrics)
-
+            print(accuracy_metrics)
             if metrics: 
                 results['sum_test_result'] = metrics['result']
                 results['reduce_calls'] = metrics['reduce_calls']
@@ -77,6 +77,4 @@ if __name__ == '__main__':
     db_config = load_config()    
 
     runner = ExperimentRunner(db_config, master_seed)
-    
-    runner.generate_name(template, False)
-    # getStuff(runner)
+    getStuff(runner)
