@@ -228,9 +228,7 @@ class ExperimentRunner:
                         results['accuracy_coverage_ratio'] = accuracy_metrics['cover_accuracy']
                         results['accuracy_size_ratio'] = accuracy_metrics['size_accuracy']
                         results['accuracy_jaccard'] = accuracy_metrics['jaccard_index']
-                        
-                print(results)
-                    
+                                            
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
             exit(1)
@@ -319,7 +317,7 @@ class ExperimentRunner:
         return metrics
     
 
-    def calculate_accuracy(self, test_results, ground_truth):
+    def __calculate_accuracy(self, test_results, ground_truth):
         """calculate the accuracy of ground truth vs test results.
             in both sets, we compare:
                 1. number of ranges
@@ -337,10 +335,6 @@ class ExperimentRunner:
         cover_accuracy = test_cover / truth_cover if truth_cover > 0 else 0
 
         jaccard_index = self.__calculate_jaccard_index(test_results['result'], ground_truth['result'])
-
-        print(size_accuracy)   
-        print(cover_accuracy)
-        print(jaccard_index)
 
         return {'size_accuracy': size_accuracy, 'cover_accuracy': cover_accuracy, 'jaccard_index': jaccard_index}
         
@@ -496,6 +490,9 @@ class ExperimentRunner:
         total_intervals = [r['total_interval_count'] for r in trial_results if r['total_interval_count'] is not None]
         combine_calls = [r['combine_calls'] for r in trial_results if r['combine_calls'] is not None]
         result_sizes = [r['result_size'] for r in trial_results if r['result_size'] is not None]
+        accuracy_coverage_ratio = [r['accuracy_coverage_ratio'] for r in trial_results if r['accuracy_coverage_ratio'] is not None]
+        accuracy_size_ratio = [r['accuracy_size_ratio'] for r in trial_results if r['accuracy_size_ratio'] is not None]
+        accuracy_jaccard = [r['accuracy_jaccard'] for r in trial_results if r['accuracy_jaccard'] is not None]
 
         aggregated = {
             'uid' : self.__generate_name(experiment, True),
@@ -544,6 +541,10 @@ class ExperimentRunner:
             'total_interval_count_mean': np.mean(total_intervals) if total_intervals else None,
             'combine_calls_mean': np.mean(combine_calls) if combine_calls else None,
             'result_size_mean': np.mean(result_sizes) if result_sizes else None,
+
+            'accuracy_coverage_ratio': np.mean(accuracy_coverage_ratio) if accuracy_coverage_ratio else None,
+            'accuracy_size_ratio': np.mean(accuracy_size_ratio) if accuracy_size_ratio else None,
+            'accuracy_jaccard': np.mean(accuracy_jaccard) if accuracy_jaccard else None,
         }
         
         return aggregated

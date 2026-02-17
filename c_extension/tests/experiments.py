@@ -128,9 +128,9 @@ template = ExperimentSettings(
 
 
 
-#######################
-## reduce_triggerSz_sizeLim tuning
-#######################
+######################
+# reduce_triggerSz_sizeLim tuning
+######################
 # reduction_tuning = ExperimentGroup('reduction_param_tuning2', 'reduce_triggerSz_sizeLim', None)
 # for trigger_size in range(1, 50, 1):
 #     for reduce_to_size in range(1, 50, 1):
@@ -155,52 +155,60 @@ template = ExperimentSettings(
 # experiments['reduction_param_tuning2'] = reduction_tuning
 
 
-# # test reduction parameters at EACH num_intervals value separately
-# for ni in range(1, 5):
-#     group_name = f'reduction_tuning_ni{ni}'
-#     reduction_group = ExperimentGroup(group_name, 'reduce_triggerSz_sizeLim', None)
-    
-#     for trigger_size in range(10, 51, 5):
-#         for reduce_to_size in range(5, 51, 5):
-#             if reduce_to_size < trigger_size:
-#                 experiment = replace(
-#                     template,
-#                     dataset_size=1000,
-#                     num_trials=5,
-#                     uncertain_ratio=0.0, 
-#                     independent_variable='reduce_triggerSz_sizeLim',
-#                     reduce_triggerSz_sizeLim=(trigger_size, reduce_to_size),
-#                     interval_size_range=(0, 5000),
-#                     gap_size_range=(0, 100),
-#                     start_interval_range=(0, 500),
-#                     interval_width_range=(50, 150),
-#                     num_intervals=ni 
-#                 )
-#                 experiment.name = format_name(experiment)
-#                 reduction_group.experiments[experiment.name] = experiment
-    
-#     experiments[group_name] = reduction_group
 
-
-
-reduction_tuning = ExperimentGroup('reduction_param_tuning2', 'reduce_triggerSz_sizeLim', None)
-for trigger_size in range(1, 3, 1):
-    for reduce_to_size in range(1, 3, 1):
-        if trigger_size - reduce_to_size  > 0:
+######################
+# WIDE reduce_triggerSz_sizeLim tuning
+######################
+reduction_tuning = ExperimentGroup('reduction_param_tuningWIDE', 'reduce_triggerSz_sizeLim', None)
+# for trigger_size in range(1, 50, 1):
+#     for reduce_to_size in range(1, 50, 1):
+for trigger_size in range(1, 5, 1):
+    for reduce_to_size in range(1, 5, 1):
+        # if trigger_size - reduce_to_size  > 15:
+        if trigger_size > reduce_to_size:
             experiment = replace(
                 template,
-                dataset_size = 10,
+                dataset_size = 25,
                 num_trials = 1,
                 uncertain_ratio = 0.0, 
                 independent_variable = 'reduce_triggerSz_sizeLim',
                 reduce_triggerSz_sizeLim = (trigger_size, reduce_to_size),
-                interval_size_range=(0, 100000),
-                gap_size_range=(2500,40000),
-                start_interval_range=(1,50000),
-                interval_width_range=(25,1000),
-                num_intervals=2
+                interval_size_range=(0, 500_000),
+                gap_size_range=(25000,100_000),
+                start_interval_range=(1, 10000),
+                interval_width_range=(1, 100),
+                num_intervals=3
             )
             experiment.name = format_name(experiment)
             reduction_tuning.experiments[experiment.name] = experiment
 
 experiments['reduction_param_tuning2'] = reduction_tuning
+
+
+## WIDE reduce_triggerSz_sizeLim tuning
+#######################
+# reduction_tuning = ExperimentGroup('reduction_param_tuningWIDE', 'reduce_triggerSz_sizeLim', None)
+# for trigger_size in range(1, 50, 1):
+#     for reduce_to_size in range(1, 50, 1):
+# # for trigger_size in range(1, 5, 1):
+#     # for reduce_to_size in range(1, 5, 1):
+#         if trigger_size - reduce_to_size  > 15:
+#         # if trigger_size > reduce_to_size:
+#             experiment = replace(
+#                 template,
+#                 dataset_size = 1000,
+#                 num_trials = 1,
+#                 uncertain_ratio = 0.0, 
+#                 independent_variable = 'reduce_triggerSz_sizeLim',
+#                 reduce_triggerSz_sizeLim = (trigger_size, reduce_to_size),
+                
+#                 interval_size_range=(1, 15_000_000),
+#                 start_interval_range=(1, 4_000_000),
+#                 gap_size_range=(400_000, 4_000_000),
+#                 interval_width_range=(50_000, 700_000),
+#                 num_intervals=4,
+#             )
+#             experiment.name = format_name(experiment)
+#             reduction_tuning.experiments[experiment.name] = experiment
+
+# experiments['reduction_param_tuning2'] = reduction_tuning
