@@ -1,7 +1,19 @@
 from cliUtility import *
 from DataTypes import *
-from main import ExperimentRunner, generate_seed
+from main import ExperimentRunner, generate_seed, ExperimentSettings
 
+template = ExperimentSettings(
+        data_type=DataType.SET, 
+        dataset_size=10_000, 
+        uncertain_ratio=0.0, 
+        mult_size_range=(1,5),
+        interval_size_range=(1, 1000), 
+        num_intervals=4, 
+        mode="all",
+        num_trials=3, 
+        gap_size_range=(0,100), 
+        name= "temp",
+        reduce_triggerSz_sizeLim=(10, 5),)
 
 def getStuff(self):
     table = 't_s_n10_unc00_ni2_gsr2500_40000_redsz2_1__iv_red_sz_t1_ms174377'
@@ -65,5 +77,6 @@ if __name__ == '__main__':
     db_config = load_config()    
 
     runner = ExperimentRunner(db_config, master_seed)
-
-    getStuff(runner)
+    
+    runner.generate_name(template, False)
+    # getStuff(runner)

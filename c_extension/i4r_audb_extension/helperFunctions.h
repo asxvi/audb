@@ -52,10 +52,13 @@ typedef struct {
     Int4RangeSet ranges;
     int resizeTrigger;
     int sizeLimit;
+    bool callNormalize;
+    
     long reduceCalls;               //how many times reduceSize() fired
     long maxIntervalCount;          //peak number of intervals seen
     long totalIntervalCount;        //sum of counts across all agg
     long combineCalls;              //number of times merged new input
+
 } SumAggStateTest;
 
 typedef struct {

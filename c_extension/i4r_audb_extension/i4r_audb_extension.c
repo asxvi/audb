@@ -848,7 +848,7 @@ agg_sum_set_finalfunc(PG_FUNCTION_ARGS)
 // agg over empty == 0,0
 /* arbitrary trigger size. doesnt use for now 
     first parameter is the state
-    second parameter is the current colA (I4RSet)
+    second parameter is the current val (I4RSet)
     third parameter is the multiplicity
  */
 Datum
@@ -1546,7 +1546,9 @@ agg_sum_set_transfuncTest(PG_FUNCTION_ARGS)
     SumAggStateTest *state;
     ArrayType *currSet;
     TypeCacheEntry *typcache;
-    Int4RangeSet inputSet, combined, reduced;
+    Int4RangeSet inputSet, combined, reduced, normalized, newState;
+    // bool callNormalize;
+
     
     if (!AggCheckCallContext(fcinfo, &aggcontext))
         elog(ERROR, "agg_sum_set_transfunc called in non-aggregate context");
@@ -1575,6 +1577,7 @@ agg_sum_set_transfuncTest(PG_FUNCTION_ARGS)
         state->ranges = deserialize_ArrayType(currSet, typcache);
         state->resizeTrigger = PG_GETARG_INT32(2);
         state->sizeLimit = PG_GETARG_INT32(3);
+        state->callNormalize = PG_GETARG_BOOL(4);
         
         state->reduceCalls = 0;
         state->combineCalls = 1;
@@ -1619,14 +1622,25 @@ agg_sum_set_transfuncTest(PG_FUNCTION_ARGS)
         
         // check reduce size
         if (combined.count >= state->resizeTrigger) {
-            reduced = reduceSize(combined, state->sizeLimit);
+            newState = reduceSize(combined, state->sizeLimit);
             pfree(combined.ranges);
-            state->ranges = reduced;
             state->reduceCalls++;
         }
         else {
-            state->ranges = combined;
+            newState = combined;
         }
+
+        if (state->callNormalize) {
+            normalized = normalize(newState);
+
+            if (newState.ranges != combined.ranges)
+                pfree(newState.ranges);
+
+            newState = normalized;
+        }
+
+        state->ranges = newState;
+
         
         MemoryContextSwitchTo(oldcontext);
         

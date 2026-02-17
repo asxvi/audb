@@ -178,11 +178,11 @@ CREATE TEMP TABLE t5_r_aggregates (
 DROP TABLE IF EXISTS t5_r_agg_data;
 CREATE TEMP TABLE t5_r_agg_data (
     id int GENERATED ALWAYS AS IDENTITY,
-    colA int4range,
+    val int4range,
     mult int4range
 );
 
-INSERT INTO t5_r_agg_data (colA, mult) VALUES
+INSERT INTO t5_r_agg_data (val, mult) VALUES
     (int4range(10,20), int4range(1,2)),  -- certain
     (int4range(5,15), int4range(1,2)),   -- certain (MIN)
     (int4range(30,40), int4range(1,2)),  -- certain (MAX)
@@ -196,16 +196,16 @@ INSERT INTO t5_r_agg_data (colA, mult) VALUES
 
 INSERT INTO t5_r_aggregates VALUES
     -- MIN tests
-    ('min_basic', 'min(combine_range_mult_min(colA, mult))', (SELECT min(combine_range_mult_min(colA, mult)) FROM t5_r_agg_data), int4range(5,15)),
-    ('min_ignores_uncertain', 'min(combine_range_mult_min(colA, mult)) WHERE id IN (3,4)', (SELECT min(combine_range_mult_min(colA, mult)) FROM t5_r_agg_data WHERE id IN (3,4)), int4range(30,40)),
-    ('min_empty_table', 'min(combine_range_mult_min(colA, mult)) WHERE 1=0', (SELECT min(combine_range_mult_min(colA, mult)) FROM t5_r_agg_data WHERE 1=0), NULL),
+    ('min_basic', 'min(combine_range_mult_min(val, mult))', (SELECT min(combine_range_mult_min(val, mult)) FROM t5_r_agg_data), int4range(5,15)),
+    ('min_ignores_uncertain', 'min(combine_range_mult_min(val, mult)) WHERE id IN (3,4)', (SELECT min(combine_range_mult_min(val, mult)) FROM t5_r_agg_data WHERE id IN (3,4)), int4range(30,40)),
+    ('min_empty_table', 'min(combine_range_mult_min(val, mult)) WHERE 1=0', (SELECT min(combine_range_mult_min(val, mult)) FROM t5_r_agg_data WHERE 1=0), NULL),
     -- MAX tests
-    ('max_basic', 'max(combine_range_mult_max(colA, mult))', (SELECT max(combine_range_mult_max(colA, mult)) FROM t5_r_agg_data), int4range(30,40)),
-    ('max_ignores_uncertain', 'max(combine_range_mult_max(colA, mult)) WHERE id IN (1,4)', (SELECT max(combine_range_mult_max(colA, mult)) FROM t5_r_agg_data WHERE id IN (1,4)), int4range(10,20)),
-    ('max_empty_table', 'max(combine_range_mult_max(colA, mult)) WHERE 1=0', (SELECT max(combine_range_mult_max(colA, mult)) FROM t5_r_agg_data WHERE 1=0), NULL),
+    ('max_basic', 'max(combine_range_mult_max(val, mult))', (SELECT max(combine_range_mult_max(val, mult)) FROM t5_r_agg_data), int4range(30,40)),
+    ('max_ignores_uncertain', 'max(combine_range_mult_max(val, mult)) WHERE id IN (1,4)', (SELECT max(combine_range_mult_max(val, mult)) FROM t5_r_agg_data WHERE id IN (1,4)), int4range(10,20)),
+    ('max_empty_table', 'max(combine_range_mult_max(val, mult)) WHERE 1=0', (SELECT max(combine_range_mult_max(val, mult)) FROM t5_r_agg_data WHERE 1=0), NULL),
     -- SUM tests
-    ('sum_basic', 'sum(combine_range_mult_sum(colA, mult)) WHERE id IN (5,6)', (SELECT sum(combine_range_mult_sum(colA, mult)) FROM t5_r_agg_data WHERE id IN (5,6)), int4range(5,9)),
-    ('sum_empty_table', 'sum(combine_range_mult_sum(colA, mult)) WHERE 1=0', (SELECT sum(combine_range_mult_sum(colA, mult)) FROM t5_r_agg_data WHERE 1=0), NULL);
+    ('sum_basic', 'sum(combine_range_mult_sum(val, mult)) WHERE id IN (5,6)', (SELECT sum(combine_range_mult_sum(val, mult)) FROM t5_r_agg_data WHERE id IN (5,6)), int4range(5,9)),
+    ('sum_empty_table', 'sum(combine_range_mult_sum(val, mult)) WHERE 1=0', (SELECT sum(combine_range_mult_sum(val, mult)) FROM t5_r_agg_data WHERE 1=0), NULL);
 
 
 -- ===================================
@@ -223,11 +223,11 @@ CREATE TEMP TABLE t6_s_aggregates (
 DROP TABLE IF EXISTS t6_s_agg_data;
 CREATE TEMP TABLE t6_s_agg_data (
     id int GENERATED ALWAYS AS IDENTITY,
-    colA int4range[],
+    val int4range[],
     mult int4range
 );
 
-INSERT INTO t6_s_agg_data (colA, mult) VALUES
+INSERT INTO t6_s_agg_data (val, mult) VALUES
     (array[int4range(1,3), int4range(6,10), int4range(20,30)], int4range(1,4)),  -- certain
     (array[int4range(2,3), int4range(9,14)], int4range(1,4)),                    -- certain
     (array[int4range(50,60), int4range(70,80)], int4range(0,2)),                 -- uncertain (ignored)
@@ -238,15 +238,15 @@ INSERT INTO t6_s_agg_data (colA, mult) VALUES
 
 INSERT INTO t6_s_aggregates VALUES
     -- MIN tests
-    ('min_set_basic', 'min(combine_set_mult_min(colA, mult)) WHERE id IN (1,2)', (SELECT min(combine_set_mult_min(colA, mult)) FROM t6_s_agg_data WHERE id IN (1,2)), array[int4range(1,3), int4range(6,14)]),
-    ('min_set_single_row', 'min(combine_set_mult_min(colA, mult)) WHERE id = 1', (SELECT min(combine_set_mult_min(colA, mult)) FROM t6_s_agg_data WHERE id = 1), array[int4range(1,3), int4range(6,10), int4range(20,30)]),
-    ('min_set_ignores_uncertain', 'min(combine_set_mult_min(colA, mult)) WHERE id IN (2,3)', (SELECT min(combine_set_mult_min(colA, mult)) FROM t6_s_agg_data WHERE id IN (2,3)), array[int4range(2,3), int4range(9,14)]),
-    ('min_set_empty_table', 'min(combine_set_mult_min(colA, mult)) WHERE 1=0', (SELECT min(combine_set_mult_min(colA, mult)) FROM t6_s_agg_data WHERE 1=0), NULL),
+    ('min_set_basic', 'min(combine_set_mult_min(val, mult)) WHERE id IN (1,2)', (SELECT min(combine_set_mult_min(val, mult)) FROM t6_s_agg_data WHERE id IN (1,2)), array[int4range(1,3), int4range(6,14)]),
+    ('min_set_single_row', 'min(combine_set_mult_min(val, mult)) WHERE id = 1', (SELECT min(combine_set_mult_min(val, mult)) FROM t6_s_agg_data WHERE id = 1), array[int4range(1,3), int4range(6,10), int4range(20,30)]),
+    ('min_set_ignores_uncertain', 'min(combine_set_mult_min(val, mult)) WHERE id IN (2,3)', (SELECT min(combine_set_mult_min(val, mult)) FROM t6_s_agg_data WHERE id IN (2,3)), array[int4range(2,3), int4range(9,14)]),
+    ('min_set_empty_table', 'min(combine_set_mult_min(val, mult)) WHERE 1=0', (SELECT min(combine_set_mult_min(val, mult)) FROM t6_s_agg_data WHERE 1=0), NULL),
     -- MAX tests
-    ('max_set_basic', 'max(combine_set_mult_max(colA, mult)) WHERE id IN (1,2)', (SELECT max(combine_set_mult_max(colA, mult)) FROM t6_s_agg_data WHERE id IN (1,2)), array[int4range(2,3), int4range(6,14), int4range(20,30)]),
-    ('max_set_single_row', 'max(combine_set_mult_max(colA, mult)) WHERE id = 2', (SELECT max(combine_set_mult_max(colA, mult)) FROM t6_s_agg_data WHERE id = 2), array[int4range(2,3), int4range(9,14)]),
-    ('max_set_ignores_uncertain', 'max(combine_set_mult_max(colA, mult)) WHERE id IN (1,3)', (SELECT max(combine_set_mult_max(colA, mult)) FROM t6_s_agg_data WHERE id IN (1,3)), array[int4range(1,3), int4range(6,10), int4range(20,30)]),
-    ('max_set_empty_table', 'max(combine_set_mult_max(colA, mult)) WHERE 1=0', (SELECT max(combine_set_mult_max(colA, mult)) FROM t6_s_agg_data WHERE 1=0), NULL);
+    ('max_set_basic', 'max(combine_set_mult_max(val, mult)) WHERE id IN (1,2)', (SELECT max(combine_set_mult_max(val, mult)) FROM t6_s_agg_data WHERE id IN (1,2)), array[int4range(2,3), int4range(6,14), int4range(20,30)]),
+    ('max_set_single_row', 'max(combine_set_mult_max(val, mult)) WHERE id = 2', (SELECT max(combine_set_mult_max(val, mult)) FROM t6_s_agg_data WHERE id = 2), array[int4range(2,3), int4range(9,14)]),
+    ('max_set_ignores_uncertain', 'max(combine_set_mult_max(val, mult)) WHERE id IN (1,3)', (SELECT max(combine_set_mult_max(val, mult)) FROM t6_s_agg_data WHERE id IN (1,3)), array[int4range(1,3), int4range(6,10), int4range(20,30)]),
+    ('max_set_empty_table', 'max(combine_set_mult_max(val, mult)) WHERE 1=0', (SELECT max(combine_set_mult_max(val, mult)) FROM t6_s_agg_data WHERE 1=0), NULL);
 
 
 -- ===================================
@@ -262,6 +262,23 @@ CREATE TEMP TABLE t7_r_special (
 
 -- INSERT INTO t7_r_special VALUES
 -- ;
+
+
+-- Test data for set aggregates
+DROP TABLE IF EXISTS tX_s_agg_data_no_overlap;
+CREATE TEMP TABLE tX_s_agg_data_no_overlap (
+    id int GENERATED ALWAYS AS IDENTITY,
+    val int4range[],
+    mult int4range
+);
+
+INSERT INTO tX_s_agg_data_no_overlap (val, mult) VALUES
+    (array[int4range(1,3), int4range(6,10), int4range(20,30)], int4range(1,4)),
+    (array[int4range(100,1000), int4range(600,1500)], int4range(1,4)),
+    (array[int4range(10000,12000), int4range(15000,16200)], int4range(1,2)),
+    (array[int4range(100000,200000), int4range(300000,400000)], int4range(1,2));
+
+
 
 -- show failures
 -- \echo Test1: Range Arithmetic

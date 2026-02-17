@@ -2,6 +2,8 @@ from numerize import numerize
 import random
 import time
 import os
+import json
+import hashlib
 import psycopg2, psycopg2.extras
 import numpy as np
 import pandas as pd
@@ -180,11 +182,10 @@ class ExperimentRunner:
             'max_time' : None,
             'sum_time' : None,
             'sumtest_time': None,
-            # 'min_result' : None,
-            # 'max_result' : None,
-            # 'sum_result' : None,
-
+            
             'sum_test_result' : None,
+            'ground_truth_result': None,
+            
             'reduce_calls' : None,
             'max_interval_count': None,
             'total_interval_count': None,
@@ -217,6 +218,8 @@ class ExperimentRunner:
                     ground_truth_metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], int_max, int_max, normalize)
                     accuracy_metrics = self.__calculate_accuracy(metrics, ground_truth_metrics)
                     
+                    if accuracy_metrics:
+                        results['ground_truth_result'] = metrics['result']
                     if metrics: 
                         results['sum_test_result'] = metrics['result']
                         results['reduce_calls'] = metrics['reduce_calls']
@@ -308,14 +311,9 @@ class ExperimentRunner:
             'total_interval_count': total_interval_count,
             'combine_calls': combine_calls,
             'result_size': len(result_array) if result_array else 0,
-            
-            # 'avg_intervals_per_combine': total_interval_count / combine_calls if combine_calls > 0 else 0,
-            # 'reduction_rate': reduce_calls / combine_calls if combine_calls > 0 else 0,
-            # 'peak_to_final_ratio': max_interval_count / len(result_array) if result_array else 0,
         }
     
         return metrics
-    
 
     def __calculate_accuracy(self, test_results, ground_truth):
         """calculate the accuracy of ground truth vs test results.
@@ -340,12 +338,14 @@ class ExperimentRunner:
         
    
     def __calculate_coverage(self, interval_set):
+        '''adds all values contained within every interval in set'''
         cover = 0
         for interval in interval_set:
             cover += interval.upper - interval.lower
         return cover
     
     def __calculate_coverage_i4r(self, interval_set: RangeSetType):
+        '''i4r version: adds all values contained within every interval in set'''
         cover = 0
         for interval in interval_set.rset:
             cover += interval.ub - interval.lb
@@ -493,6 +493,11 @@ class ExperimentRunner:
         accuracy_coverage_ratio = [r['accuracy_coverage_ratio'] for r in trial_results if r['accuracy_coverage_ratio'] is not None]
         accuracy_size_ratio = [r['accuracy_size_ratio'] for r in trial_results if r['accuracy_size_ratio'] is not None]
         accuracy_jaccard = [r['accuracy_jaccard'] for r in trial_results if r['accuracy_jaccard'] is not None]
+        
+        # actual set results for convenience
+        sum_test_result = [r['sum_test_result'] for r in trial_results if r['sum_test_result'] is not None]
+        ground_truth_result = [r['ground_truth_result'] for r in trial_results if r['ground_truth_result'] is not None]
+
 
         aggregated = {
             'uid' : self.__generate_name(experiment, True),
@@ -545,6 +550,9 @@ class ExperimentRunner:
             'accuracy_coverage_ratio': np.mean(accuracy_coverage_ratio) if accuracy_coverage_ratio else None,
             'accuracy_size_ratio': np.mean(accuracy_size_ratio) if accuracy_size_ratio else None,
             'accuracy_jaccard': np.mean(accuracy_jaccard) if accuracy_jaccard else None,
+
+            'sum_test_result': sum_test_result if sum_test_result else None,
+            'ground_truth_result': ground_truth_result if ground_truth_result else None,
         }
         
         return aggregated
@@ -568,7 +576,14 @@ class ExperimentRunner:
                         print(f"  No tables found matching: {find_trigger}\n")
                         return
                 
+                    '''
+                        if too many table drops at once, add this basic logic and run script with no expriments
+                        ERROR: out of shared memory ;  or we can:  HINT: You might need to increase max_locks_per_transaction
+                    '''
+                    # i = 0
                     for table in tables:
+                        # i +=1
+                        # if(i<1000):
                         cur.execute(f"DROP TABLE {table[0]};")
                         print(f"  Dropping Table {table[0]}")
 
@@ -665,17 +680,21 @@ class ExperimentRunner:
 
     def __generate_name(self, experiment: ExperimentSettings, generalName: bool = False) -> str:
         '''
-            name format: t_experiment.name_{r | s}_{tX}_{master.seed}_{trial.seed}
+            generates postgres safe name (< 63 chars). old name was being cut.
             if generalName param is set, then trial number will be emit from result
+
+                format:     t_{dtype}_{iv_abbrev}_{10 char dictHashOfExperiment}_t{trialNum}
         '''
         dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
-
+        iv_abbrev = experiment.iv_map.get(experiment.independent_variable if experiment.independent_variable else 'iv')
+        param_str = json.dumps(experiment.asdict(), sort_keys=True, default=str)
+        
+        hashed = hashlib.sha1(param_str.encode()).hexdigest()[:10]
+    
         if generalName:
-            return f"t_{experiment.name}_s{self.master_seed}"
-
-        seed_uid = str(self.trial_seed)[-5:]
-
-        return f"t_{experiment.name}_t{experiment.curr_trial}_ms{self.master_seed}_ts{seed_uid}"
+            return f"t_{dtype}_iv_{iv_abbrev}_{hashed}"
+        
+        return f"t_{dtype}_iv_{iv_abbrev}_{hashed}_t{experiment.curr_trial}"
     
 def run_all():
     ### Parse args and config

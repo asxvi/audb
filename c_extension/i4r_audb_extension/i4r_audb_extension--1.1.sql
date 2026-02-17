@@ -316,7 +316,7 @@ CREATE TYPE sum_set_metrics AS (
     combineCalls bigint
 );
 
-CREATE FUNCTION agg_sum_set_transfuncTest(internal, int4range[], integer, integer) 
+CREATE FUNCTION agg_sum_set_transfuncTest(internal, int4range[], integer, integer, bool) 
 RETURNS internal
 AS 'MODULE_PATHNAME', 'agg_sum_set_transfuncTest'
 LANGUAGE c;
@@ -326,7 +326,7 @@ RETURNS sum_set_metrics
 AS 'MODULE_PATHNAME', 'agg_sum_set_finalfuncTest'
 LANGUAGE c;
 
-create aggregate sumTest (int4range[], resizeTrigger integer, sizeLimit integer) 
+create aggregate sumTest (int4range[], resizeTrigger integer, sizeLimit integer, bool) 
 (
     stype = internal,
     sfunc = agg_sum_set_transfuncTest,
