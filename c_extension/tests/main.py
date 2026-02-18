@@ -100,6 +100,7 @@ class ExperimentRunner:
         self.resultFilepath: str = None
         self.name = None
         self.groupName = None
+        self.csv_paths = []
 
     DATA_TYPE_CONFIG = {
         DataType.RANGE: {
@@ -201,6 +202,9 @@ class ExperimentRunner:
             'excess_ratio': None,
             'false_coverage_fraction': None,
 
+            # v3
+            'result_coverage': None,
+
         }
         table = experiment.experiment_id
         config = self.DATA_TYPE_CONFIG[experiment.data_type]
@@ -217,14 +221,15 @@ class ExperimentRunner:
                     # get additional tests for sumtest
                     normalize = True
                     int_max = 2147483647
-                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], False)
+                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not normalize)
+                    metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not normalize)
                     
-                    metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], normalize)
-                    ground_truth_metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], int_max, int_max, normalize)
-                    accuracy_metrics = self.__calculate_accuracy(metrics, ground_truth_metrics)
+                    # ground_truth_metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], int_max, int_max, normalize)
+                    # ground_truth_metrics = None
+                    # accuracy_metrics = self.__calculate_accuracy(metrics, ground_truth_metrics)
                     
-                    if ground_truth_metrics:
-                        results['ground_truth_result'] = ground_truth_metrics['result']
+                    # if ground_truth_metrics:
+                    #     results['ground_truth_result'] = ground_truth_metrics['result']
                     if metrics: 
                         results['sum_test_result'] = metrics['result']
                         results['reduce_calls'] = metrics['reduce_calls']
@@ -232,12 +237,13 @@ class ExperimentRunner:
                         results['total_interval_count'] = metrics['total_interval_count']
                         results['combine_calls'] = metrics['combine_calls']
                         results['result_size'] = metrics['result_size']
-                    if accuracy_metrics:
-                        results['accuracy_coverage_ratio'] = accuracy_metrics['cover_accuracy']
-                        results['accuracy_jaccard'] = accuracy_metrics['jaccard_index']
-                        results['compression_ratio'] = accuracy_metrics['compression_ratio']
-                        results['false_coverage_fraction'] = accuracy_metrics['false_coverage_fraction']
-                        results['excess_ratio'] = accuracy_metrics['excess_ratio']
+                        results['result_coverage'] = self.__calculate_coverage(metrics['result'])
+                    # if accuracy_metrics:
+                    #     results['accuracy_coverage_ratio'] = accuracy_metrics['cover_accuracy']
+                    #     results['accuracy_jaccard'] = accuracy_metrics['jaccard_index']
+                    #     results['compression_ratio'] = accuracy_metrics['compression_ratio']
+                    #     results['false_coverage_fraction'] = accuracy_metrics['false_coverage_fraction']
+                    #     results['excess_ratio'] = accuracy_metrics['excess_ratio']
 
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
@@ -340,7 +346,7 @@ class ExperimentRunner:
         truth_size = len(ground_truth['result'])
         compression_ratio = test_size / truth_size if truth_size > 0 else 0.0
 
-        # excess_truth = percent difference
+        # excess_ratio = percent difference
         test_cover = self.__calculate_coverage(test_results['result'])
         truth_cover = self.__calculate_coverage(ground_truth['result'])
         excess_ratio = float(test_cover - truth_cover) / truth_cover if truth_cover > 0 else 0.0
@@ -455,16 +461,13 @@ class ExperimentRunner:
                 continue
             
             # get the interval width
-            if hasattr(experiment, 'interval_width') or hasattr(experiment, 'interval_width_range'):
-                if experiment.interval_width is not None:
-                    interval_width = experiment.interval_width
-                elif experiment.interval_width_range is not None:
-                    interval_width = np.random.randint(*experiment.interval_width_range)
-                else:
-                    raise ValueError("Either interval_width or interval_width_range must be specified")
-                interval_end = start + interval_width
+            if experiment.interval_width is not None:
+                interval_width = experiment.interval_width
+            elif experiment.interval_width_range is not None:
+                interval_width = np.random.randint(*experiment.interval_width_range)
             else:
                 raise ValueError("Either interval_width or interval_width_range must be specified")
+            interval_end = start + interval_width
 
             rset.append(RangeType(start, interval_end, False))
 
@@ -508,8 +511,7 @@ class ExperimentRunner:
         
         # accuracy attempts
         accuracy_coverage_ratio = [r['accuracy_coverage_ratio'] for r in trial_results if r['accuracy_coverage_ratio'] is not None]
-        accuracy_jaccard = [r['accuracy_jaccard'] for r in trial_results if r['accuracy_jaccard'] is not None]
-                
+        accuracy_jaccard = [r['accuracy_jaccard'] for r in trial_results if r['accuracy_jaccard'] is not None]            
         compression_ratio = [r['compression_ratio'] for r in trial_results if r['compression_ratio'] is not None]
         false_coverage_fraction = [r['false_coverage_fraction'] for r in trial_results if r['false_coverage_fraction'] is not None]
         excess_ratio = [r['excess_ratio'] for r in trial_results if r['excess_ratio'] is not None]
@@ -518,6 +520,8 @@ class ExperimentRunner:
         sum_test_result = [r['sum_test_result'] for r in trial_results if r['sum_test_result'] is not None]
         ground_truth_result = [r['ground_truth_result'] for r in trial_results if r['ground_truth_result'] is not None]
 
+
+        result_coverage = [r['result_coverage'] for r in trial_results if r['result_coverage'] is not None]
 
         aggregated = {
             'uid' : self.__generate_name(experiment, True),
@@ -576,6 +580,9 @@ class ExperimentRunner:
             'compression_ratio': np.mean(compression_ratio) if compression_ratio else None,
             'false_coverage_fraction': np.mean(false_coverage_fraction) if false_coverage_fraction else None,
             'excess_ratio': np.mean(excess_ratio) if excess_ratio else None,
+
+            # v3
+            'result_coverage': np.mean(result_coverage) if result_coverage else None,
             
             # actual I4R's
             'sum_test_result': sum_test_result if sum_test_result else None,
@@ -640,6 +647,7 @@ class ExperimentRunner:
         
         if self.results and experiment.save_csv:
             csv_path = self.__generate_csv_results(experiment.name)
+            self.csv_paths.append(csv_path)
             outputs['csv'] = csv_path
             print(f"  CSV saved: {csv_path}")
 
@@ -668,7 +676,10 @@ class ExperimentRunner:
     
     def generate_plots(self, csv_path: str, indep_variable: str) -> None:
         plotter = StatisticsPlotter(self.resultFilepath, self.master_seed)
+        
         plotter.plot_all(csv_path, indep_variable)
+        df = plotter.load_all_csvs(self.csv_paths)
+        
 
     def __save_ddl_file(self, experiment: ExperimentSettings, data):
         ''' write data to DDL file for later loading 
@@ -769,7 +780,10 @@ def run_all():
             runner.set_file_path(group_name, exp_name)
             runner.run_experiment(experiment)
         
-        results_paths = runner.save_results(experiment)
+            runner.save_results(experiment)
+        
+        runner. runner.csv_paths
+        print(a)
 
     ### Clean after
     if args.clean_after:

@@ -77,4 +77,5 @@ if __name__ == '__main__':
     db_config = load_config()    
 
     runner = ExperimentRunner(db_config, master_seed)
-    getStuff(runner)
+    
+    runner.run_experiment(template)
