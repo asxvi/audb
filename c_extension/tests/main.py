@@ -92,15 +92,8 @@ class ExperimentRunner:
     '''
         ExperimentRunner runs entire or parts of a test (gen_data, insert_db)
     '''
-    def __init__(self, db_config, seed):
-        self.db_config = db_config
-        self.results = []
-        self.master_seed = seed
-        self.trial_seed = None
-        self.resultFilepath: str = None
-        self.name = None
-        self.groupName = None
-        self.csv_paths = []
+
+    NORMALIZE = True
 
     DATA_TYPE_CONFIG = {
         DataType.RANGE: {
@@ -114,6 +107,16 @@ class ExperimentRunner:
             "combine_max": "combine_set_mult_max",
         },
     }
+
+    def __init__(self, db_config, seed):
+        self.db_config = db_config
+        self.results = []
+        self.master_seed = seed
+        self.trial_seed = None
+        self.resultFilepath: str = None
+        self.name = None
+        self.groupName = None
+        self.csv_paths = []
 
     def run_experiment(self, experiment: ExperimentSettings) -> list:
         '''an experiement has N trials. gen data for each trial, run queries//benchmark results, and append to results'''    
@@ -135,7 +138,7 @@ class ExperimentRunner:
             if experiment.save_ddl:
                 self.__save_ddl_file(experiment, file_data_format)
             
-            self.insert_data_db(experiment, db_data_format)
+            self.__insert_data_db(experiment, db_data_format)
 
             # run queries and benchmark
             trial_results = self.run_queries(experiment)
@@ -175,7 +178,7 @@ class ExperimentRunner:
         return db_formatted_rows, file_formatted_rows
 
     def run_queries(self, experiment: ExperimentSettings):
-        '''Run same aggregation tests on both DataTypes.'''
+        '''Run aggregation tests and collect metrics.'''
         
         results = {
             'row_count' : 0,
@@ -183,26 +186,12 @@ class ExperimentRunner:
             'max_time' : None,
             'sum_time' : None,
             'sumtest_time': None,
-            
             'sum_test_result' : None,
-            'ground_truth_result': None,
-            
             'reduce_calls' : None,
             'max_interval_count': None,
             'total_interval_count': None,
             'combine_calls': None,
             'result_size': None,
-
-            # v1
-            'accuracy_coverage_ratio': None,
-            'accuracy_jaccard': None,
-            
-            # v2
-            'compression_ratio': None,
-            'excess_ratio': None,
-            'false_coverage_fraction': None,
-
-            # v3
             'result_coverage': None,
 
         }
@@ -212,24 +201,19 @@ class ExperimentRunner:
         try:
             with self.connect_db() as conn:
                 with conn.cursor() as cur:
+                    # count 
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
+                    
+                    # aggreate metrics
                     results['sum_time'] = self.run_aggregate(cur, table, 'SUM', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
                     results['min_time'] = self.run_aggregate(cur, table, 'MIN', config['combine_min'])
                     results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
+                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not self.NORMALIZE)
                     
-                    # get additional tests for sumtest
-                    normalize = True
-                    int_max = 2147483647
-                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not normalize)
-                    metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not normalize)
+                    # get additional tests for sumtest. Run experiment and time profile once each
+                    metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not self.NORMALIZE)
                     
-                    # ground_truth_metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], int_max, int_max, normalize)
-                    # ground_truth_metrics = None
-                    # accuracy_metrics = self.__calculate_accuracy(metrics, ground_truth_metrics)
-                    
-                    # if ground_truth_metrics:
-                    #     results['ground_truth_result'] = ground_truth_metrics['result']
                     if metrics: 
                         results['sum_test_result'] = metrics['result']
                         results['reduce_calls'] = metrics['reduce_calls']
@@ -238,16 +222,9 @@ class ExperimentRunner:
                         results['combine_calls'] = metrics['combine_calls']
                         results['result_size'] = metrics['result_size']
                         results['result_coverage'] = self.__calculate_coverage(metrics['result'])
-                    # if accuracy_metrics:
-                    #     results['accuracy_coverage_ratio'] = accuracy_metrics['cover_accuracy']
-                    #     results['accuracy_jaccard'] = accuracy_metrics['jaccard_index']
-                    #     results['compression_ratio'] = accuracy_metrics['compression_ratio']
-                    #     results['false_coverage_fraction'] = accuracy_metrics['false_coverage_fraction']
-                    #     results['excess_ratio'] = accuracy_metrics['excess_ratio']
 
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
-            exit(1)
         
         return results
 
@@ -327,86 +304,15 @@ class ExperimentRunner:
         }
     
         return metrics
-
-    def __calculate_accuracy(self, test_results, ground_truth):
-        """calculate the accuracy of ground truth vs test results.
-            in both sets, we compare:
-                1. number of ranges
-                2. the range covered by ranges
-                3. jaccard index |A n B| / |A u B|
-
-                4. excess_ratio: The percent difference actual result vs expected
-        """
-
-        if not test_results or not ground_truth:
-            return None
-
-        # how many intervals survived relative to ground truth (1.0 == no compression)
-        test_size = len(test_results['result'])
-        truth_size = len(ground_truth['result'])
-        compression_ratio = test_size / truth_size if truth_size > 0 else 0.0
-
-        # excess_ratio = percent difference
-        test_cover = self.__calculate_coverage(test_results['result'])
-        truth_cover = self.__calculate_coverage(ground_truth['result'])
-        excess_ratio = float(test_cover - truth_cover) / truth_cover if truth_cover > 0 else 0.0
-        # false_coverage_fraction = float(test_cover - truth_cover) / test_cover if test_cover > 0 else 0.0
-        false_coverage_fraction = 0.0
-
-        cover_accuracy = test_cover / truth_cover if truth_cover > 0 else 0
-        jaccard_index = self.__calculate_jaccard_index(test_results['result'], ground_truth['result'])
-
-        return {'cover_accuracy': cover_accuracy, 'jaccard_index': jaccard_index, 'compression_ratio': compression_ratio, 'excess_ratio': excess_ratio, 'false_coverage_fraction': false_coverage_fraction}
-        
-   
+           
     def __calculate_coverage(self, interval_set):
         '''adds all values contained within every interval in set'''
         cover = 0
         for interval in interval_set:
             cover += interval.upper - interval.lower
         return cover
-    
-    def __calculate_coverage_i4r(self, interval_set: RangeSetType):
-        '''i4r version: adds all values contained within every interval in set'''
-        cover = 0
-        for interval in interval_set.rset:
-            cover += interval.ub - interval.lb
-        return cover
-    
-    def __calculate_jaccard_index(self, ranges_a, ranges_b):
-        '''
-            Jaccard similarity- measures similarity between finite non-empty sample sets 
-                |A n B| / |A u B|
-            https://en.wikipedia.org/wiki/Jaccard_index
-        '''
 
-        if not ranges_a or not ranges_b:
-            return 0.0
-
-        setA = RangeSetType([RangeType(r.lower, r.upper) for r in ranges_a], cu=True)
-        setB = RangeSetType([RangeType(r.lower, r.upper) for r in ranges_b], cu=True)
-        # rng = RangeType(100_000_000, 100_100_101)       #test value to see result
-        # setB.rset.append(rng)
-        # setB.cleanup() 
-                
-        intersection = setA.set_intersection(setB)
-        union = setA.set_union(setB)
-    
-        ic = self.__calculate_coverage_i4r(intersection)
-        uc = self.__calculate_coverage_i4r(union)
-
-        jaccard = ic / uc if uc > 0 else 0.0
-        # print('A    ', setA)
-        # print('B    ', setB)
-        # print('i    ',intersection)
-        # print('u    ', union)
-        # print('ic   ', ic)
-        # print('uc   ', uc)
-        # print('j    ', jaccard)
-
-        return jaccard
-
-    def insert_data_db(self, experiment: ExperimentSettings, data):
+    def __insert_data_db(self, experiment: ExperimentSettings, data):
         '''Insert data into database specified in config file'''
         with self.connect_db() as conn:
             with conn.cursor() as cur:
@@ -450,7 +356,7 @@ class ExperimentRunner:
         rset = []
 
         # set the first starting point
-        if hasattr(experiment, 'start_interval_range') and experiment.start_interval_range is not None:
+        if experiment.start_interval_range is not None:
             start = np.random.randint(*experiment.start_interval_range)
         else:
             start = experiment.interval_size_range[0]
@@ -481,6 +387,7 @@ class ExperimentRunner:
                     gap = 0  
                 
                 start = interval_end + gap
+
                 # next next start exceeds bounds, we can't add more intervals
                 if start >= experiment.interval_size_range[1]:
                     break
@@ -497,33 +404,23 @@ class ExperimentRunner:
         return RangeType(lb, ub)
     
     def __calc_aggregate_results(self, experiment: ExperimentSettings, trial_results: dict) -> dict:
-        # remainder agg
-        min_times = [r['min_time'] for r in trial_results if r['min_time'] is not None]
-        max_times = [r['max_time'] for r in trial_results if r['max_time'] is not None]
-        sum_times = [r['sum_time'] for r in trial_results if r['sum_time'] is not None]
-        sumtest_times = [r['sumtest_time'] for r in trial_results if r['sumtest_time'] is not None]
-        # SUMTEST stuff 
-        reduce_calls = [r['reduce_calls'] for r in trial_results if r['reduce_calls'] is not None]
-        max_intervals = [r['max_interval_count'] for r in trial_results if r['max_interval_count'] is not None]
-        total_intervals = [r['total_interval_count'] for r in trial_results if r['total_interval_count'] is not None]
-        combine_calls = [r['combine_calls'] for r in trial_results if r['combine_calls'] is not None]
-        result_sizes = [r['result_size'] for r in trial_results if r['result_size'] is not None]
-        
-        # accuracy attempts
-        accuracy_coverage_ratio = [r['accuracy_coverage_ratio'] for r in trial_results if r['accuracy_coverage_ratio'] is not None]
-        accuracy_jaccard = [r['accuracy_jaccard'] for r in trial_results if r['accuracy_jaccard'] is not None]            
-        compression_ratio = [r['compression_ratio'] for r in trial_results if r['compression_ratio'] is not None]
-        false_coverage_fraction = [r['false_coverage_fraction'] for r in trial_results if r['false_coverage_fraction'] is not None]
-        excess_ratio = [r['excess_ratio'] for r in trial_results if r['excess_ratio'] is not None]
 
-        # actual set results for convenience
-        sum_test_result = [r['sum_test_result'] for r in trial_results if r['sum_test_result'] is not None]
-        ground_truth_result = [r['ground_truth_result'] for r in trial_results if r['ground_truth_result'] is not None]
+        def extract(key):
+            return [r[key] for r in trial_results if r.get(key) is not None]
 
-
-        result_coverage = [r['result_coverage'] for r in trial_results if r['result_coverage'] is not None]
+        min_times = extract('min_time')
+        max_times = extract('max_time')
+        sum_times = extract('sum_time')
+        sumtest_times = extract('sumtest_time')
+        reduce_calls = extract('reduce_calls')
+        max_intervals = extract('max_interval_count')
+        total_intervals = extract('total_interval_count')
+        combine_calls = extract('combine_calls')
+        result_sizes = extract('result_size')
+        result_coverages = extract('result_coverage')
 
         aggregated = {
+            # experiment metadata
             'uid' : self.__generate_name(experiment, True),
             'master_seed': self.master_seed,
             'data_type' : 'range' if experiment.data_type == DataType.RANGE else 'set',
@@ -538,55 +435,29 @@ class ExperimentRunner:
             'num_intervals_range': experiment.num_intervals_range,
             'gap_size_range': experiment.gap_size_range,
             'interval_width_range': experiment.interval_width_range,
-
             'reduce_triggerSz_sizeLim': experiment.reduce_triggerSz_sizeLim,
             'independent_variable': experiment.independent_variable,
 
             # MIN stats
             'min_time_mean': np.mean(min_times) if min_times else None,
-            'min_time_std': np.std(min_times) if min_times else None,
-            'min_time_min': np.min(min_times) if min_times else None,
-            'min_time_max': np.max(min_times) if min_times else None,
-            
+            'min_time_std': np.std(min_times) if min_times else None,    
             # MAX stats
             'max_time_mean': np.mean(max_times) if max_times else None,
             'max_time_std': np.std(max_times) if max_times else None,
-            'max_time_min': np.min(max_times) if max_times else None,
-            'max_time_max': np.max(max_times) if max_times else None,
-            
             # SUM stats 
             'sum_time_mean': np.mean(sum_times) if sum_times else None,
             'sum_time_std': np.std(sum_times) if sum_times else None,
-            'sum_time_min': np.min(sum_times) if sum_times else None,
-            'sum_time_max': np.max(sum_times) if sum_times else None,
-            
-            # SUMTEST stats
             'sumtest_time_mean': np.mean(sumtest_times) if sumtest_times else None,
             'sumtest_time_std': np.std(sumtest_times) if sumtest_times else None,
+            
+            # reduction stats
             'reduce_calls_mean': np.mean(reduce_calls) if reduce_calls else None,
-            'reduce_calls_std': np.std(reduce_calls) if reduce_calls else None,
             'max_interval_count_mean': np.mean(max_intervals) if max_intervals else None,
-            'max_interval_count_std': np.std(max_intervals) if max_intervals else None,
             'total_interval_count_mean': np.mean(total_intervals) if total_intervals else None,
             'combine_calls_mean': np.mean(combine_calls) if combine_calls else None,
             'result_size_mean': np.mean(result_sizes) if result_sizes else None,
-
-            # Accuracy Attempts :(
-            # v1
-            'accuracy_coverage_ratio': np.mean(accuracy_coverage_ratio) if accuracy_coverage_ratio else None,
-            'accuracy_jaccard': np.mean(accuracy_jaccard) if accuracy_jaccard else None,
-            
-            # v2
-            'compression_ratio': np.mean(compression_ratio) if compression_ratio else None,
-            'false_coverage_fraction': np.mean(false_coverage_fraction) if false_coverage_fraction else None,
-            'excess_ratio': np.mean(excess_ratio) if excess_ratio else None,
-
-            # v3
-            'result_coverage': np.mean(result_coverage) if result_coverage else None,
-            
-            # actual I4R's
-            'sum_test_result': sum_test_result if sum_test_result else None,
-            'ground_truth_result': ground_truth_result if ground_truth_result else None,
+            'result_coverage_mean': np.mean(result_coverages) if result_coverages else None,
+            # ^^ v3
         }
         
         return aggregated
@@ -642,16 +513,15 @@ class ExperimentRunner:
     def save_results(self, experiment: ExperimentSettings):
         '''handles all experiment file outputs. (DDL, CSV results, Plots)
         **Does not handle DDL, DDL is handeled in run_experiment after generating data'''
-
-        outputs = {}
         
-        if self.results and experiment.save_csv:
-            csv_path = self.__generate_csv_results(experiment.name)
-            self.csv_paths.append(csv_path)
-            outputs['csv'] = csv_path
-            print(f"  CSV saved: {csv_path}")
+        if not self.results or not experiment.save_csv:
+            return
+    
+        csv_path = self.__generate_csv_results(experiment.name)
+        self.csv_paths.append(csv_path)
+        print(f"  CSV saved: {csv_path}")
 
-            self.generate_plots(csv_path, experiment.independent_variable)
+        self.generate_plots(csv_path, experiment.independent_variable)
 
     def __generate_csv_results(self, experiment_name: str) -> str:
         '''save experiment results to CSV'''
@@ -685,8 +555,7 @@ class ExperimentRunner:
         ''' write data to DDL file for later loading 
             #NOTE broken. Need way to store final group and apppend all DDL to proper directory
         '''
-        raise DeprecationWarning("Broken. Will fix if ever actually used. NOTE- Need way to store final group and append all DDL to proper directory. Currently it stores in group dirctory, but not the specific Experiment within this group.")
-
+        raise NotImplementedError("Broken. Will fix if ever actually used. NOTE- Need way to store final group and append all DDL to proper directory. Currently it stores in group dirctory, but not the specific Experiment within this group.")
         experiment_folder_path = f'data/results/{self.groupName}/ddl'
         timestamp = time.strftime("d%d_m%m_y%Y")
         out_file = f'{timestamp}_{experiment.name}_sd{self.master_seed}'
@@ -782,8 +651,7 @@ def run_all():
         
             runner.save_results(experiment)
         
-        a = runner.csv_paths
-        print(a)
+        print(f"Generated {len(runner.csv_paths)} CSV files: {runner.csv_paths}")
 
     ### Clean after
     if args.clean_after:

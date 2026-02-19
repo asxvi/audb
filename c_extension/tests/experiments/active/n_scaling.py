@@ -30,11 +30,11 @@ template = ExperimentSettings(
 
 def static_n_sweep(max_n: int = 11000, trigger_size: int = 10, reduce_to_size: int = 5):
     n_sweep = ExperimentGroup('n_sweep', 'dataset_size', None)
-    for n in range(10_000, max_n+1, 50_000):
+    for n in range(10_000, max_n+1, 10_000):
         experiment = replace(
             template,
             dataset_size             = n,
-            num_trials               = 1,
+            num_trials               = 5,
             uncertain_ratio          = 0.0,
             independent_variable     = 'dataset_size',
             interval_size_range      = (1, 4_000),
@@ -59,8 +59,3 @@ experiments['n_scaling_9_3'] = static_n_sweep(100_000, 9, 3)
 experiments['n_scaling_5_2'] = static_n_sweep(100_000, 5, 2)
 experiments['n_scaling_3_1'] = static_n_sweep(100_000, 3, 1)
 experiments['n_scaling_1_1'] = static_n_sweep(100_000, 1, 1)
-
-
-
-# static_n_sweep(100_000, 10, 5)
-# static_n_sweep(50000, 10, 5)
