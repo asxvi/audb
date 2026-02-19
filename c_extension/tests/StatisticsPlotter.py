@@ -193,3 +193,33 @@ class StatisticsPlotter:
         plt.savefig(f'{csv_path}_heatmap.jpg', dpi=300, bbox_inches='tight')
         
         # return f'{csv_path}_heatmap.jpg'
+
+
+    def generate_reduction_heatmap2(self, df: pd.DataFrame, csv_path: str, indep_variable: str):
+        """generate heatmap for reduction parameter tuning"""
+        
+        if indep_variable != "reduce_triggerSz_sizeLim":
+            return
+        
+        # parse tuple column
+        parsed = df['reduce_triggerSz_sizeLim'].apply(
+            lambda x: eval(x) if isinstance(x, str) else x
+        )
+        df['trigger_sz'] = parsed.apply(lambda x: x[0])
+        df['reduce_to_sz'] = parsed.apply(lambda x: x[1])
+        
+        # pivot table input for heatmap 
+        sum_pivot = df.pivot_table(values='sum_time_mean', index='reduce_to_sz', columns='trigger_sz')   
+        
+        fig, (ax) = plt.subplots(1, 1, figsize=(12, 5))
+
+        # SUM heatmap
+        sns.heatmap(sum_pivot, annot=True, fmt='.1f', cmap='RdYlGn_r', ax=ax, cbar_kws={'label': 'Time (ms)'})
+        ax.set_title('SUM Time Heatmap', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Trigger Size', fontsize=12)
+        ax.set_ylabel('Reduce To Size', fontsize=12)
+        
+        plt.tight_layout()
+        plt.savefig(f'{csv_path}_heatmap.jpg', dpi=300, bbox_inches='tight')
+        
+        # return f'{csv_path}_heatmap.jpg'

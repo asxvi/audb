@@ -782,7 +782,7 @@ def run_all():
         
             runner.save_results(experiment)
         
-        runner. runner.csv_paths
+        a = runner.csv_paths
         print(a)
 
     ### Clean after
