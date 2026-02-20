@@ -251,12 +251,17 @@ class ExperimentRunner:
         return results
     
     def save_results(self, experiment: ExperimentSettings) -> str:
-        ''' saves and returns CSV path of results  '''
+        ''' saves and returns CSV path of results experiment.resultFilepath'''
         
         if not self.results or not experiment.save_csv:
             return
         
-        csv_path = self.__generate_csv_results(experiment.name)
+        csv_name = f"results_{experiment.name}_sd{self.master_seed}.csv"
+        csv_path = os.path.join(self.resultFilepath, csv_name)
+
+        df = pd.DataFrame(self.results)
+        df.to_csv(csv_path, index=True)         
+        
         self.csv_paths.append(csv_path)
         print(f"  CSV saved: {csv_path}")
 
@@ -292,24 +297,24 @@ class ExperimentRunner:
                     conn.rollback()
 
     def set_file_path(self, group_name: str, experiment_name:str) -> None:
-        '''creates experiments root folder
-            
-            stored in data/results. optional bucketing into group is group_name specified
-            
-            format: ./dd/mm/yyyy_{experiment_name}_sd{master_seed}
-        '''
+        """creates experiment folder path based on group and experiment name.
+        if experiment_name is None, creates a folder for the entire group.
 
-        timestamp = time.strftime("d%d_m%m_y%Y")
-        out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
+        Format:
+        - with experiment: ./data/results/<group>/<experiment_name>_sd<seed>
+        - group-only:    ./data/results/<group>/sd<seed>"""
         
-        # prepend group in output path
-        if group_name:
-            experiment_folder_path = f'data/results/{group_name}/{out_file}'
+        if experiment_name:
+            folder_name = f"{experiment_name}_sd{self.master_seed}"
         else:
-            experiment_folder_path = f'data/results/{out_file}'
-        
-        self.resultFilepath = experiment_folder_path
+            folder_name = f"sd{self.master_seed}"
 
+        if group_name:
+            self.resultFilepath = os.path.join("data", "results", group_name, folder_name)
+        else:
+            self.resultFilepath = os.path.join("data", "results", folder_name)
+
+        os.makedirs(self.resultFilepath, exist_ok=True)
     # ----------------------------------  
     # --- Internal Helpers (Private) ---
     # ----------------------------------
@@ -551,23 +556,6 @@ class ExperimentRunner:
 
     def __connect_db(self):
         return psycopg2.connect(**self.db_config)
-
-    def __generate_csv_results(self, experiment_name: str) -> str:
-        '''save experiment results to CSV'''
-        if not self.results:
-            return 
-
-        experiment_folder_path = self.resultFilepath
-        out_file = f'results_sd{self.master_seed}'
-
-        csv_path = f'{experiment_folder_path}/{out_file}.csv'  
-        os.makedirs(experiment_folder_path, exist_ok=True)  
-
-        # convert internal results member to csv
-        df = pd.DataFrame(self.results)
-        df.to_csv(csv_path, index=True)         
-
-        return csv_path
     
     def __generate_name(self, experiment: ExperimentSettings, generalName: bool = False) -> str:
         '''
@@ -651,11 +639,13 @@ def run_all():
     ### Run every experiment and save results
     for group_name, ExpGroup in experiments.items(): 
         results = _run_experiment_group(runner, group_name, ExpGroup)
-        _plot_experiment_group(runner, results)
+        # _plot_experiment_group(runner, results)
 
     ### Clean after
     if args.clean_after:
         runner.clean_tables(args.clean_after)
+
+    print("Unique Master seed: ", master_seed)
 
 def generate_seed(in_seed=None):
     '''genrate the master seed of this programs run. (can be included in runner or settings class)'''
@@ -688,12 +678,12 @@ def format_name(experiment: ExperimentSettings):
     red = ""
     red_cfg = getattr(experiment, 'reduce_triggerSz_sizeLim', None)
     if red_cfg:
-        red = f"r{red_cfg[0]}_{red_cfg[1]}"
+        red = f"red{red_cfg[0]}_{red_cfg[1]}"
     
     # shortened independent variable
     iv = getattr(experiment, 'independent_variable', 'iv')
     if iv:
-        iv = experiment.iv_map[iv]
+        iv = f"iv_{experiment.iv_map[iv]}"
     
     seed = f"s{getattr(experiment, 'seed', '')}" if getattr(experiment, 'seed', None) else ""
     
@@ -723,30 +713,21 @@ def _run_experiment_group(runner: ExperimentRunner, group_name: str, group: Expe
     runner.results = []
     runner.name = group.name
     runner.groupName = group_name
-    
-    # all csv results for group
-    group_results_csvs = []
-    
+    runner.set_file_path(group_name, None)
+        
     # for every experiment within group, run it
     for exp_name, experiment in group.experiments.items():
-        runner.set_file_path(group_name, exp_name)
         runner.run_experiment(experiment)
-        result_csv_path = runner.save_results(experiment)
-        group_results_csvs.append(result_csv_path)
+    
+    os.makedirs(runner.resultFilepath, exist_ok=True)
+    group_csv_path = f"{runner.resultFilepath}/results_sd{runner.master_seed}.csv"
+    
+    df = pd.DataFrame(runner.results)
+    df.to_csv(group_csv_path, index=False)
 
-        _plot_experiment(runner, result_csv_path, experiment)
+    print(f"  Saved group CSV: {group_csv_path}")
 
-    print(f"  Generated {len(runner.csv_paths)} CSV files")
-    return group_results_csvs
-
-def _plot_experiment(runner: ExperimentRunner, csv_path: str, experiment: ExperimentSettings) -> None:
-        ''' add optional experiment level plotting '''
-
-        if csv_path is None:
-            raise ValueError('No list of csv results for group')
-
-        plotter = StatisticsPlotter(runner.resultFilepath, runner.master_seed)
-        plotter.plot_experiment(csv_path, experiment.independent_variable)
+    return group_csv_path
 
 def _plot_experiment_group(runner: ExperimentRunner, group_results: list) -> None:
     if group_results is None:

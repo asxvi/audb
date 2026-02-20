@@ -26,6 +26,7 @@ template = ExperimentSettings(
     reduce_triggerSz_sizeLim=(10, 5),
 )
 
+
 def static_n_sweep(max_n: int = 100_000, step: int = 10_000, trigger_size: int = 10, reduce_to_size: int = 5):
     n_sweep = ExperimentGroup('n_sweep', 'dataset_size', None)
     for n in range(10_000, max_n+1, step):
