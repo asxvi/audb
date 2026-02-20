@@ -1,3 +1,4 @@
+import sys
 from numerize import numerize
 import random
 import time
@@ -30,8 +31,8 @@ class ExperimentGroup:
 class ExperimentSettings:
     '''
         Class contains the modifiable settings of a test
-        if num_intervals is used, num_intervals_range shouldn't be used
-        if gap_size is used, gap_size_range shouldn't be used
+        if num_intervals is used, num_intervals_range shouldn't be used (left default=NULL)
+        if gap_size is used, gap_size_range shouldn't be used (left default=NULL)
     '''
     name: str                                   # required 
     data_type: DataType                         # always Set or Range
@@ -133,8 +134,7 @@ class ExperimentRunner:
             # get randomly generated data for curr seed
             db_data_format, file_data_format = self.generate_data(experiment)
 
-            # save in ddl compatible format. Insert into DB regardless... need to run tests.
-            # DOES NOT WORK properly
+            # DOES NOT WORK properly # save in ddl compatible format. Insert into DB regardless... need to run tests.
             if experiment.save_ddl:
                 self.__save_ddl_file(experiment, file_data_format)
             
@@ -225,6 +225,7 @@ class ExperimentRunner:
 
         except Exception as e:
             print(f"Error running queries for {experiment.experiment_id}: {e}")
+            raise
         
         return results
 
@@ -511,17 +512,17 @@ class ExperimentRunner:
         self.resultFilepath = experiment_folder_path
 
     def save_results(self, experiment: ExperimentSettings):
-        '''handles all experiment file outputs. (DDL, CSV results, Plots)
+        '''handles all file outputs for current Experiment. (DDL, CSV results, Plots)
         **Does not handle DDL, DDL is handeled in run_experiment after generating data'''
         
         if not self.results or not experiment.save_csv:
             return
-    
+        
         csv_path = self.__generate_csv_results(experiment.name)
         self.csv_paths.append(csv_path)
         print(f"  CSV saved: {csv_path}")
 
-        self.generate_plots(csv_path, experiment.independent_variable)
+        self.generate_experiment_specific_plots(csv_path, experiment.independent_variable)
 
     def __generate_csv_results(self, experiment_name: str) -> str:
         '''save experiment results to CSV'''
@@ -544,12 +545,15 @@ class ExperimentRunner:
         
         return csv_path
     
-    def generate_plots(self, csv_path: str, indep_variable: str) -> None:
+    def generate_experiment_specific_plots(self, csv_path: str, indep_variable: str) -> None:
+        '''creates plotter object and generates all plots'''
         plotter = StatisticsPlotter(self.resultFilepath, self.master_seed)
-        
         plotter.plot_all(csv_path, indep_variable)
+    
+    def generate_group_specific_plots(self, indep_variable: str) -> None:
+        plotter = StatisticsPlotter(self.resultFilepath, self.master_seed)
         df = plotter.load_all_csvs(self.csv_paths)
-        
+
 
     def __save_ddl_file(self, experiment: ExperimentSettings, data):
         ''' write data to DDL file for later loading 
@@ -606,12 +610,8 @@ class ExperimentRunner:
 def run_all():
     ### Parse args and config
     args = parse_args()
-
-    if args.seed:
-        master_seed = generate_seed(args.seed)
-    else:
-        master_seed = generate_seed()
-    print("The unique seed is ", master_seed)
+    master_seed = generate_seed(args.seed)
+    print("Unique Master seed: ", master_seed)
 
     try:
         db_config = load_config(args.dbconfig)    
@@ -626,41 +626,19 @@ def run_all():
     if args.clean_before:
         runner.clean_tables(args.clean_before)
 
-    ### Load data: 3 branches of execution. Quick run, YAML file, python script.
-    if args.quick:
-        experiments = create_quick_experiment(args)
-    elif args.yaml_experiments_file is not None:
-        experiments = load_experiments_from_file(args.yaml_experiments_file)
-    elif args.code:
-        namespace = {'runner': runner, 'db_config': db_config,}
-        exec(open(args.code).read(), namespace)
-        experiments = namespace.get('experiments', {})
+    ### Load Experiments
+    experiments = _load_experiments(args, runner, db_config)
 
     ### Run every experiment and save results
     for group_name, ExpGroup in experiments.items(): 
-        print(f"running experiment group:  {group_name}")
-
-        # clear results buffer for each indep test group
-        runner.results = []
-        runner.name = ExpGroup.name
-        runner.groupName = group_name
-
-        for exp_name, experiment in ExpGroup.experiments.items():
-            runner.set_file_path(group_name, exp_name)
-            runner.run_experiment(experiment)
-        
-            runner.save_results(experiment)
-        
-        print(f"Generated {len(runner.csv_paths)} CSV files: {runner.csv_paths}")
+        _run_experiment_group(runner, group_name, ExpGroup)
 
     ### Clean after
     if args.clean_after:
         runner.clean_tables(args.clean_after)
 
 def generate_seed(in_seed=None):
-    '''
-        genrate the master seed of this programs run. (can be included in runner or settings class)
-    '''
+    '''genrate the master seed of this programs run. (can be included in runner or settings class)'''
     if in_seed is not None:
         seed = in_seed
     else:
@@ -701,6 +679,37 @@ def format_name(experiment: ExperimentSettings):
     rv =  f"{dtype}{sz}{unc}{ni_nir}{gs_gsr}{red_sz}{iv}"
     return rv
 
+def _load_experiments(args, runner, db_config):
+    '''Load experiment configuration from various sources. (CLI, YAML, Python Script)'''
+
+    if args.quick:
+        return create_quick_experiment(args)
+    elif args.yaml_experiments_file:
+        return load_experiments_from_file(args.yaml_experiments_file)
+    elif args.code:
+        namespace = {'runner': runner, 'db_config': db_config}
+        exec(open(args.code).read(), namespace)
+        return namespace.get('experiments', {})
+    else:
+        sys.exit("No experiment source specified (use --help for examples)")
+
+def _run_experiment_group(runner: ExperimentRunner, group_name: str, group: ExperimentGroup):
+    '''Run all experiments in a group and generate results.'''
+
+    print(f"\nRunning experiment group: {group_name}")
+    
+    runner.results = []
+    runner.name = group.name
+    runner.groupName = group_name
+    
+    # for every experiment within group, run it
+    for exp_name, experiment in group.experiments.items():
+        runner.set_file_path(group_name, exp_name)
+        runner.run_experiment(experiment)
+        runner.save_results(experiment)
+    
+    print(f"  Generated {len(runner.csv_paths)} CSV files")
+    
 if __name__ == '__main__':
     start = time.perf_counter()
     run_all()

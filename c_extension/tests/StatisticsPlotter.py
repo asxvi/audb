@@ -43,13 +43,7 @@ class StatisticsPlotter:
             dfs.append(df)
         
         combined = pd.concat(dfs, ignore_index=True)
-        
-        # Parse reduce params
-        if 'reduce_triggerSz_sizeLim' in combined.columns:
-            parsed = combined['reduce_triggerSz_sizeLim'].apply(self.parse_reduce_tuple)
-            combined['trigger_sz'] = parsed.apply(lambda x: x[0] if x else None)
-            combined['size_lim']   = parsed.apply(lambda x: x[1] if x else None)
-        
+                
         return combined
 
     def generate_3_agg_plots(self, csv_path: str, indep_variable: str):
