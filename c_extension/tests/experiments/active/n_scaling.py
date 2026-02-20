@@ -1,7 +1,7 @@
 from cliUtility import *
 from DataTypes import *
 from dataclasses import replace
-from main import ExperimentGroup
+from main import ExperimentGroup, format_name
 
 
 '''
@@ -26,7 +26,6 @@ template = ExperimentSettings(
     reduce_triggerSz_sizeLim=(10, 5),
 )
 
-
 def static_n_sweep(max_n: int = 100_000, step: int = 10_000, trigger_size: int = 10, reduce_to_size: int = 5):
     n_sweep = ExperimentGroup('n_sweep', 'dataset_size', None)
     for n in range(10_000, max_n+1, step):
@@ -43,7 +42,7 @@ def static_n_sweep(max_n: int = 100_000, step: int = 10_000, trigger_size: int =
             num_intervals            = 4,
             reduce_triggerSz_sizeLim = (trigger_size, reduce_to_size),
         )
-        experiment.name = f"n{n}_redSz{trigger_size}_{reduce_to_size}"
+        experiment.name = format_name(experiment)
         n_sweep.experiments[experiment.name] = experiment
 
     return n_sweep
@@ -94,7 +93,7 @@ def reduction_sweep(n: int = 100_000):
 # experiments['n_scaling_9_3'] = static_n_sweep(100_000, 10_000, 9, 3)
 # experiments['n_scaling_5_2'] = static_n_sweep(100_000, 10_000, 5, 2)
 # experiments['n_scaling_3_1'] = static_n_sweep(100_000, 10_000, 3, 1)
-# experiments['n_scaling_1_1'] = static_n_sweep(100_000, 10_000, 1, 1)
+experiments['n_scaling_1_1'] = static_n_sweep(40000, 10_000, 1, 1)
 
 
 # experiments['reduction_sweep50k'] = reduction_sweep()

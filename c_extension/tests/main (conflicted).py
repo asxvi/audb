@@ -16,7 +16,6 @@ import numpy as np
 # local
 from cliUtility import *
 from DataTypes import *
-from StatisticsPlotter import *
 
 @dataclass
 class ExperimentGroup:
@@ -250,8 +249,8 @@ class ExperimentRunner:
         
         return results
     
-    def save_results(self, experiment: ExperimentSettings) -> str:
-        ''' saves and returns CSV path of results  '''
+    def save_results(self, experiment: ExperimentSettings):
+        ''' saves and returns CSV results only  '''
         
         if not self.results or not experiment.save_csv:
             return
@@ -414,7 +413,7 @@ class ExperimentRunner:
             FROM {table};"""
         cur.execute(sql)
         
-        # print(f"DEBUG SQL: {sql}") 
+        print(f"DEBUG SQL: {sql}") 
         results = cur.fetchone()[0]
         plan_root = results[0]
         plan = plan_root["Plan"]
@@ -569,6 +568,8 @@ class ExperimentRunner:
 
         return csv_path
     
+    def 
+    
     def __generate_name(self, experiment: ExperimentSettings, generalName: bool = False) -> str:
         '''
             generates postgres safe name (< 63 chars). old name was being cut.
@@ -650,8 +651,7 @@ def run_all():
 
     ### Run every experiment and save results
     for group_name, ExpGroup in experiments.items(): 
-        results = _run_experiment_group(runner, group_name, ExpGroup)
-        _plot_experiment_group(runner, results)
+        _run_experiment_group(runner, group_name, ExpGroup)
 
     ### Clean after
     if args.clean_after:
@@ -675,30 +675,29 @@ def format_datasize(size):
         return numerize.numerize(size, 0)
 
 def format_name(experiment: ExperimentSettings):
-    """ generate unique name for an experiment based on its parameters.
-        auto-includes dataset size, reduction config, and optional seed."""
+    '''format name using experiment elements'''
 
-    # base type: s = set, r = range
-    dtype = 's' if getattr(experiment, 'data_type', None) == DataType.SET else 'r'
-    
-    # dataset size
-    sz = f"n{getattr(experiment, 'dataset_size', 0)}"
-    
-    # reduction trigger/limit
-    red = ""
-    red_cfg = getattr(experiment, 'reduce_triggerSz_sizeLim', None)
-    if red_cfg:
-        red = f"r{red_cfg[0]}_{red_cfg[1]}"
-    
-    # shortened independent variable
-    iv = getattr(experiment, 'independent_variable', 'iv')
-    if iv:
-        iv = experiment.iv_map[iv]
-    
-    seed = f"s{getattr(experiment, 'seed', '')}" if getattr(experiment, 'seed', None) else ""
-    
-    name = f"{dtype}_{sz}_{red}_{iv}{seed}"
-    return name
+    dtype = 's' if experiment.data_type == DataType.SET else 'r'
+    sz = f"_n{format_datasize(experiment.dataset_size)}"
+    unc = f"_unc{str.replace(str(experiment.uncertain_ratio), '.', '')}"
+    # msr = f"{experiment.mult_size_range[0]}_{experiment.mult_size_range[1]}"
+    iv = f"__iv_{experiment.iv_map[experiment.independent_variable]}"
+    red_sz = f"_redSz{experiment.reduce_triggerSz_sizeLim[0]}_{experiment.reduce_triggerSz_sizeLim[1]}"
+    ni_nir = ""
+    gs_gsr = ""
+
+    if experiment.num_intervals:
+        ni_nir = f'_ni{experiment.num_intervals}'
+    elif experiment.num_intervals_range:
+        ni_nir = f'_nir{experiment.num_intervals_range[0]}_{experiment.num_intervals_range[1]}'
+
+    if experiment.gap_size:
+        gs_gsr = f'_gs{experiment.gap_size}'
+    elif experiment.gap_size_range:
+        gs_gsr = f'_gsr{experiment.gap_size_range[0]}_{experiment.gap_size_range[1]}'
+
+    rv =  f"{dtype}{sz}{unc}{ni_nir}{gs_gsr}{red_sz}{iv}"
+    return rv
 
 def _load_experiments(args, runner, db_config):
     '''Load experiment configuration from various sources. (CLI, YAML, Python Script)'''
@@ -719,42 +718,17 @@ def _run_experiment_group(runner: ExperimentRunner, group_name: str, group: Expe
 
     print(f"\nRunning experiment group: {group_name}")
     
-    # reset runner metadata to current experiment group
     runner.results = []
     runner.name = group.name
     runner.groupName = group_name
-    
-    # all csv results for group
-    group_results_csvs = []
     
     # for every experiment within group, run it
     for exp_name, experiment in group.experiments.items():
         runner.set_file_path(group_name, exp_name)
         runner.run_experiment(experiment)
-        result_csv_path = runner.save_results(experiment)
-        group_results_csvs.append(result_csv_path)
-
-        _plot_experiment(runner, result_csv_path, experiment)
-
-    print(f"  Generated {len(runner.csv_paths)} CSV files")
-    return group_results_csvs
-
-def _plot_experiment(runner: ExperimentRunner, csv_path: str, experiment: ExperimentSettings) -> None:
-        ''' add optional experiment level plotting '''
-
-        if csv_path is None:
-            raise ValueError('No list of csv results for group')
-
-        plotter = StatisticsPlotter(runner.resultFilepath, runner.master_seed)
-        plotter.plot_experiment(csv_path, experiment.independent_variable)
-
-def _plot_experiment_group(runner: ExperimentRunner, group_results: list) -> None:
-    if group_results is None:
-        raise ValueError('No list of csv results for group')
-
-    plotter = StatisticsPlotter(runner.resultFilepath, runner.master_seed)
-    plotter.plot_experiment_group(group_results)
+        runner.save_results(experiment)
     
+    print(f"  Generated {len(runner.csv_paths)} CSV files")
     
 if __name__ == '__main__':
     start = time.perf_counter()

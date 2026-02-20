@@ -1,6 +1,4 @@
 import ast
-import os
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -14,18 +12,17 @@ class StatisticsPlotter:
         self.resultFilepath = resultFilepath
         self.master_seed = seed
     
-    def plot_all(self, csv_path: str, indep_variable: str):
-        """ calls all plotting functions """
+    # def plot_experiment(self, csv_path: str, indep_variable: str):
+    #     """ calls all plotting functions for a specific experiment"""
 
-        three_agg_path = self.generate_3_agg_plots(csv_path, indep_variable)
-        comb_agg_path = self.generate_combined_agg_plot(csv_path, indep_variable)
-        heat_agg_path = self.generate_reduction_heatmap(csv_path, indep_variable)
+    #     three_agg_path = self.generate_3_agg_plots(csv_path, indep_variable)
+    #     comb_agg_path = self.generate_combined_agg_plot(csv_path, indep_variable)
+    #     heat_agg_path = self.generate_reduction_heatmap(csv_path, indep_variable)
         
-        print(f"  3 aggs saved: {three_agg_path}")
-        print(f"  Combined aggs saved: {comb_agg_path}")
-        if heat_agg_path: 
-            print(f"  Heatmap saved: {heat_agg_path}")
-
+    #     print(f"  3 aggs saved: {three_agg_path}")
+    #     print(f"  Combined aggs saved: {comb_agg_path}")
+    #     if heat_agg_path: 
+    #         print(f"  Heatmap saved: {heat_agg_path}")
 
     def parse_reduce_tuple(self, val):
         """Parse reduce_triggerSz_sizeLim column."""
@@ -189,7 +186,7 @@ class StatisticsPlotter:
         # return f'{csv_path}_heatmap.jpg'
 
 
-    def generate_reduction_heatmap2(self, df: pd.DataFrame, csv_path: str, indep_variable: str):
+    def generate_reduction_heatmap2(self, df: pd.DataFrame, str, indep_variable: str):
         """generate heatmap for reduction parameter tuning"""
         
         if indep_variable != "reduce_triggerSz_sizeLim":
@@ -214,6 +211,60 @@ class StatisticsPlotter:
         ax.set_ylabel('Reduce To Size', fontsize=12)
         
         plt.tight_layout()
-        plt.savefig(f'{csv_path}_heatmap.jpg', dpi=300, bbox_inches='tight')
+        outpath = f'{self.resultFilepath}_heatmap.jpg'
+        plt.savefig(outpath, dpi=300, bbox_inches='tight')
         
-        # return f'{csv_path}_heatmap.jpg'
+        return outpath
+
+
+    def plot_experiment_group(self, group_csv_results: list) -> None:
+        df = self.load_all_csvs(group_csv_results)
+    
+    def plot_experiment(self, csv_path: str, indep_variable: str) -> None:
+        df = pd.read_csv(csv_path)
+        
+        self.exp_plot_time_vs_size(df, indep_variable)
+
+    def exp_plot_time_vs_size(self, df: pd.DataFrame, indep_variable: str) -> None:
+        """generate single plot with all three N vs time metrics"""
+        
+        # x values
+        try:
+            n = df[indep_variable]
+        except Exception as e:
+            return f"error trying to get x-axis:  {e}"
+        if pd.api.types.is_numeric_dtype(n):
+            x_pos = n.values
+            xtick_labels = n.values
+        else:
+            x_pos = range(len(n))
+            xtick_labels = n.values
+
+        # y values
+        min_mean_time = df['min_time_mean']
+        max_mean_time = df['max_time_mean']
+        sum_mean_time = df['sum_time_mean']
+        
+        # plots
+        fig, ax = plt.subplots(figsize=(12, 5))
+        ax.errorbar(n, min_mean_time, yerr=df['min_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='purple', label='MIN')
+        ax.errorbar(n, max_mean_time, yerr=df['max_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='orange', label='MAX')
+        ax.errorbar(n, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green', label='SUM')
+
+        # titles and labels
+        ax.set_title(f"Query Performance vs {indep_variable})", fontsize=14, fontweight='bold')
+        ax.set_xlabel(f'iv: {indep_variable}', fontsize=12)
+        ax.set_ylabel('Time (ms)', fontsize=12)
+        ax.legend(fontsize=11)
+        ax.grid(True, alpha=0.3)
+        
+        step = max(1, len(x_pos) // 10)
+        ax.set_xticks(x_pos[::step])
+        ax.set_xticklabels(xtick_labels[::step], rotation=45, ha='right')
+
+        plt.tight_layout()
+        agg_out_file = f'aggregate_n_vs_time_sd{self.master_seed}'
+        outpath = f"{self.resultFilepath}/{agg_out_file}"
+        plt.savefig(outpath)
+        return outpath
+
