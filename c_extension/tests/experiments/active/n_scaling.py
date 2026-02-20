@@ -1,8 +1,7 @@
 from cliUtility import *
 from DataTypes import *
-from numerize import numerize
 from dataclasses import replace
-from main import format_datasize, format_name, ExperimentGroup
+from main import ExperimentGroup
 
 
 '''
@@ -98,5 +97,7 @@ def reduction_sweep(n: int = 100_000):
 # experiments['n_scaling_1_1'] = static_n_sweep(100_000, 10_000, 1, 1)
 
 
-experiments['reduction_sweep50k'] = reduction_sweep()
+# experiments['reduction_sweep50k'] = reduction_sweep()
+
+# experiments['tempGarb'] = ExperimentGroup('tempGarb', 'reduce_triggerSz_sizeLim', {template})
 

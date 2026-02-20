@@ -1,20 +1,20 @@
+# standard
 import sys
-from numerize import numerize
 import random
 import time
 import os
 import json
 import hashlib
+from dataclasses import dataclass
+
+# 3rd party
+from numerize import numerize
 import psycopg2, psycopg2.extras
 import numpy as np
-import pandas as pd
-from dataclasses import dataclass
-import matplotlib.pyplot as plt
-import seaborn as sns
 
+# local
 from cliUtility import *
 from DataTypes import *
-from StatisticsPlotter import StatisticsPlotter
 
 @dataclass
 class ExperimentGroup:
@@ -33,6 +33,17 @@ class ExperimentSettings:
         Class contains the modifiable settings of a test
         if num_intervals is used, num_intervals_range shouldn't be used (left default=NULL)
         if gap_size is used, gap_size_range shouldn't be used (left default=NULL)
+
+        - name:                   required. consider pairing with format_name(self) after setting attiributes
+        - data_type:              always Set or Range
+        - curr_trial:             internal
+        - experiment_id:          unique string name that identifies specific experiment
+        - dataset_size:           modifiable. number of rows to produce
+        - uncertain_ratio:        modifiable. uncertainty in data
+        - interval_size_range:     
+
+        WIP
+
     '''
     name: str                                   # required 
     data_type: DataType                         # always Set or Range
@@ -59,6 +70,7 @@ class ExperimentSettings:
     save_ddl:bool = False           # store ddl code to make tables 
     save_csv: bool = True           # store csv with statistics and results of test
 
+    # shortened abbreviation of atributes
     iv_map = {
         "dataset_size": "n",
         "uncertain_ratio": "unc",
@@ -71,7 +83,9 @@ class ExperimentSettings:
         "reduce_triggerSz_sizeLim": "red_sz"
     }
 
-    def asdict(self):
+    def to_dict(self) -> dict:
+        ''' convenience function converting class to dict''' 
+
         dt = 'range' if self.data_type == DataType.RANGE else 'set'
         return {
             'name': self.name,
@@ -83,6 +97,11 @@ class ExperimentSettings:
             'uncertain_ratio': self.uncertain_ratio,
             "interval_size_range": self.interval_size_range,
             'mult_size_range': self.mult_size_range,
+            'independent_variable': self.independent_variable,
+            'start_interval_range': self.start_interval_range,
+            'reduce_triggerSz_sizeLim': self.reduce_triggerSz_sizeLim,
+            'interval_width': self.interval_width,
+            'interval_width_range': self.interval_width_range,
             'num_intervals': self.num_intervals,
             'gap_size': self.gap_size,
             'num_intervals_range': self.num_intervals_range,
@@ -120,7 +139,7 @@ class ExperimentRunner:
         self.csv_paths = []
 
     def run_experiment(self, experiment: ExperimentSettings) -> list:
-        '''an experiement has N trials. gen data for each trial, run queries//benchmark results, and append to results'''    
+        '''an experiement has N trials. generate data for each trial, run queries//benchmark results, and append to results'''    
         # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
         experiment_results = []
         
@@ -199,20 +218,20 @@ class ExperimentRunner:
         config = self.DATA_TYPE_CONFIG[experiment.data_type]
 
         try:
-            with self.connect_db() as conn:
+            with self.__connect_db() as conn:
                 with conn.cursor() as cur:
                     # count 
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
                     
                     # aggreate metrics
-                    results['sum_time'] = self.run_aggregate(cur, table, 'SUM', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
-                    results['min_time'] = self.run_aggregate(cur, table, 'MIN', config['combine_min'])
-                    results['max_time'] = self.run_aggregate(cur, table, 'MAX', config['combine_max'])
-                    results['sumtest_time'] = self.run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not self.NORMALIZE)
+                    results['sum_time'] = self.__run_aggregate(cur, table, 'SUM', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
+                    results['min_time'] = self.__run_aggregate(cur, table, 'MIN', config['combine_min'])
+                    results['max_time'] = self.__run_aggregate(cur, table, 'MAX', config['combine_max'])
+                    results['sumtest_time'] = self.__run_aggregate(cur, table, 'SUMTEST', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not self.NORMALIZE)
                     
                     # get additional tests for sumtest. Run experiment and time profile once each
-                    metrics = self.get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not self.NORMALIZE)
+                    metrics = self.__get_sumtest_metrics(cur, table, config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1], not self.NORMALIZE)
                     
                     if metrics: 
                         results['sum_test_result'] = metrics['result']
@@ -228,109 +247,71 @@ class ExperimentRunner:
             raise
         
         return results
-
-    def run_aggregate(self, cur, table, agg_name, combine_func, *agg_params):
-        '''General aggregate runner with no WHERE clause'''
-
-        params_sql = ",".join(str(param) for param in agg_params)
-        sql = f"""EXPLAIN (analyze, format json)
-            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
-            FROM {table};"""
-        cur.execute(sql)
-        
-        print(f"DEBUG SQL: {sql}") 
-        results = cur.fetchone()[0]
-        plan_root = results[0]
-        plan = plan_root["Plan"]
-        agg_time = plan["Actual Total Time"]
-        
-        return agg_time
     
-    def get_aggregate_result(self, cur, table, agg_name, combine_func, *agg_params):
-        '''get actual aggregate result value (no timing)'''
+    def save_results(self, experiment: ExperimentSettings):
+        ''' saves and returns CSV results only  '''
         
-        params_sql = ",".join(str(param) for param in agg_params)
-        sql = f"""
-            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
-            FROM {table};"""
+        if not self.results or not experiment.save_csv:
+            return
         
-        cur.execute(sql)
-        result = cur.fetchone()
-        
-        if result is None:
-            return None
-        
-        result_value = result[0]
-        
-        return result_value
-    
-    def get_sumtest_metrics(self, cur, table, combine_func, trigger_sz, size_lim, normalize: bool):
-        '''get SUMTEST metrics from composite type result using field accessors'''
-        
-        sql = f"""
-            SELECT 
-                (result).result,
-                (result).resizeTrigger,
-                (result).sizeLimit,
-                (result).reduceCalls,
-                (result).maxIntervalCount,
-                (result).totalIntervalCount,
-                (result).combineCalls
-            FROM (
-                SELECT sumTest({combine_func}(val, mult), {trigger_sz}, {size_lim}, {normalize}) as result
-                FROM {table}) subq;"""
-        
-        cur.execute(sql)
-        result = cur.fetchone()     
-        if result is None:
-            return None
-        
-        result_array = result[0] 
-        resize_trigger = result[1]
-        size_limit = result[2]
-        reduce_calls = result[3]
-        max_interval_count = result[4]
-        total_interval_count = result[5]
-        combine_calls = result[6]
+        csv_path = self.__generate_csv_results(experiment.name)
+        self.csv_paths.append(csv_path)
+        print(f"  CSV saved: {csv_path}")
 
-        metrics = {
-            'result': result_array,             # list of NumericRange objects
-            'resize_trigger': resize_trigger,
-            'size_limit': size_limit,
-            'reduce_calls': reduce_calls,
-            'max_interval_count': max_interval_count,
-            'total_interval_count': total_interval_count,
-            'combine_calls': combine_calls,
-            'result_size': len(result_array) if result_array else 0,
-        }
+        return csv_path
     
-        return metrics
-           
-    def __calculate_coverage(self, interval_set):
-        '''adds all values contained within every interval in set'''
-        cover = 0
-        for interval in interval_set:
-            cover += interval.upper - interval.lower
-        return cover
-
-    def __insert_data_db(self, experiment: ExperimentSettings, data):
-        '''Insert data into database specified in config file'''
-        with self.connect_db() as conn:
+    def clean_tables(self, find_trigger="t_%"):
+        '''drop all tables with wildcard match {find_trigger}'''
+        
+        print(f"\nCleaning/ Dropping all Tables starting with '{find_trigger}'")
+        with self.__connect_db() as conn:
             with conn.cursor() as cur:
-                table_name = experiment.experiment_id
-                cur.execute(f"DROP TABLE IF EXISTS {table_name};")
+                try:
+                    cur.execute(f"""SELECT tablename 
+                                FROM pg_tables 
+                                WHERE schemaname = 'public' AND tablename LIKE '{find_trigger}';""")
+                    tables = cur.fetchall()
 
-                if experiment.data_type == DataType.RANGE:
-                    cur.execute(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range, mult int4range);")                
-                    template = "(%s::int4range, %s::int4range)"
-                elif experiment.data_type == DataType.SET:
-                    cur.execute(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range[], mult int4range);")
-                    template = "(%s::int4range[], %s::int4range)"
-                
-                sql = f"INSERT INTO {table_name} (val, mult) VALUES %s"
-                psycopg2.extras.execute_values(cur, sql, data, template)
-                conn.commit()
+                    if not tables:
+                        print(f"  No tables found matching: {find_trigger}\n")
+                        return
+
+                    #    if too many table drops at once, add this basic logic and run script with no expriments
+                    #    ERROR: out of shared memory ;  or we can:  HINT: You might need to increase max_locks_per_transaction
+                    # i = 0
+                    for table in tables:
+                        # i +=1
+                        # if(i<1000):
+                        cur.execute(f"DROP TABLE {table[0]};")
+                        print(f"  Dropping Table {table[0]}")
+
+                except Exception as e:
+                    print(f"    Error cleaning tables: {e}")
+                    conn.rollback()
+
+    def set_file_path(self, group_name: str, experiment_name:str) -> None:
+        '''creates experiments root folder
+            
+            stored in data/results. optional bucketing into group is group_name specified
+            
+            format: ./dd/mm/yyyy_{experiment_name}_sd{master_seed}
+        '''
+
+        timestamp = time.strftime("d%d_m%m_y%Y")
+        out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
         
+        # prepend group in output path
+        if group_name:
+            experiment_folder_path = f'data/results/{group_name}/{out_file}'
+        else:
+            experiment_folder_path = f'data/results/{out_file}'
+        
+        self.resultFilepath = experiment_folder_path
+
+    # ----------------------------------  
+    # --- Internal Helpers (Private) ---
+    # ----------------------------------
+
     def __generate_range(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
@@ -404,7 +385,110 @@ class ExperimentRunner:
         ub = np.random.randint(lb+1, experiment.mult_size_range[1]+1)
         return RangeType(lb, ub)
     
+    def __insert_data_db(self, experiment: ExperimentSettings, data):
+        '''Insert data into database specified in config file'''
+        with self.__connect_db() as conn:
+            with conn.cursor() as cur:
+                table_name = experiment.experiment_id
+                cur.execute(f"DROP TABLE IF EXISTS {table_name};")
+
+                if experiment.data_type == DataType.RANGE:
+                    cur.execute(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range, mult int4range);")                
+                    template = "(%s::int4range, %s::int4range)"
+                elif experiment.data_type == DataType.SET:
+                    cur.execute(f"CREATE TABLE {table_name} (id INT GENERATED ALWAYS AS IDENTITY, val int4range[], mult int4range);")
+                    template = "(%s::int4range[], %s::int4range)"
+                
+                sql = f"INSERT INTO {table_name} (val, mult) VALUES %s"
+                psycopg2.extras.execute_values(cur, sql, data, template)
+                conn.commit()
+    
+    def __run_aggregate(self, cur, table, agg_name, combine_func, *agg_params):
+        '''General aggregate runner with no WHERE clause'''
+
+        params_sql = ",".join(str(param) for param in agg_params)
+        sql = f"""EXPLAIN (analyze, format json)
+            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
+            FROM {table};"""
+        cur.execute(sql)
+        
+        print(f"DEBUG SQL: {sql}") 
+        results = cur.fetchone()[0]
+        plan_root = results[0]
+        plan = plan_root["Plan"]
+        agg_time = plan["Actual Total Time"]
+        
+        return agg_time
+    
+    def __get_aggregate_result(self, cur, table, agg_name, combine_func, *agg_params):
+        '''get actual aggregate result value (no timing)'''
+        
+        params_sql = ",".join(str(param) for param in agg_params)
+        sql = f"""
+            SELECT {agg_name} ({combine_func}(val, mult) {',' if params_sql else ''}{params_sql})
+            FROM {table};"""
+        
+        cur.execute(sql)
+        result = cur.fetchone()
+        
+        if result is None:
+            return None
+        
+        result_value = result[0]
+        
+        return result_value
+    
+    def __get_sumtest_metrics(self, cur, table, combine_func, trigger_sz, size_lim, normalize: bool):
+        '''get SUMTEST metrics from composite type result using field accessors'''
+        
+        sql = f"""
+            SELECT 
+                (result).result,
+                (result).resizeTrigger,
+                (result).sizeLimit,
+                (result).reduceCalls,
+                (result).maxIntervalCount,
+                (result).totalIntervalCount,
+                (result).combineCalls
+            FROM (
+                SELECT sumTest({combine_func}(val, mult), {trigger_sz}, {size_lim}, {normalize}) as result
+                FROM {table}) subq;"""
+        
+        cur.execute(sql)
+        result = cur.fetchone()     
+        if result is None:
+            return None
+        
+        result_array = result[0] 
+        resize_trigger = result[1]
+        size_limit = result[2]
+        reduce_calls = result[3]
+        max_interval_count = result[4]
+        total_interval_count = result[5]
+        combine_calls = result[6]
+
+        metrics = {
+            'result': result_array,             # list of NumericRange objects
+            'resize_trigger': resize_trigger,
+            'size_limit': size_limit,
+            'reduce_calls': reduce_calls,
+            'max_interval_count': max_interval_count,
+            'total_interval_count': total_interval_count,
+            'combine_calls': combine_calls,
+            'result_size': len(result_array) if result_array else 0,
+        }
+    
+        return metrics
+           
+    def __calculate_coverage(self, interval_set):
+        '''adds all values contained within every interval in set'''
+        cover = 0
+        for interval in interval_set:
+            cover += interval.upper - interval.lower
+        return cover
+
     def __calc_aggregate_results(self, experiment: ExperimentSettings, trial_results: dict) -> dict:
+        ''' combines all result data, and returns dict of all experiment metadata leter used to convert to CSV'''
 
         def extract(key):
             return [r[key] for r in trial_results if r.get(key) is not None]
@@ -463,66 +547,8 @@ class ExperimentRunner:
         
         return aggregated
 
-    def connect_db(self):
+    def __connect_db(self):
         return psycopg2.connect(**self.db_config)
-
-    def clean_tables(self, find_trigger="t_%"):
-        '''drop all tables with wildcard match: find_trigger'''
-        
-        print(f"\nCleaning/ Dropping all Tables starting with '{find_trigger}'")
-        with self.connect_db() as conn:
-            with conn.cursor() as cur:
-                try:
-                    cur.execute(f"""SELECT tablename 
-                                FROM pg_tables 
-                                WHERE schemaname = 'public' AND tablename LIKE '{find_trigger}';""")
-                    tables = cur.fetchall()
-
-                    if not tables:
-                        print(f"  No tables found matching: {find_trigger}\n")
-                        return
-                
-                    '''
-                        if too many table drops at once, add this basic logic and run script with no expriments
-                        ERROR: out of shared memory ;  or we can:  HINT: You might need to increase max_locks_per_transaction
-                    '''
-                    # i = 0
-                    for table in tables:
-                        # i +=1
-                        # if(i<1000):
-                        cur.execute(f"DROP TABLE {table[0]};")
-                        print(f"  Dropping Table {table[0]}")
-
-                except Exception as e:
-                    print(f"    Error cleaning tables: {e}")
-                    conn.rollback()
-
-    def set_file_path(self, group_name: str, experiment_name:str) -> None:
-        '''creates experiments root folder'''
-
-        timestamp = time.strftime("d%d_m%m_y%Y")
-        out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
-        
-        # prepend group in output path
-        if group_name:
-            experiment_folder_path = f'data/results/{group_name}/{out_file}'
-        else:
-            experiment_folder_path = f'data/results/{out_file}'
-        
-        self.resultFilepath = experiment_folder_path
-
-    def save_results(self, experiment: ExperimentSettings):
-        '''handles all file outputs for current Experiment. (DDL, CSV results, Plots)
-        **Does not handle DDL, DDL is handeled in run_experiment after generating data'''
-        
-        if not self.results or not experiment.save_csv:
-            return
-        
-        csv_path = self.__generate_csv_results(experiment.name)
-        self.csv_paths.append(csv_path)
-        print(f"  CSV saved: {csv_path}")
-
-        self.generate_experiment_specific_plots(csv_path, experiment.independent_variable)
 
     def __generate_csv_results(self, experiment_name: str) -> str:
         '''save experiment results to CSV'''
@@ -530,31 +556,31 @@ class ExperimentRunner:
             return 
 
         experiment_folder_path = self.resultFilepath
-        
-        # longer, more descriptive name, or shorter, easier name
-        timestamp = time.strftime("d%d_m%m_y%Y")
-        # out_file = f'{timestamp}_{experiment_name}_sd{self.master_seed}'
         out_file = f'results_sd{self.master_seed}'
 
         csv_path = f'{experiment_folder_path}/{out_file}.csv'  
         os.makedirs(experiment_folder_path, exist_ok=True)           
 
-        # convert internal results member to csv
-        df = pd.DataFrame(self.results)
-        df.to_csv(csv_path, index=True)
-        
         return csv_path
     
-    def generate_experiment_specific_plots(self, csv_path: str, indep_variable: str) -> None:
-        '''creates plotter object and generates all plots'''
-        plotter = StatisticsPlotter(self.resultFilepath, self.master_seed)
-        plotter.plot_all(csv_path, indep_variable)
+    def __generate_name(self, experiment: ExperimentSettings, generalName: bool = False) -> str:
+        '''
+            generates postgres safe name (< 63 chars). old name was being cut.
+            if generalName param is set, then trial number will be emit from result
+
+                format:     t_{dtype}_{iv_abbrev}_{10 char dictHashOfExperiment}_t{trialNum}
+        '''
+        dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
+        iv_abbrev = experiment.iv_map.get(experiment.independent_variable if experiment.independent_variable else 'iv')
+        param_str = json.dumps(experiment.to_dict(), sort_keys=True, default=str)
+        
+        hashed = hashlib.sha1(param_str.encode()).hexdigest()[:10]
     
-    def generate_group_specific_plots(self, indep_variable: str) -> None:
-        plotter = StatisticsPlotter(self.resultFilepath, self.master_seed)
-        df = plotter.load_all_csvs(self.csv_paths)
-
-
+        if generalName:
+            return f"t_{dtype}_iv_{iv_abbrev}_{hashed}"
+        
+        return f"t_{dtype}_iv_{iv_abbrev}_{hashed}_t{experiment.curr_trial}"
+        
     def __save_ddl_file(self, experiment: ExperimentSettings, data):
         ''' write data to DDL file for later loading 
             #NOTE broken. Need way to store final group and apppend all DDL to proper directory
@@ -588,26 +614,13 @@ class ExperimentRunner:
                 file.write(';\n\n')
 
         print(f"  DDL saved: {ddl_path}")
-
-    def __generate_name(self, experiment: ExperimentSettings, generalName: bool = False) -> str:
-        '''
-            generates postgres safe name (< 63 chars). old name was being cut.
-            if generalName param is set, then trial number will be emit from result
-
-                format:     t_{dtype}_{iv_abbrev}_{10 char dictHashOfExperiment}_t{trialNum}
-        '''
-        dtype = 'r' if experiment.data_type == DataType.RANGE else 's'
-        iv_abbrev = experiment.iv_map.get(experiment.independent_variable if experiment.independent_variable else 'iv')
-        param_str = json.dumps(experiment.asdict(), sort_keys=True, default=str)
-        
-        hashed = hashlib.sha1(param_str.encode()).hexdigest()[:10]
-    
-        if generalName:
-            return f"t_{dtype}_iv_{iv_abbrev}_{hashed}"
-        
-        return f"t_{dtype}_iv_{iv_abbrev}_{hashed}_t{experiment.curr_trial}"
     
 def run_all():
+    '''
+        Main entrypoint to running experiments. 
+        Parses args, starts runner engine, runs experiments, and processes results
+    '''
+
     ### Parse args and config
     args = parse_args()
     master_seed = generate_seed(args.seed)
@@ -717,5 +730,6 @@ if __name__ == '__main__':
 
     print(f"Tests took {end-start:.3f} s")
 
-# python3 main.py --quick -dt r -nt 5 -sz 2 -ur .0 -ca        
-# python3 main.py -xf tests_config.yaml -cb   
+    # example cli runs (not recommended)
+        # python3 main.py --quick -dt r -nt 5 -sz 2 -ur .0 -ca        
+        # python3 main.py -xf tests_config.yaml -cb   
