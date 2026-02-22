@@ -30,6 +30,20 @@ class ExperimentGroup:
             self.experiments = {}
 
 @dataclass
+class ExperimentSuite:
+    name: str
+    groups: dict[str, ExperimentGroup] = None
+
+    def __post_init__(self):
+        if self.groups is None:
+            self.groups = {}
+
+    def add(self, group: ExperimentGroup):
+        if group.name in self.groups:
+            raise ValueError(f"Duplicate group name: {group.name}")
+        self.groups[group.name] = group
+
+@dataclass
 class ExperimentSettings:
     '''
         Class contains the modifiable settings of a test
@@ -285,18 +299,19 @@ class ExperimentRunner:
 
                     #    if too many table drops at once, add this basic logic and run script with no expriments
                     #    ERROR: out of shared memory ;  or we can:  HINT: You might need to increase max_locks_per_transaction
-                    # i = 0
+                    i = 0
                     for table in tables:
-                        # i +=1
+                        i +=1
                         # if(i<1000):
                         cur.execute(f"DROP TABLE {table[0]};")
-                        print(f"  Dropping Table {table[0]}")
-
+                        # print(f"  Dropping Table {table[0]}")
+                        
+                    print(f' Dropped {i} tables')
                 except Exception as e:
                     print(f"    Error cleaning tables: {e}")
                     conn.rollback()
 
-    def set_file_path(self, group_name: str, experiment_name:str) -> None:
+    def set_file_path(self, suite_name: str, group_name: str, experiment_name:str) -> None:
         """creates experiment folder path based on group and experiment name.
         if experiment_name is None, creates a folder for the entire group.
 
@@ -309,16 +324,16 @@ class ExperimentRunner:
         else:
             folder_name = f"sd{self.master_seed}"
 
-        if group_name:
-            self.resultFilepath = os.path.join("data", "results", group_name, folder_name)
+        if group_name and suite_name:
+            self.resultFilepath = os.path.join("data", "results", suite_name, group_name, folder_name)
         else:
             self.resultFilepath = os.path.join("data", "results", folder_name)
 
         os.makedirs(self.resultFilepath, exist_ok=True)
+    
     # ----------------------------------  
     # --- Internal Helpers (Private) ---
     # ----------------------------------
-
     def __generate_range(self, experiment:ExperimentSettings) -> RangeType:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
@@ -419,7 +434,7 @@ class ExperimentRunner:
             FROM {table};"""
         cur.execute(sql)
         
-        print(f"DEBUG SQL: {table}") 
+        # print(f"DEBUG SQL: {table}") 
         results = cur.fetchone()[0]
         plan_root = results[0]
         plan = plan_root["Plan"]
@@ -636,12 +651,11 @@ def run_all():
     ### Load Experiments
     experiments = _load_experiments(args, runner, db_config)
 
-    ### Run every experiment and save results
-    for group_name, ExpGroup in experiments.items(): 
-        results = _run_experiment_group(runner, group_name, ExpGroup)
-        _plot_experiment_group(runner, results, ExpGroup.independent_variable)
-        
-        print(f'    Group results saved in: {runner.resultFilepath}')
+    ### Run every experiment Suite and save results
+    for suite in experiments.values():
+        for group in suite.groups.values():
+            results = _run_experiment_group(runner, suite.name, group)
+            print(f'    Group results saved in: {runner.resultFilepath}')  
 
     ### Clean after
     if args.clean_after:
@@ -706,19 +720,21 @@ def _load_experiments(args, runner, db_config):
     else:
         sys.exit("No experiment source specified (use --help for examples)")
 
-def _run_experiment_group(runner: ExperimentRunner, group_name: str, group: ExperimentGroup):
+def _run_experiment_group(runner: ExperimentRunner, suite_name: str, group: ExperimentGroup):
     '''Run all experiments in a group and generate results.'''
 
-    print(f"\nRunning experiment group: {group_name}")
+    print(f"\nRunning experiment group: [{suite_name}]- {group.name}")
     
     # reset runner metadata to current experiment group
     runner.results = []
-    runner.name = group.name
-    runner.groupName = group_name
-    runner.set_file_path(group_name, None)
+    
+    runner.name = suite_name
+    runner.groupName = group.name
+
+    runner.set_file_path(suite_name, group.name, None)
         
     # for every experiment within group, run it
-    for exp_name, experiment in group.experiments.items():
+    for experiment in group.experiments.values():
         runner.run_experiment(experiment)
 
     os.makedirs(runner.resultFilepath, exist_ok=True)
@@ -726,6 +742,9 @@ def _run_experiment_group(runner: ExperimentRunner, group_name: str, group: Expe
     
     df = pd.DataFrame(runner.results)
     df.to_csv(group_csv_path, index=False)
+    
+    # print(group_csv_path)
+    
     return group_csv_path
 
 def _plot_experiment_group(runner: ExperimentRunner, group_results: list, independent_variable: str) -> None:
