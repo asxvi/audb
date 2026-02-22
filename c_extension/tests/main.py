@@ -419,7 +419,7 @@ class ExperimentRunner:
             FROM {table};"""
         cur.execute(sql)
         
-        # print(f"DEBUG SQL: {sql}") 
+        print(f"DEBUG SQL: {table}") 
         results = cur.fetchone()[0]
         plan_root = results[0]
         plan = plan_root["Plan"]
@@ -639,13 +639,15 @@ def run_all():
     ### Run every experiment and save results
     for group_name, ExpGroup in experiments.items(): 
         results = _run_experiment_group(runner, group_name, ExpGroup)
-        # _plot_experiment_group(runner, results)
+        _plot_experiment_group(runner, results, ExpGroup.independent_variable)
+        
+        print(f'    Group results saved in: {runner.resultFilepath}')
 
     ### Clean after
     if args.clean_after:
         runner.clean_tables(args.clean_after)
 
-    print("Unique Master seed: ", master_seed)
+    print("\nUnique Master seed: ", master_seed)
 
 def generate_seed(in_seed=None):
     '''genrate the master seed of this programs run. (can be included in runner or settings class)'''
@@ -718,25 +720,21 @@ def _run_experiment_group(runner: ExperimentRunner, group_name: str, group: Expe
     # for every experiment within group, run it
     for exp_name, experiment in group.experiments.items():
         runner.run_experiment(experiment)
-    
+
     os.makedirs(runner.resultFilepath, exist_ok=True)
     group_csv_path = f"{runner.resultFilepath}/results_sd{runner.master_seed}.csv"
     
     df = pd.DataFrame(runner.results)
     df.to_csv(group_csv_path, index=False)
-
-    print(f"  Saved group CSV: {group_csv_path}")
-
     return group_csv_path
 
-def _plot_experiment_group(runner: ExperimentRunner, group_results: list) -> None:
+def _plot_experiment_group(runner: ExperimentRunner, group_results: list, independent_variable: str) -> None:
     if group_results is None:
         raise ValueError('No list of csv results for group')
 
     plotter = StatisticsPlotter(runner.resultFilepath, runner.master_seed)
-    plotter.plot_experiment_group(group_results)
-    
-    
+    plotter.plot_experiment_group(group_results, independent_variable)
+
 if __name__ == '__main__':
     start = time.perf_counter()
     run_all()
