@@ -48,20 +48,23 @@ def static_n_sweep(max_n: int = 100_000, step: int = 10_000, trigger_size: int =
     
     return group
 
-def plot_all_n_scale(n, step):
-    suite = ExperimentSuite('n_sweeping')
-    # experiments['n_scaling_15_10'] = static_n_sweep(n, step, 15, 10)
-    # experiments['n_scaling_10_5'] = static_n_sweep(n, step, 10, 5)
-    # experiments['n_scaling_4_2'] = static_n_sweep(n, step, 4, 2)
-    # experiments['n_scaling_9_3'] = static_n_sweep(n, step, 9, 3)
-    # experiments['n_scaling_5_2'] = static_n_sweep(n, step, 5, 2)
+def plot_all_n_scale(n:int, step:int, suite_name:str = None):
+    suite_name = suite_name if suite_name is not None else 'n_sweeping'
+    if suite_name not in experiments:
+        experiments[suite_name] = ExperimentSuite(suite_name)
+    
+    suite = experiments[suite_name]
+    
+    suite.add(static_n_sweep(n, step, 15, 10))
+    suite.add(static_n_sweep(n, step, 10, 5))
+    suite.add(static_n_sweep(n, step, 4, 2))
+    suite.add(static_n_sweep(n, step, 9, 3))
+    suite.add(static_n_sweep(n, step, 5, 2))
     suite.add(static_n_sweep(n, step, 3, 1))
     suite.add(static_n_sweep(n, step, 1, 1))
 
-    experiments[suite.name] = suite
-plot_all_n_scale(10_000, 1_000)
-# plot_all_n_scale(40_000, 4_000)
-# plot_all_n_scale(100_000, 10_000)
+# plot_all_n_scale(10_000, 1000, 'n_sweeping100k')
+plot_all_n_scale(400, 40, 'n_sweeping400k')
 
 def num_intervals_sweep(max_ni: int = 4, n: int = 10_000):
     group = ExperimentGroup(f'ni{max_ni}_n{n}_sweep', 'num_intervals', None)
@@ -99,6 +102,13 @@ def plot_all_ni_sweep(max_ni, n):
 
     experiments[suite.name] = suite
 
-plot_all_ni_sweep(5, 10_000)
+# plot_all_ni_sweep(1, 100)
 # plot_all_n_scale(40_000, 4_000)
 # plot_all_n_scale(100_000, 10_000)
+
+
+# for fn, args in [
+#     (plot_all_n_scale, (100, 10)),
+#     (plot_all_n_scale, (400, 40)),
+# ]:
+#     fn(*args)

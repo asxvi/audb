@@ -1,4 +1,5 @@
 # standard
+import pathlib
 import sys
 import random
 import time
@@ -320,14 +321,15 @@ class ExperimentRunner:
         - group-only:    ./data/results/<group>/sd<seed>"""
         
         if experiment_name:
-            folder_name = f"{experiment_name}_sd{self.master_seed}"
+            # folder_name = f"{experiment_name}_sd{self.master_seed}"
+            folder_name = f"{experiment_name}"
         else:
-            folder_name = f"sd{self.master_seed}"
+            folder_name = ""
 
         if group_name and suite_name:
-            self.resultFilepath = os.path.join("data", "results", suite_name, group_name, folder_name)
+            self.resultFilepath = os.path.join("data", "results", str(self.master_seed), suite_name, group_name, folder_name)
         else:
-            self.resultFilepath = os.path.join("data", "results", folder_name)
+            self.resultFilepath = os.path.join("data", "results", str(self.master_seed), folder_name)
 
         os.makedirs(self.resultFilepath, exist_ok=True)
     
@@ -434,7 +436,7 @@ class ExperimentRunner:
             FROM {table};"""
         cur.execute(sql)
         
-        # print(f"DEBUG SQL: {table}") 
+        print(f"DEBUG SQL: {table}") 
         results = cur.fetchone()[0]
         plan_root = results[0]
         plan = plan_root["Plan"]
@@ -624,45 +626,6 @@ class ExperimentRunner:
 
         print(f"  DDL saved: {ddl_path}")
     
-def run_all():
-    '''
-        Main entrypoint to running experiments. 
-        Parses args, starts runner engine, runs experiments, and processes results
-    '''
-
-    ### Parse args and config
-    args = parse_args()
-    master_seed = generate_seed(args.seed)
-    print("Unique Master seed: ", master_seed)
-
-    try:
-        db_config = load_config(args.dbconfig)    
-    except Exception as e:
-        print(f"Error loading config: {e}")
-        exit(1)
-
-    ### Start engine
-    runner = ExperimentRunner(db_config, master_seed)
-
-    ### Clean before
-    if args.clean_before:
-        runner.clean_tables(args.clean_before)
-
-    ### Load Experiments
-    experiments = _load_experiments(args, runner, db_config)
-
-    ### Run every experiment Suite and save results
-    for suite in experiments.values():
-        for group in suite.groups.values():
-            results = _run_experiment_group(runner, suite.name, group)
-            print(f'    Group results saved in: {runner.resultFilepath}')  
-
-    ### Clean after
-    if args.clean_after:
-        runner.clean_tables(args.clean_after)
-
-    print("\nUnique Master seed: ", master_seed)
-
 def generate_seed(in_seed=None):
     '''genrate the master seed of this programs run. (can be included in runner or settings class)'''
     if in_seed is not None:
@@ -706,6 +669,51 @@ def format_name(experiment: ExperimentSettings):
     name = f"{dtype}_{sz}_{red}_{iv}{seed}"
     return name
 
+def run_all():
+    '''
+        Main entrypoint to running experiments. 
+        Parses args, starts runner engine, runs experiments, and processes results
+    '''
+
+    ### Parse args and config
+    args = parse_args()
+    master_seed = generate_seed(args.seed)
+    print("Unique Master seed: ", master_seed)
+
+    try:
+        db_config = load_config(args.dbconfig)    
+    except Exception as e:
+        print(f"Error loading config: {e}")
+        exit(1)
+
+    ### Start engine
+    runner = ExperimentRunner(db_config, master_seed)
+
+    ### Clean before
+    if args.clean_before:
+        runner.clean_tables(args.clean_before)
+
+    ### Load Experiments
+    experiments = _load_experiments(args, runner, db_config)
+
+    ### Run every experiment Suite and save results
+    for suite in experiments.values():
+        
+        suite_results = []
+        for group in suite.groups.values():
+            results = _run_experiment_group(runner, suite.name, group)
+            print(f'    Group results saved in: {runner.resultFilepath}')  
+            suite_results.append(results)
+        
+        # plot aggregate results for suite
+        _plot_experiment_suite(runner, suite_results)
+
+    ### Clean after
+    if args.clean_after:
+        runner.clean_tables(args.clean_after)
+
+    print("\nUnique Master seed: ", master_seed)
+
 def _load_experiments(args, runner, db_config):
     '''Load experiment configuration from various sources. (CLI, YAML, Python Script)'''
 
@@ -747,12 +755,25 @@ def _run_experiment_group(runner: ExperimentRunner, suite_name: str, group: Expe
     
     return group_csv_path
 
-def _plot_experiment_group(runner: ExperimentRunner, group_results: list, independent_variable: str) -> None:
-    if group_results is None:
-        raise ValueError('No list of csv results for group')
+# def _plot_experiment_group(runner: ExperimentRunner, group_results: list, independent_variable: str) -> None:
+#     if group_results is None:
+#         raise ValueError('No list of csv results for group')
+
+#     plotter = StatisticsPlotter(runner.resultFilepath, runner.master_seed)
+#     plotter.plot_experiment_group(group_results, independent_variable)
+
+def _plot_experiment_suite(runner: ExperimentRunner, csv_paths: list) -> None:
+    if csv_paths is None:
+            raise ValueError('No list of csv results for suite')
+
+    # create a suite-level folder (one level above groups)
+    last_group_csv = Path(runner.resultFilepath)
+    suite_folder = last_group_csv.parent  # parent of group folder → suite folder
+    os.makedirs(suite_folder, exist_ok=True)
+    runner.resultFilepath = suite_folder
 
     plotter = StatisticsPlotter(runner.resultFilepath, runner.master_seed)
-    plotter.plot_experiment_group(group_results, independent_variable)
+    plotter.plot_experiment_suite(csv_paths)
 
 if __name__ == '__main__':
     start = time.perf_counter()

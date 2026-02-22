@@ -40,6 +40,16 @@ class StatisticsPlotter:
         self.plot_timeNaccuracy_vs_iv(df, independent_variable)
         self.run_reduce_plot_suite(df, independent_variable)
     
+
+    def plot_experiment_suite(self, csv_results: list) -> None:
+        df = self.load_all_csvs(csv_results)    
+
+        iv = df['independent_variable'][0]
+        print(iv)
+
+        self.plot_timeNaccuracy_vs_iv(df, iv)
+        self.run_reduce_plot_suite(df, iv)
+
     def run_reduce_plot_suite(self, df: pd.DataFrame, independent_variable: str) -> None:
         ''' check that IV is actually reduce, and then create relevant plots '''
 
@@ -78,7 +88,7 @@ class StatisticsPlotter:
         ax1.errorbar(iv, sum_mean_time, yerr=df['sum_time_std'], marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green', label='SUM')
 
         # titles and labels
-        ax1.set_title(f"Query Performance vs {indep_variable} (n={int(df['dataset_size'].mean())})", fontsize=14, fontweight='bold')
+        ax1.set_title(f"Query Performance vs {indep_variable} (n={int(df['dataset_size'].iloc[-1])})", fontsize=14, fontweight='bold')
         ax1.set_xlabel(f'iv: {indep_variable}', fontsize=12)
         ax1.set_ylabel('Time (ms)', fontsize=12)
         ax1.legend(fontsize=11)
@@ -96,9 +106,9 @@ class StatisticsPlotter:
         ax2.errorbar(iv, y, marker='o', capsize=5, capthick=1, linewidth=2, markersize=5, color='green', label='SUM')
 
         # titles and labels
-        ax2.set_title(f"Coverage vs {indep_variable} (n={int(df['dataset_size'].mean())})", fontsize=14, fontweight='bold')
+        ax2.set_title(f"Coverage vs {indep_variable} (n={int(df['dataset_size'].iloc[-1])})", fontsize=14, fontweight='bold')
         ax2.set_xlabel(f'iv: {indep_variable}', fontsize=12)
-        ax2.set_ylabel('result_coverage_mean (ms)', fontsize=12)
+        ax2.set_ylabel('result_coverage_mean (ratio ~1)', fontsize=12)
         ax2.legend(fontsize=11)
         ax2.grid(True, alpha=0.3)
         
