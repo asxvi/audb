@@ -110,14 +110,14 @@ class StatisticsPlotter:
 
         # TIME axis labels
         ax1.set_ylabel('Time (ms)')
-        ax1.set_title('Time vs Dataset Size by Reduction Parameters')
+        ax1.set_title(f'Time vs {indep_variable} by Reduction Parameters')
         ax1.grid(True, alpha=0.3)
         ax1.legend(title='Reduce Params')
 
         # COVERAGE axis labels
         ax2.set_ylabel('Coverage')
         ax2.set_xlabel('Dataset Size')
-        ax2.set_title('Coverage vs Dataset Size by Reduction Parameters')
+        ax2.set_title(f'Coverage vs {indep_variable} by Reduction Parameters')
         ax2.grid(True, alpha=0.3)
         ax2.legend(title='Reduce Params')
 

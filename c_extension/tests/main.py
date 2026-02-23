@@ -661,8 +661,9 @@ def format_name(experiment: ExperimentSettings):
     
     # shortened independent variable
     iv = getattr(experiment, 'independent_variable', 'iv')
-    if iv:
-        iv = f"iv_{experiment.iv_map[iv]}"
+    iv_val = getattr(experiment, iv, None)
+    if iv and iv_val is not None:
+        iv = f"iv_{experiment.iv_map[iv]}{iv_val}"
     
     seed = f"s{getattr(experiment, 'seed', '')}" if getattr(experiment, 'seed', None) else ""
     
@@ -698,7 +699,6 @@ def run_all():
 
     ### Run every experiment Suite and save results
     for suite in experiments.values():
-        
         suite_results = []
         for group in suite.groups.values():
             results = _run_experiment_group(runner, suite.name, group)
