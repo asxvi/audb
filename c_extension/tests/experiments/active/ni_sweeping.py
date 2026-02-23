@@ -91,7 +91,6 @@ def ni_gap_sweep(max_ni: int = 10, n: int = 10_000, trigger_size: int = 10, redu
     return group
 
 def plot_ni_gap_sweep(max_ni: int, n: int, suite_name: str = None):
-    
     suite_name = suite_name if suite_name is not None else f'ni_gap_sweeping{format_datasize(n)}'
     if suite_name not in experiments:
         experiments[suite_name] = ExperimentSuite(suite_name)
@@ -104,7 +103,15 @@ def plot_ni_gap_sweep(max_ni: int, n: int, suite_name: str = None):
     experiments[suite_name].add(ni_gap_sweep(max_ni, n, 3, 1))
     experiments[suite_name].add(ni_gap_sweep(max_ni, n, 1, 1))
 
+
+
+def plot_ni_gap_sweep_red_sweep(max_ni: int, n: int, suite_name: str = None):
+    suite_name = suite_name if suite_name is not None else f'ni_sweeping{format_datasize(n)}'
+    if suite_name not in experiments:
+        experiments[suite_name] = ExperimentSuite(suite_name)
     
+    for i in range (1, 11):
+        experiments[suite_name].add(num_intervals_sweep(max_ni, n, i, i))
 
 
 
@@ -112,5 +119,4 @@ def plot_ni_gap_sweep(max_ni: int, n: int, suite_name: str = None):
 ## <<<<====>>>> ##
 ## <<<<====>>>> ##
 # plot_all_ni_sweep(10, 10_000, 'ni_sweeping10k')
-
-plot_ni_gap_sweep(10, 10_000, 'ni_gap_10k')
+plot_ni_gap_sweep_red_sweep(10, 10_000, 'ni_gap_10k')

@@ -279,6 +279,58 @@ INSERT INTO tX_s_agg_data_no_overlap (val, mult) VALUES
     (array[int4range(100000,200000), int4range(300000,400000)], int4range(1,2));
 
 
+DROP TABLE IF EXISTS tX_superWide2;
+CREATE TEMP TABLE tX_superWide2 (
+    id int GENERATED ALWAYS AS IDENTITY,
+    val int4range[],
+    mult int4range
+);
+INSERT INTO tX_superWide2 (val, mult) VALUES
+    (array[int4range(1,3), int4range(10000,100000)], int4range(1,4)),
+    (array[int4range(1,3), int4range(10000,100000)], int4range(1,4)),
+    (array[int4range(1,3), int4range(10000,100000)], int4range(1,2)),
+    (array[int4range(1,3), int4range(10000,100000)], int4range(1,2));
+
+DROP TABLE IF EXISTS tX_superWide3;
+CREATE TEMP TABLE tX_superWide3 (
+    id int GENERATED ALWAYS AS IDENTITY,
+    val int4range[],
+    mult int4range
+);
+INSERT INTO tX_superWide3 (val, mult) VALUES
+    (array[int4range(1,3), int4range(10000,100000), int4range(1000000,100000000)], int4range(1,4)),
+    (array[int4range(1,3), int4range(10000,100000), int4range(1000000,100000000)], int4range(1,4)),
+    (array[int4range(1,3), int4range(10000,100000), int4range(1000000,100000000)], int4range(1,2)),
+    (array[int4range(1,3), int4range(10000,100000), int4range(1000000,100000000)], int4range(1,2));
+
+
+DROP TABLE IF EXISTS tX_superWideN;
+CREATE TEMP TABLE tX_superWideN (
+    id int GENERATED ALWAYS AS IDENTITY,
+    val int4range[],
+    mult int4range
+);
+INSERT INTO tX_superWideN (val, mult) VALUES
+    (array[int4range(1,3)], int4range(1,4)),
+    (array[int4range(1,3), int4range(10000,100000)], int4range(1,2)),
+    (array[int4range(1,3), int4range(10000,100000), int4range(1000000,10000000)], int4range(1,4)),
+    (array[int4range(1,3), int4range(10000,100000), int4range(1000000,10000000), int4range(10000000,40000000)], int4range(1,2));
+
+DROP TABLE IF EXISTS tX_superNarrow3;
+CREATE TEMP TABLE tX_superNarrow3 (
+    id int GENERATED ALWAYS AS IDENTITY,
+    val int4range[],
+    mult int4range
+);
+INSERT INTO tX_superNarrow3 (val, mult) VALUES
+    (array[int4range(1,66), int4range(100,150), int4range(200,500)], int4range(1,4)),
+    (array[int4range(1,66), int4range(100,150), int4range(200,500)], int4range(1,4)),
+    (array[int4range(1,66), int4range(100,150), int4range(200,500)], int4range(1,4)),
+    (array[int4range(1,66), int4range(100,150), int4range(200,500)], int4range(1,4));
+
+
+
+
 
 -- show failures
 -- \echo Test1: Range Arithmetic

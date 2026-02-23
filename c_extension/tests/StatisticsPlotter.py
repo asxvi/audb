@@ -116,7 +116,7 @@ class StatisticsPlotter:
 
         # COVERAGE axis labels
         ax2.set_ylabel('Coverage')
-        ax2.set_xlabel('Dataset Size')
+        ax2.set_xlabel(indep_variable)
         ax2.set_title(f'Coverage vs {indep_variable} by Reduction Parameters')
         ax2.grid(True, alpha=0.3)
         ax2.legend(title='Reduce Params')

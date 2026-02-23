@@ -348,6 +348,10 @@ int range_distance(Int4Range a, Int4Range b){
 }
 
 // reduce size inplace and return newly allocated RangeSet
+/*
+  sort the input and greedily merge. Traverses through entire set while we have more ranges than desires.
+  O(N^2) worst case if numRangesKeep = N, we sort (NlogN), N times
+*/
 Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
   Int4RangeSet normalized;
   Int4RangeSet sortedInput;
@@ -389,6 +393,7 @@ Int4RangeSet reduceSize(Int4RangeSet vals, int numRangesKeep){
     bestIndex = -1;
 
     // greedy look for smallest remaining gap
+    // O(N)
     for(i=1; i<currNumRanges; i++){
       currDist = abs(range_distance(sortedInput.ranges[i], sortedInput.ranges[i-1]));
       
