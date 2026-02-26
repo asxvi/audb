@@ -50,33 +50,6 @@ def num_intervals_sweep(max_ni: int = 4, n: int = 10_000, trigger_size: int = 10
     return group
 
 
-def num_intervals_sweep_const_size(max_ni: int = 4, n: int = 10_000, trigger_size: int = 10, reduce_to_size: int = 5):
-    
-    group = ExperimentGroup(f'ni{max_ni}_red{trigger_size}_{reduce_to_size}_sweep', 'num_intervals', None)
-    for ni in range(1, max_ni+1, 1):
-        experiment = replace(
-            template,
-            dataset_size             = n,
-            num_trials               = 5,
-            uncertain_ratio          = 0.0,
-            independent_variable     = 'num_intervals',
-            interval_size_range      = (1, 50_000),
-            start_interval_range     = (1, 2),
-            gap_size                 = int((50000-100)/ni),
-            # gap_size_range           = (1000, 5000),
-            interval_width           = 100,
-            # interval_width_range     = (2, 15),
-            num_intervals            = ni,
-            reduce_triggerSz_sizeLim = (trigger_size, reduce_to_size),
-        )
-
-        experiment.name = format_name(experiment)
-        group.experiments[experiment.name] = experiment
-
-    return group
-
-
-
 
 def ni_gap_sweep(gap_sizes, max_ni: int = 10, n: int = 10_000, trigger_size: int = 10, reduce_to_size: int = 5):
     group = ExperimentGroup(f'ni_gap_red{trigger_size}_{reduce_to_size}_sweep', 'num_intervals', None)
@@ -101,11 +74,6 @@ def ni_gap_sweep(gap_sizes, max_ni: int = 10, n: int = 10_000, trigger_size: int
             group.experiments[experiment.name] = experiment
     
     return group
-
-
-
-
-
 
 # ================ #
 

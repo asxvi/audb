@@ -50,9 +50,11 @@ class StatisticsPlotter:
         df = self.load_all_csvs(csv_results)    
         
         iv = df['independent_variable'][0]
-        path = self.plot_time_coverage_by_reduce(df, iv)
+        self.plot_time_coverage_by_reduce(df, iv)
+        self.plot_reduction_heatmap(df, iv)
+        self.plot_3_row_red_vs_TimeNCover(df, iv)
         
-        print("Results saved in: ", path)
+        print("Results saved in: ", self.resultFilepath)
     
     def plot_reduction_heatmap(self, df: pd.DataFrame, indep_variable: str) -> str:
         """generate heatmap for reduction parameter tuning"""
@@ -132,8 +134,11 @@ class StatisticsPlotter:
     
     # def plot_2_row_each_ni(self, df) -> str:
 
-    def plot_3_row_red_vs_TimeNCover(self, df) -> str:
+    def plot_3_row_red_vs_TimeNCover(self, df, iv) -> str:
         ''' calculates time/cover/distance vs redution params for each ni'''
+        
+        if iv != 'num_intervals':
+            return
 
         reduce_params = sorted(df['reduce_triggerSz_sizeLim_tuple'].unique())
 

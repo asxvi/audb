@@ -36,11 +36,11 @@ def num_intervals_sweep_const_size(max_ni: int = 4, n: int = 10_000, trigger_siz
             num_trials               = 5,
             uncertain_ratio          = 0.0,
             independent_variable     = 'num_intervals',
-            interval_size_range      = (1, 50_000),
+            interval_size_range      = (1, 10_000),
             start_interval_range     = (1, 2),
             # gap_size                 = int((50000-100)/ni),
-            gap_size_range           = (int((50000-500)/ni), int((50000-100)/ni)),
-            interval_width_range     = (100, 500),
+            gap_size_range           = (int((10000-1000)/ni), int((10000-500)/ni)),
+            interval_width_range     = (500, 1000),
             # interval_width           = 100,
             num_intervals            = ni,
             reduce_triggerSz_sizeLim = (trigger_size, reduce_to_size),
@@ -54,6 +54,7 @@ def num_intervals_sweep_const_size(max_ni: int = 4, n: int = 10_000, trigger_siz
 # ================ #
 
 def plot_all_ni_n_sweep(max_ni, n_list, suite_name = None):
+    ''' see relationship between ni and n'''
     suite_name = suite_name if suite_name is not None else 'ni_n_sweeping'
     if suite_name not in experiments:
         experiments[suite_name] = ExperimentSuite(suite_name)

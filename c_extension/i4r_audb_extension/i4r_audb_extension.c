@@ -50,7 +50,6 @@ PG_FUNCTION_INFO_V1(set_reduce_size);
 //sum
 PG_FUNCTION_INFO_V1(combine_range_mult_sum);
 PG_FUNCTION_INFO_V1(agg_sum_range_transfunc);
-
 PG_FUNCTION_INFO_V1(combine_set_mult_sum);
 PG_FUNCTION_INFO_V1(agg_sum_set_transfunc);
 PG_FUNCTION_INFO_V1(agg_sum_set_finalfunc);
