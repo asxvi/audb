@@ -63,6 +63,7 @@ class ExperimentSettings:
 
     '''
     name: str                                   # required 
+    # distribution_config: DistributionConfig = field(default_factory=DistributionConfig)     # distribution type
     data_type: DataType                         # always Set or Range
     curr_trial: int = 0                         # keep track locally 
     experiment_id: str = None                   # unique string name that identifies specific experiment
@@ -106,10 +107,10 @@ class ExperimentSettings:
 
         dt = 'range' if self.data_type == DataType.RANGE else 'set'
         return {
-            'name': self.name,
+            # 'name': self.name,
             'data_type': dt,
-            'curr_trial': self.curr_trial,
-            'experiment_id': self.experiment_id,
+            # 'curr_trial': self.curr_trial,
+            # 'experiment_id': self.experiment_id,
             'num_trials': self.num_trials,
             'dataset_size': self.dataset_size,
             'uncertain_ratio': self.uncertain_ratio,
@@ -156,36 +157,69 @@ class ExperimentRunner:
         self.groupName = None
         self.csv_paths = []
 
-    def run_experiment(self, experiment: ExperimentSettings) -> list:
-        '''an experiement has N trials. generate data for each trial, run queries//benchmark results, and append to results'''    
-        # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
-        experiment_results = []
+    # def run_experiment(self, experiment: ExperimentSettings) -> list:
+    #     '''an experiement has N trials. generate data for each trial, run queries//benchmark results, and append to results'''    
+    #     # generate data for each trial. Insert ddl to file optinally. After inserting to DB, run tests
+    #     experiment_results = []
         
+    #     for trial in range(experiment.num_trials):
+    #         # create a trial seed dependent on the master seed, and specific trial number
+    #         experiment.curr_trial = trial+1
+    #         self.trial_seed = (self.master_seed + experiment.curr_trial) % (2**32)
+    #         np.random.seed(self.trial_seed)
+    #         experiment.experiment_id = self.__generate_name(experiment)
+            
+    #         # only gen new data on first trial. otherwise, we keep same data between trials
+    #         if trial == 0:
+    #             # get randomly generated data for curr seed
+    #             db_data_format, file_data_format = self.generate_data(experiment)
+
+
+    #         # DOES NOT WORK properly # save in ddl compatible format. Insert into DB regardless... need to run tests.
+    #         if experiment.save_ddl:
+    #             self.__save_ddl_file(experiment, file_data_format)
+            
+    #         self.__insert_data_db(experiment, db_data_format)
+
+    #         # run queries and benchmark
+    #         trial_results = self.run_queries(experiment)
+    #         experiment_results.append(trial_results)
+
+    #     aggregated_results = self.__calc_aggregate_results(experiment, experiment_results)
+    #     self.results.append(aggregated_results)
+
+    #     return experiment_results
+
+    def run_experiment(self, experiment: ExperimentSettings) -> list:
+        experiment_results = []
+
+        # Set seed once for the whole experiment
+        self.trial_seed = (self.master_seed + experiment.curr_trial) % (2**32)
+        np.random.seed(self.trial_seed)
+
+        # Set experiment_id BEFORE generating/inserting data
+        experiment.curr_trial = 1
+        experiment.experiment_id = self.__generate_name(experiment)
+
+        # Generate data once and insert under the fixed experiment_id
+        db_data_format, file_data_format = self.generate_data(experiment)
+        if experiment.save_ddl:
+            self.__save_ddl_file(experiment, file_data_format)
+        self.__insert_data_db(experiment, db_data_format)
+
         for trial in range(experiment.num_trials):
-            # create a trial seed dependent on the master seed, and specific trial number
-            experiment.curr_trial = trial+1
-            self.trial_seed = (self.master_seed + experiment.curr_trial) % (2**32)
-            np.random.seed(self.trial_seed)
-            experiment.experiment_id = self.__generate_name(experiment)
-            
-            # get randomly generated data for curr seed
-            db_data_format, file_data_format = self.generate_data(experiment)
+            experiment.curr_trial = trial + 1
+            # print(f' trial:{experiment.curr_trial}')
+            # experiment_id stays the same every trial — same table, same data
+            # experiment.experiment_id = self.__generate_name(experiment)
 
-            # DOES NOT WORK properly # save in ddl compatible format. Insert into DB regardless... need to run tests.
-            if experiment.save_ddl:
-                self.__save_ddl_file(experiment, file_data_format)
-            
-            self.__insert_data_db(experiment, db_data_format)
-
-            # run queries and benchmark
             trial_results = self.run_queries(experiment)
             experiment_results.append(trial_results)
 
         aggregated_results = self.__calc_aggregate_results(experiment, experiment_results)
         self.results.append(aggregated_results)
-
         return experiment_results
-        
+            
     def generate_data(self, experiment :ExperimentSettings):
         '''
             Generates pseudorandom data based on user specified experiment settings. 
@@ -204,6 +238,7 @@ class ExperimentRunner:
 
             mult_obj = self.__generate_mult(experiment)
             mult = str(mult_obj)
+            # row tuple looks like:     | val | mult |, val = set or individual range
             db_formatted_rows.append((val, mult))
             
             # save in ddl preffered format if requested
@@ -242,6 +277,8 @@ class ExperimentRunner:
                     # count 
                     cur.execute(f"SELECT COUNT(*) FROM {table};")
                     results['row_count'] = cur.fetchone()[0]
+                    
+                    # print(f" DEBUG SQL- running aggs on : {table}") 
                     
                     # aggreate metrics
                     results['sum_time'] = self.__run_aggregate(cur, table, 'SUM', config['combine_sum'], experiment.reduce_triggerSz_sizeLim[0], experiment.reduce_triggerSz_sizeLim[1])
@@ -351,7 +388,6 @@ class ExperimentRunner:
         # uncertain ratio. maybe should account for half nulls, half mult 0
         if np.random.random() < experiment.uncertain_ratio * 0.5:  
             return RangeType(0, 0, True)
-
         
         lb = np.random.randint(*experiment.interval_size_range)
         ub = np.random.randint(lb+1, experiment.interval_size_range[1]+1)
@@ -459,7 +495,7 @@ class ExperimentRunner:
         
         cur.execute(sql)
     
-        print(f"DEBUG SQL: {table}") 
+        # print(f"DEBUG SQL: {table}") 
         results = cur.fetchone()[0]
         plan_root = results[0]
         plan = plan_root["Plan"]
@@ -625,7 +661,8 @@ class ExperimentRunner:
         if generalName:
             return f"t_{dtype}_iv_{iv_abbrev}_{hashed}"
         
-        return f"t_{dtype}_iv_{iv_abbrev}_{hashed}_t{experiment.curr_trial}"
+        return f"t_{dtype}_iv_{iv_abbrev}_{hashed}"
+        # return f"t_{dtype}_iv_{iv_abbrev}_{hashed}_t{experiment.curr_trial}"
         
     def __save_ddl_file(self, experiment: ExperimentSettings, data):
         ''' write data to DDL file for later loading 
@@ -674,9 +711,9 @@ def generate_seed(in_seed=None):
     return seed
 
 def format_datasize(size):
-        if size >= 1_000_000: 
-            return str.replace(numerize.numerize(size, 2), '.', '_')
-        return numerize.numerize(size, 0)
+    if size >= 1_000_000: 
+        return str.replace(numerize.numerize(size, 2), '.', '_')
+    return numerize.numerize(size, 0)
 
 def format_name(experiment: ExperimentSettings):
     """ generate unique name for an experiment based on its parameters.
@@ -739,7 +776,7 @@ def run_all():
 
     ### Load Experiments
     experiments = _load_experiments(args, runner, db_config)
-
+    
     ### Run every experiment Suite and save results
     for suite in experiments.values():
         suite_results = []
@@ -747,7 +784,8 @@ def run_all():
             results = _run_experiment_group(runner, suite.name, group)
             print(f'    Group results saved in: {runner.resultFilepath}')  
             suite_results.append(results)
-        print(suite_results)
+        
+        print(f"\n    Suite results: {suite_results}")
 
         # plot aggregate results for suite
         _plot_experiment_suite(runner, suite_results)
@@ -782,9 +820,8 @@ def _run_experiment_group(runner: ExperimentRunner, suite_name: str, group: Expe
     
     runner.name = suite_name
     runner.groupName = group.name
-
     runner.set_file_path(suite_name, group.name, None)
-        
+
     # for every experiment within group, run it
     for experiment in group.experiments.values():
         runner.run_experiment(experiment)
@@ -818,5 +855,5 @@ if __name__ == '__main__':
     print(f"Tests took {end-start:.3f} s")
 
     # example cli runs (not recommended)
-        # python3 main.py --quick -dt r -nt 5 -sz 2 -ur .0 -ca        
-        # python3 main.py -xf tests_config.yaml -cb   
+    # python3 main.py --quick -dt r -nt 5 -sz 2 -ur .0 -ca        
+    # python3 main.py -xf tests_config.yaml -cb   

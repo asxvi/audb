@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 from enum import Enum
+from dataclasses import dataclass, field
 import itertools
 import numpy as np
 
@@ -304,3 +305,29 @@ class RangeSetType:
 class DataType(Enum):
     RANGE = RangeType
     SET = RangeSetType
+
+class DataDistribution(Enum):
+    UNIFORM     = 1
+    NORMAL      = 2
+    LOGNORMAL   = 3
+    ZIPFIAN     = 4
+    POISSON     = 5
+    CLUSTERED   = 6
+    
+@dataclass
+class DistributionConfig:
+    distribution: DataDistribution = DataDistribution.UNIFORM
+    
+    # normal
+    mean: float = None
+    std: float = None
+
+    # zipfian
+    zipf_a: float = 1.5
+
+    # poisson
+    lam:float = 5.0
+
+    # clustered
+    n_clusters: int = 5
+    cluster_spread = 0.1

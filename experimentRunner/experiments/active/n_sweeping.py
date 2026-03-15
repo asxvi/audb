@@ -33,13 +33,13 @@ def static_n_sweep(max_n: int = 100_000, step: int = 10_000, trigger_size: int =
         experiment = replace(
             template,
             dataset_size             = n,
-            num_trials               = 1,
+            num_trials               = 3,
             uncertain_ratio          = 0.0,
             independent_variable     = 'dataset_size',
             interval_size_range      = (1, 100_000),
-            start_interval_range     = (1, 5),
+            start_interval_range     = (1, 500),
             gap_size_range           = (2000, 2001),
-            interval_width_range     = (5, 6),
+            interval_width_range     = (1, 100),
             num_intervals            = 5,
             reduce_triggerSz_sizeLim = (trigger_size, reduce_to_size),
         )
@@ -57,7 +57,7 @@ def plot_all_n_sweep(n:int, step:int, suite_name:str = None):
     suite = experiments[suite_name]
     
     
-    # suite.add(static_n_sweep(n, step, 500, 10))
+    suite.add(static_n_sweep(n, step, 500, 10))
     suite.add(static_n_sweep(n, step, 150, 10))
     suite.add(static_n_sweep(n, step, 50, 10))
     suite.add(static_n_sweep(n, step, 15, 10))
