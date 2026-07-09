@@ -1,9 +1,23 @@
-# GPROM- AUDB Extension
+# GPROM- AUDB Postgres Extension
 
 ## Overview
-PostgreSQL extension for range-based uncertainty arithmetic and aggregates. Part of the [GPROM](https://github.com/IITDBGroup/gprom) project for provenance and uncertainty management.
+
+Extension extends PostgreSQL with range-based uncertainty arithmetic, logical operators, pruning operations, and uncertainty-aware aggregate functions. 
+
+The extension is part of the [GPROM](https://github.com/IITDBGroup/gprom) project for provenance and uncertainty management and is implemented as a native PostgreSQL C extension using the PGXS build system.
+
+## Project Structure
+
+This project intentionally follows the conventional layout used by many
+PostgreSQL extensions.
+
+PostgreSQL's PGXS build system is designed around a relatively flat directory
+layout, so the extension implementation, SQL definitions, control file, and
+build configuration are kept together. Functionality is organized across
+multiple C source files rather than nested source directories.
 
 ## Prerequisites
+
 - PostgreSQL 12+ (tested on 14, 15, 16)
 - Build tools: `gcc`, `make`, `pg_config`
 - Docker (optional, containerized development)
@@ -28,14 +42,13 @@ PostgreSQL extension for range-based uncertainty arithmetic and aggregates. Part
    docker exec -it audb_test bash
 ```
 
-4. Build and install inside the container:
+4. Build and install the extension.
 ```sh
-   cd [....]/audb/c_extension/i4r_audb_extension
    make clean
    make && make install
 ```
 
-5. Connect to the database:
+5. Connect to PostgreSQL and create the extension.
 ```sh
    psql -U postgres -d audb_test
 ```
@@ -43,7 +56,7 @@ PostgreSQL extension for range-based uncertainty arithmetic and aggregates. Part
    CREATE EXTENSION i4r_audb_extension;
 ```
 ### Option 2: Local Installation
-0. Ensure dependencies are installed and proper version is used.
+0. Ensure PostgreSQL development packages and build tools are installed.
 1. Clone the repository:
 ```sh
    git clone <repository_url>
@@ -52,7 +65,6 @@ PostgreSQL extension for range-based uncertainty arithmetic and aggregates. Part
 
 2. Build and install:
 ```sh
-   make clean
    make
    sudo make install
 ```
@@ -126,7 +138,6 @@ set_normalize, set_sort, set_reduce_size, lift, array_length, range_coverage, se
 * prune_set_lt, prune_set_lte, prune_set_gt, prune_set_gte, prune_set_and, prune_set_or, prune_set_eq
 
 
-TODO add function declarations
 <!-- 
 - `range_add(int4range, int4range) → int4range`
 - `range_subtract(int4range, int4range) → int4range`

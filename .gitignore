@@ -1,11 +1,14 @@
 .DS_Store
-.vscode
-.misc
+.vscode/
+.misc/
+*.bc
 
 # Test suite files to ignore
 database.ini
 experimentRunner/data/
-c_extension/experimentRunner/data/
+
+
+
 
 # https://github.com/github/gitignore/blob/main/C.gitignore
 
