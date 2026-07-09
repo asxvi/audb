@@ -1,3 +1,14 @@
+-- /*-------------------------------------------------------------------------
+--  * i4r_audb_extension_test--1.1.sql
+--  *
+--  * Regression test suite for sanity checks.
+--  * 
+--  * i4r_audb_extension/i4r_audb_extension_test--1.1.sql
+--  *
+--  *-------------------------------------------------------------------------
+--  */
+
+
 drop extension i4r_audb_extension;
 create extension i4r_audb_extension;
 

@@ -1,4 +1,4 @@
-comment = 'AUDB extension for PGTYPE Int4Range'
+comment = 'AUDB: Provenance extension for uncertain intervals'
 default_version = '1.1'
 module_pathname = '$libdir/i4r_audb_extension'
 relocatable = true

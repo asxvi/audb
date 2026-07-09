@@ -8,7 +8,7 @@
  * data types. Extension of Original GPRoM system https://github.com/IITDBGroup/gprom
  *
  * 
- * src/audb_extension.c
+ * i4r_audb_extension/audb_extension.c
  *
  *-------------------------------------------------------------------------
  */
