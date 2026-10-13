@@ -1,61 +1,40 @@
-.DS_Store
-.vscode/
+# Local working files
+ignore/
 .misc/
-*.bc
-
-# Test suite files to ignore
 database.ini
+
+# local clutter
+c_extension/plpgsql_implementation/
+c_extension/i4r_audb_extension/testing.c
+c_extension/i4r_audb_extension/pruning_tests.sql
+experimentRunner/notebooks/
 experimentRunner/data/
 
+# OS and editor
+.DS_Store
+.vscode/
 
-
-
-# https://github.com/github/gitignore/blob/main/C.gitignore
-
-# Prerequisites
-*.d
-
-# Object files
+# C and PGXS build output
 *.o
-*.ko
-*.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Shared objects (inc. Windows DLLs)
-*.dll
 *.so
 *.so.*
 *.dylib
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
 *.a
-*.la
-*.lo
+*.bc
+*.d
 
+# PGXS regression output
+results/
+regression.diffs
+regression.out
+tmp_check/
 
-# python stuff
-# Environments
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
 .env
 .envrc
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.ipynb_checkpoints
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[codz]
-*$py.class
+.ipynb_checkpoints/
