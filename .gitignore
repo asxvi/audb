@@ -3,10 +3,14 @@ ignore/
 .misc/
 database.ini
 
-# local clutter
+# extension
 c_extension/plpgsql_implementation/
 c_extension/i4r_audb_extension/testing.c
 c_extension/i4r_audb_extension/pruning_tests.sql
+
+# experiment
+experimentRunner/experiments/archive
+experimentRunner/graphics
 experimentRunner/notebooks/
 experimentRunner/data/
 
